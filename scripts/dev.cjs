@@ -1,0 +1,10 @@
+const {spawn, spawnSync} = require('child_process');
+const path = require('path');
+process.chdir(path.resolve(__dirname,'..'));
+const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const run = (args,cwd) => spawn(npm,args,{cwd,stdio:'inherit',shell:process.platform === 'win32'});
+const build=spawnSync(npm,['run','build'],{stdio:'inherit',shell:process.platform==='win32'});
+if(build.status) process.exit(build.status || 1);
+const children=[run(['run','build','--','--watch'],'client'),run(['run','build','--','--watch'],'storefront'),run(['run','dev'],'server')];
+for(const event of ['SIGINT','SIGTERM']) process.on(event,()=>{children.forEach(p=>p.kill());process.exit();});
+children.forEach(p=>p.on('exit',code=>{if(code){children.forEach(other=>other.kill());process.exit(code);}}));
