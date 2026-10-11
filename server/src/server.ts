@@ -22,6 +22,8 @@ import { webpNegotiation } from './utils/webpImages';
 import authRoutes from './modules/auth/authRoutes';
 import orderRoutes from './modules/orders/orderRoutes';
 import courierRoutes from './modules/couriers/courierRoutes';
+import orderProtectionRoutes from './modules/orders/orderProtectionRoutes';
+import incompleteOrderRoutes from './modules/orders/incompleteOrderRoutes';
 import wooRoutes from './modules/woocommerce/wooRoutes';
 import inventoryRoutes from './modules/inventory/inventoryRoutes';
 import purchaseRoutes from './modules/purchases/purchaseRoutes';
@@ -178,6 +180,8 @@ app.get('/api/ready', async (_req, res) => {
 app.use('/api/email', emailRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/order-protection', orderProtectionRoutes);
+app.use('/api/incomplete-orders', incompleteOrderRoutes);
 app.use('/api/couriers', courierRoutes);
 app.use('/api/woocommerce', wooRoutes);
 app.use('/api/inventory', inventoryRoutes);

@@ -38,7 +38,12 @@ export async function dispatchOrderToCourier(options: SendToCourierOptions) {
   if (!order) {
     throw new Error('Order not found');
   }
-  if (order.trashedAt || ['CANCELLED', 'RETURNED', 'DELIVERED'].includes(order.status)) throw new Error('Closed or trashed orders cannot be dispatched');
+  if (order.trashedAt || ['CANCELLED', 'RETURNED', 'DELIVERED', 'HOLD'].includes(order.status) || order.riskReviewStatus === 'REVIEW_REQUIRED') throw new Error('Closed, held or unreviewed orders cannot be dispatched');
+
+  if (courierName !== 'MANUAL') {
+    const saved = await prisma.orderCourierLocation.findUnique({ where: { orderId_provider: { orderId, provider: courierName } } });
+    if (saved) options = { ...options, cityId: options.cityId ?? (saved.districtExternalId ? Number(saved.districtExternalId) : undefined), zoneId: options.zoneId ?? (saved.thanaExternalId ? Number(saved.thanaExternalId) : undefined), areaId: options.areaId ?? (saved.areaExternalId ? Number(saved.areaExternalId) : undefined), areaName: options.areaName ?? saved.areaName ?? undefined };
+  }
 
   const locationProvider = courierName;
   const location = async (level: 'DISTRICT' | 'THANA' | 'AREA', externalId?: number) => externalId && locationProvider !== 'MANUAL' ?
@@ -279,12 +284,14 @@ export async function dispatchBulkToPathao(orderIds: string[]) {
 
   for (const orderId of ids) {
     const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true, customer: true } });
-    if (!order || order.trashedAt || ['CANCELLED', 'RETURNED', 'DELIVERED'].includes(order.status)) {
+    if (!order || order.trashedAt || ['CANCELLED', 'RETURNED', 'DELIVERED', 'HOLD'].includes(order.status) || order.riskReviewStatus === 'REVIEW_REQUIRED') {
       errors.push({ orderId, error: 'Order not found or closed' }); continue;
     }
     if (order.customerName.trim().length < 3 || !/^01[3-9]\d{8}$/.test(order.customerPhone) || order.customerAddress.trim().length < 10) {
       errors.push({ orderId, error: 'Pathao needs a recipient name, valid Bangladesh phone and full address' }); continue;
     }
+    const saved = await prisma.orderCourierLocation.findUnique({ where: { orderId_provider: { orderId, provider: 'PATHAO' } } });
+    if (!saved?.districtExternalId || !saved.thanaExternalId) { errors.push({ orderId, error: 'Select Pathao city and zone on the order first' }); continue; }
     const claim = await prisma.order.updateMany({
       where: { id: orderId, courierName: null, courierConsignmentId: null },
       data: { courierName: 'PATHAO', courierStatus: 'BOOKING_REQUESTED', courierStoreId: config.storeId },
@@ -295,7 +302,7 @@ export async function dispatchBulkToPathao(orderIds: string[]) {
       store_id: Number(config.storeId), merchant_order_id: order.orderNumber,
       recipient_name: order.customerName, recipient_phone: order.customerPhone,
       ...(order.customer?.alternativePhone && /^01[3-9]\d{8}$/.test(order.customer.alternativePhone) ? { recipient_secondary_phone: order.customer.alternativePhone } : {}),
-      recipient_address: order.customerAddress, delivery_type: 48, item_type: 2,
+      recipient_address: order.customerAddress, recipient_city: Number(saved.districtExternalId), recipient_zone: Number(saved.thanaExternalId), ...(saved.areaExternalId ? { recipient_area: Number(saved.areaExternalId) } : {}), delivery_type: 48, item_type: 2,
       item_quantity: order.items.reduce((sum, item) => sum + item.quantity, 0) || 1,
       item_weight: 0.5, amount_to_collect: Math.max(0, Math.round(order.grandTotal - order.advancePaid)),
       item_description: order.items.map((item) => item.productName).join(', ').slice(0, 180),
@@ -330,7 +337,7 @@ export async function dispatchBulkToSteadfast(orderIds: string[], userId?: strin
 
   for (const orderId of ids) {
     const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true, customer: true } });
-    if (!order || order.trashedAt || ['CANCELLED', 'RETURNED', 'DELIVERED'].includes(order.status)) {
+    if (!order || order.trashedAt || ['CANCELLED', 'RETURNED', 'DELIVERED', 'HOLD'].includes(order.status) || order.riskReviewStatus === 'REVIEW_REQUIRED') {
       errors.push({ orderId, error: 'Order not found or closed' }); continue;
     }
     const codAmount = Math.max(0, order.grandTotal - order.advancePaid);

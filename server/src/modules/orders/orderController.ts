@@ -5,6 +5,8 @@ import { logAudit } from '../audit/auditService';
 import { notifyOrderStatus, sendOrderNotification } from '../messaging/messageService';
 import { revealSecret } from '../../utils/security';
 import { getNextOrderNumber } from './orderNumberService';
+import { evaluateOrderRisk, recordRiskDecision } from './orderProtection';
+import { saveOrderCourierSuggestions } from '../couriers/orderLocationService';
 
 export const listOrders = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -330,6 +332,7 @@ export const updateOrder = async (req: AuthRequest, res: Response): Promise<void
     const changed = await prisma.order.updateMany({ where: { id, courierName: null, trashedAt: null, status: { in: ['PENDING', 'CONFIRMED', 'PACKAGING', 'HOLD'] } }, data });
     if (!changed.count) { res.status(409).json({ success: false, message: 'Order changed during editing; reload before saving' }); return; }
     const updated = await prisma.order.findUniqueOrThrow({ where: { id } });
+    if (['customerAddress', 'district', 'city', 'zone', 'area'].some(field => data[field] !== undefined)) await saveOrderCourierSuggestions(updated.id, updated);
     await logAudit({
       userId: req.user?.id, userName: req.user?.name, action: 'UPDATE', entity: 'ORDER', entityId: id,
       details: { orderNumber: order.orderNumber, editedFields: Object.keys(data) }, ipAddress: req.ip,
@@ -559,27 +562,15 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
       if (available < quantity) { res.status(409).json({ success: false, message: `Only ${available} item(s) left for ${product.name}` }); return; }
     }
 
+    const overrideReason = typeof req.body.overrideReason === 'string' ? req.body.overrideReason.trim() : '';
+    const riskInput = { phone: customerPhone, address: customerAddress || '', items: items.map((item: any) => ({ productId: item.productId, variantId: item.variantId, quantity: Number(item.quantity || 1) })), source: 'STAFF' as const, override: req.user?.role === 'SUPER_ADMIN' && overrideReason.length >= 3 };
+    const risk = await prisma.$transaction(tx => evaluateOrderRisk(tx, riskInput));
+    if (risk.decision === 'BLOCK') { await prisma.$transaction(tx => recordRiskDecision(tx, riskInput, risk)); res.status(409).json({ success: false, message: 'Order blocked by protection rules. Super Admin can override with a reason.', reasons: risk.reasons }); return; }
     let customer = await prisma.customer.findUnique({
       where: { phone: customerPhone },
     });
 
-    let isFraudSuspect = false;
-    let isDuplicate = false;
-
-    if (customer) {
-      if (customer.isBlacklisted || customer.riskScore > 60 || customer.returnedOrders > 2) {
-        isFraudSuspect = true;
-      }
-      const recentOrders = await prisma.order.findMany({
-        where: {
-          customerPhone,
-          createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
-        },
-      });
-      if (recentOrders.length > 0) {
-        isDuplicate = true;
-      }
-    } else {
+    if (!customer) {
       customer = await prisma.customer.create({
         data: {
           name: customerName,
@@ -668,7 +659,7 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
         city,
         zone,
         area,
-        status: 'PENDING',
+        status: risk.decision === 'HOLD' ? 'HOLD' : 'PENDING',
         paymentMethod,
         paymentStatus: advancePaid >= grandTotal ? 'PAID' : advancePaid > 0 ? 'PARTIAL' : 'PENDING',
         subtotal,
@@ -682,8 +673,12 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
         assignedToId,
         internalNote,
         customerNote,
-        isFraudSuspect,
-        isDuplicate,
+        sourceChannel: 'STAFF',
+        orderFingerprint: risk.fingerprint,
+        riskReasons: risk.reasons,
+        riskReviewStatus: risk.decision === 'HOLD' ? 'REVIEW_REQUIRED' : 'CLEAR',
+        isFraudSuspect: risk.reasons.length > 0,
+        isDuplicate: risk.reasons.includes('EXACT_DUPLICATE'),
         items: {
           create: orderItemsData,
         },
@@ -692,6 +687,8 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
         items: true,
       },
     });
+    await saveOrderCourierSuggestions(newOrder.id, newOrder);
+    await prisma.$transaction(tx => recordRiskDecision(tx, riskInput, risk, newOrder.id));
 
     await prisma.customer.update({
       where: { id: customer.id },
@@ -748,6 +745,7 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
 
     const allowedStatuses = new Set(['PENDING', 'CONFIRMED', 'PACKAGING', 'HANDED_OVER', 'IN_TRANSIT', 'DELIVERED', 'PARTIAL_DELIVERED', 'CANCELLED', 'RETURNED', 'HOLD', 'FAKE_TRASH']);
     if (!allowedStatuses.has(status)) { res.status(400).json({ success: false, message: 'Invalid order status' }); return; }
+    if (currentOrder.riskReviewStatus === 'REVIEW_REQUIRED' && !['HOLD', 'CANCELLED'].includes(status)) { res.status(409).json({ success: false, message: 'Approve fraud review before progressing this order' }); return; }
     if (currentOrder.status === status) { res.json({ success: true, message: 'Order status is unchanged', order: currentOrder }); return; }
     if (['CANCELLED', 'RETURNED'].includes(currentOrder.status)) {
       res.status(409).json({ success: false, message: 'A cancelled or returned order cannot be reopened because its stock has already been restored' });
@@ -759,7 +757,7 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
       return;
     }
     const prevStatus = currentOrder.status;
-    const updateData: any = { status };
+    const updateData: any = { status, ...(status === 'CANCELLED' && currentOrder.riskReviewStatus === 'REVIEW_REQUIRED' ? { riskReviewStatus: 'REJECTED' } : {}) };
 
     if (status === 'DELIVERED') {
       updateData.deliveredAt = new Date();
@@ -841,13 +839,14 @@ export const bulkUpdateStatus = async (req: AuthRequest, res: Response): Promise
 
     const selectedOrders = await prisma.order.findMany({
       where: { id: { in: orderIds }, trashedAt: null },
-      select: { id: true, wooOrderId: true, status: true },
+      select: { id: true, wooOrderId: true, status: true, riskReviewStatus: true },
     });
 
     if (selectedOrders.length !== new Set(orderIds).size || selectedOrders.some((order) => ['DELIVERED', 'PARTIAL_DELIVERED', 'CANCELLED', 'RETURNED', 'FAKE_TRASH'].includes(order.status))) {
       res.status(409).json({ success: false, message: 'Select existing active orders only. Completed, cancelled, returned or trashed orders require individual review.' });
       return;
     }
+    if (selectedOrders.some(order => order.riskReviewStatus === 'REVIEW_REQUIRED') && status !== 'HOLD') { res.status(409).json({ success: false, message: 'Approve fraud review before progressing held orders' }); return; }
     const result = await prisma.$transaction(async (tx) => {
       let count = 0;
       for (const order of selectedOrders) {

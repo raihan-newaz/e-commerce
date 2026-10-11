@@ -41,6 +41,10 @@ export interface Order {
   city?: string;
   zone?: string;
   area?: string;
+  sourceChannel?: string | null;
+  sourceIp?: string | null;
+  riskReasons?: string[] | null;
+  riskReviewStatus?: string;
   status: 'PENDING' | 'CONFIRMED' | 'PACKAGING' | 'HANDED_OVER' | 'IN_TRANSIT' | 'DELIVERED' | 'PARTIAL_DELIVERED' | 'CANCELLED' | 'RETURNED' | 'HOLD' | 'FAKE_TRASH';
   priority: 'NORMAL' | 'URGENT';
   paymentMethod: string;

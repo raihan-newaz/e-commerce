@@ -12,11 +12,16 @@ export function mountWebApps(app: Express) {
     if (path.extname(req.path) || req.path.startsWith('/assets/')) { res.status(404).end(); return; }
     next();
   };
-  const shell = (dir: string) => (req: express.Request, res: express.Response) => {
+  const shell = (dir: string, isStore = false) => (req: express.Request, res: express.Response) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') { res.status(405).end(); return; }
     if (!fs.existsSync(path.join(dir, 'index.html'))) { res.status(503).type('text').send('Build the application before starting the server.'); return; }
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('X-LiteSpeed-Cache-Control', 'no-cache');
+    if (isStore) {
+      res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+      res.setHeader('X-LiteSpeed-Cache-Control', 'public, max-age=120');
+    } else {
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('X-LiteSpeed-Cache-Control', 'no-cache');
+    }
     res.sendFile(path.join(dir, 'index.html'));
   };
   const staticOptions = { index: false as const, maxAge: 0, setHeaders: (res: express.Response, file: string) => {
@@ -26,5 +31,5 @@ export function mountWebApps(app: Express) {
   // Published HTML and builder iframe documents share these read-only font assets.
   for (const name of ['eicons', 'font-awesome']) app.use('/'+name, express.static(path.join(admin,name)), (_req,res) => {res.status(404).end();});
   app.use(webpNegotiation(store), express.static(store, staticOptions));
-  app.get('*', assetMiss, shell(store));
+  app.get('*', assetMiss, shell(store, true));
 }

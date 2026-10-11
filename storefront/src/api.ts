@@ -131,6 +131,18 @@ export const getLandingDesign = async (slug: string): Promise<LandingDesign | nu
   }
 };
 const checkoutKeys = new Map<string,string>();
+export const getIncompleteToken = (source: string) => {
+  const key = `nix-incomplete:${source}`;
+  try {
+    const existing = sessionStorage.getItem(key);
+    if (existing && /^[a-f\d-]{36}$/i.test(existing)) return existing;
+    const token = crypto.randomUUID();
+    sessionStorage.setItem(key, token);
+    return token;
+  } catch { return crypto.randomUUID(); }
+};
+export const clearIncompleteToken = (source: string) => { try { sessionStorage.removeItem(`nix-incomplete:${source}`); } catch {} };
+export const saveIncompleteCheckout = (payload: unknown) => request<{ success: boolean; id: string }>('/api/incomplete-orders/public', { method: 'POST', body: JSON.stringify(payload) });
 export async function placeOrder(payload: any, _key?: string) {
   const {idempotencyKey: _old, _eventId, _fbc, _fbp, _trackingConsent, ...stable} = payload;
   const data = new TextEncoder().encode(JSON.stringify(stable));

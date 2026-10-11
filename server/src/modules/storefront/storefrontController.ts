@@ -14,6 +14,7 @@ import { calculateLandingDiscount } from './landingCouponController';
 import { generateEventId } from './metaConversionsApi';
 import { revealSecret } from '../../utils/security';
 import { productSlug } from '../inventory/productValidation';
+import { getCache, setCache } from '../../redis';
 export { productSlug } from '../inventory/productValidation';
 
 const checkoutSchema = z.object({
@@ -136,6 +137,16 @@ export const listStorefrontProducts = async (req: Request, res: Response): Promi
     const category = String(req.query.category || '').trim();
     const sort = String(req.query.sort || '').trim();
     const take = Math.min(Math.max(parseInt(String(req.query.limit), 10) || 24, 1), 60);
+
+    const cacheKey = `storefront:products:${search}:${category}:${sort}:${take}`;
+    const cached = await getCache<any>(cacheKey);
+    if (cached) {
+      res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=180');
+      res.set('X-LiteSpeed-Cache-Control', 'public, max-age=120');
+      res.json(cached);
+      return;
+    }
+
     const products = await prisma.product.findMany({
       where: {
         status: 'ACTIVE',
@@ -146,7 +157,8 @@ export const listStorefrontProducts = async (req: Request, res: Response): Promi
       orderBy: { createdAt: 'desc' },
       take,
     });
-    res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=120');
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=180');
+    res.set('X-LiteSpeed-Cache-Control', 'public, max-age=120');
     const sales = sort === 'best-selling'
       ? await prisma.orderItem.groupBy({ by: ['productId'], where: { productId: { not: null } }, _sum: { quantity: true } })
       : [];
@@ -155,7 +167,9 @@ export const listStorefrontProducts = async (req: Request, res: Response): Promi
       ? [...products].sort((a, b) => (salesByProduct.get(b.id) || 0) - (salesByProduct.get(a.id) || 0))
       : products;
     const currentColors = await attributeColorsFor(sorted);
-    res.json({ success: true, products: sorted.map(product => publicProduct(product, currentColors)) });
+    const result = { success: true, products: sorted.map(product => publicProduct(product, currentColors)) };
+    await setCache(cacheKey, result, 120);
+    res.json(result);
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -165,6 +179,15 @@ export const getStorefrontProduct = async (req: Request, res: Response): Promise
   try {
     const rawKey = String(req.params.id || '').trim();
     const key = rawKey;
+    const cacheKey = `storefront:product:${key}`;
+    const cached = await getCache<any>(cacheKey);
+    if (cached) {
+      res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=180');
+      res.set('X-LiteSpeed-Cache-Control', 'public, max-age=120');
+      res.json(cached);
+      return;
+    }
+
     let product = await prisma.product.findFirst({
       where: {
         OR: [
@@ -190,7 +213,8 @@ export const getStorefrontProduct = async (req: Request, res: Response): Promise
       });
     }
     if (!product) { res.status(404).json({ success: false, message: 'Product not found' }); return; }
-    res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=120');
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=180');
+    res.set('X-LiteSpeed-Cache-Control', 'public, max-age=120');
     const categoryTrail: Array<{ name: string; slug: string }> = [];
     const matchedCategory = await prisma.category.findUnique({ where: { name: product.category || 'Fashion' }, select: { id: true, name: true, slug: true, parentId: true } });
     let category: { id: string; name: string; slug: string; parentId: string | null } | null = matchedCategory;
@@ -204,7 +228,9 @@ export const getStorefrontProduct = async (req: Request, res: Response): Promise
       category = parent;
     }
     const currentColors = await attributeColorsFor([product]);
-    res.json({ success: true, product: { ...publicProduct(product, currentColors), categoryTrail } });
+    const result = { success: true, product: { ...publicProduct(product, currentColors), categoryTrail } };
+    await setCache(cacheKey, result, 120);
+    res.json(result);
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }

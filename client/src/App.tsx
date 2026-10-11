@@ -12,6 +12,8 @@ const EmailSettingsPage = lazy(() => import('./pages/EmailSettingsPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then((module) => ({ default: module.DashboardPage })));
 const OrdersPage = lazy(() => import('./pages/OrdersPage').then((module) => ({ default: module.OrdersPage })));
 const OrderDetailsPage = lazy(() => import('./pages/OrderDetailsPage').then((module) => ({ default: module.OrderDetailsPage })));
+const IncompleteOrdersPage = lazy(() => import('./pages/IncompleteOrdersPage'));
+const OrderProtectionPage = lazy(() => import('./pages/OrderProtectionPage'));
 const CourierHubPage = lazy(() => import('./pages/CourierHubPage').then((module) => ({ default: module.CourierHubPage })));
 const InventoryPage = lazy(() => import('./pages/InventoryPage').then((module) => ({ default: module.InventoryPage })));
 const ProductsPage = lazy(() => import('./pages/ProductsPage').then((module) => ({ default: module.ProductsPage })));
@@ -94,6 +96,7 @@ export const App: React.FC = () => {
               <Route index element={<DashboardPage />} />
               <Route path="orders" element={<OrdersPage />} />
               <Route path="orders/:id" element={<OrderDetailsPage />} />
+              <Route path="incomplete-orders" element={<IncompleteOrdersPage />} />
               <Route path="courier-hub" element={<CourierHubPage />} />
               <Route path="inventory" element={<InventoryPage />} />
               <Route path="products" element={<ProductsPage />} />
@@ -121,6 +124,7 @@ export const App: React.FC = () => {
               <Route path="theme-customizer" element={<ThemeCustomizerPage />} />
               <Route path="settings" element={<Navigate to="/settings/woocommerce" replace />} />
               <Route path="settings/email" element={<EmailSettingsPage />} />
+              <Route path="settings/order-protection" element={<OrderProtectionPage />} />
               <Route path="settings/:section" element={<SettingsPage />} />
             </Route>
 

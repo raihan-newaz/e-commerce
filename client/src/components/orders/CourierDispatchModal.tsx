@@ -12,6 +12,7 @@ interface CourierDispatchModalProps {
 }
 
 type Location = { id: string; externalId: string; name: string; normalizedName: string; parentExternalId?: string; districtName?: string; active: boolean };
+type SavedLocation = { provider: string; districtExternalId?: string | null; thanaExternalId?: string | null; areaExternalId?: string | null; areaName?: string | null };
 const normalize = (value: string) => value.toLowerCase().normalize('NFKC').replace(/\b(district|zila|zilla)\b/g, ' ').replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ');
 const autoMatch = (items: Location[], hints: string[], address: string): Location | undefined => {
   for (const hint of hints) {
@@ -56,8 +57,11 @@ export const CourierDispatchModal: React.FC<CourierDispatchModalProps> = ({
   const [redxAreaQuery, setRedxAreaQuery] = useState(order?.area || '');
   const [redxStores, setRedxStores] = useState<Array<{ id: number; name: string; area_id: number }>>([]);
   const [redxStoreId, setRedxStoreId] = useState('');
+  const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
   const manuallySelected = useRef({ district: false, thana: false, area: false });
   const locationProvider = courier;
+  const saved = savedLocations.find(item => item.provider === courier);
+  useEffect(() => { if (order?.id) api.get(`/order-protection/orders/${order.id}/locations`).then(({ data }) => setSavedLocations(data.locations || [])).catch(() => {}); }, [order?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -82,15 +86,15 @@ export const CourierDispatchModal: React.FC<CourierDispatchModalProps> = ({
     if (courier !== 'REDX' || !order || !redxAreas.length || manuallySelected.current.area || redxAreaId) return;
     const district = normalize(order.district || order.city || '');
     const candidates = district ? redxAreas.filter(item => !item.districtName || normalize(item.districtName) === district) : redxAreas;
-    const match = autoMatch(candidates, [order.area || ''], order.customerAddress);
+    const match = candidates.find(item => item.externalId === saved?.areaExternalId) || autoMatch(candidates, [order.area || ''], order.customerAddress);
     if (match) setRedxAreaId(match.externalId);
-  }, [courier, order, redxAreas, redxAreaId]);
+  }, [courier, order, redxAreas, redxAreaId, saved?.areaExternalId]);
 
   useEffect(() => {
     if (!order || !cities.length || manuallySelected.current.district || selectedCity) return;
-    const match = autoMatch(cities, [order.district || '', order.city || ''], order.customerAddress);
+    const match = cities.find(item => item.externalId === saved?.districtExternalId) || autoMatch(cities, [order.district || '', order.city || ''], order.customerAddress);
     if (match) setSelectedCity(match.externalId);
-  }, [cities, order, selectedCity]);
+  }, [cities, order, selectedCity, saved?.districtExternalId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -102,9 +106,9 @@ export const CourierDispatchModal: React.FC<CourierDispatchModalProps> = ({
 
   useEffect(() => {
     if (!order || !zones.length || manuallySelected.current.thana || selectedZone) return;
-    const match = autoMatch(zones, [order.zone || '', order.city || ''], order.customerAddress);
+    const match = zones.find(item => item.externalId === saved?.thanaExternalId) || autoMatch(zones, [order.zone || '', order.city || ''], order.customerAddress);
     if (match) setSelectedZone(match.externalId);
-  }, [zones, order, selectedZone]);
+  }, [zones, order, selectedZone, saved?.thanaExternalId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -116,9 +120,10 @@ export const CourierDispatchModal: React.FC<CourierDispatchModalProps> = ({
 
   useEffect(() => {
     if (!order || !areas.length || manuallySelected.current.area || selectedArea) return;
-    const match = autoMatch(areas, [order.area || ''], order.customerAddress);
+    const match = areas.find(item => item.externalId === saved?.areaExternalId) || autoMatch(areas, [order.area || ''], order.customerAddress);
     if (match) setSelectedArea(match.externalId);
-  }, [areas, order, selectedArea]);
+  }, [areas, order, selectedArea, saved?.areaExternalId]);
+  useEffect(() => { if (courier === 'STEADFAST' && saved?.areaName) setManualArea(saved.areaName); }, [courier, saved?.areaName]);
 
   useEffect(() => { setPriceQuote(null); }, [courier, selectedCity, selectedZone, selectedStore, redxAreaId, redxStoreId, deliveryType, itemType, weight]);
 

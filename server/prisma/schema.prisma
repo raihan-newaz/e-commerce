@@ -484,6 +484,11 @@ model Order {
   city            String?
   zone            String?
   area            String?
+  sourceChannel   String? @db.VarChar(32)
+  sourceIp        String? @db.VarChar(45)
+  orderFingerprint String? @db.VarChar(64)
+  riskReasons     Json?
+  riskReviewStatus String @default("CLEAR") @db.VarChar(20)
   status          String  @default("PENDING") // PENDING, CONFIRMED, PACKAGING, HANDED_OVER, IN_TRANSIT, DELIVERED, PARTIAL_DELIVERED, CANCELLED, RETURNED, HOLD, FAKE_TRASH
   priority        String  @default("NORMAL") // NORMAL, URGENT
   paymentMethod   String  @default("COD") // COD, BKASH, NAGAD, BANK, PREPAID
@@ -536,14 +541,121 @@ model Order {
   paymentAttempts PaymentAttempt[]
   courierEvents CourierWebhookEvent[]
   courierRequests CourierRequest[]
+  courierLocations OrderCourierLocation[]
+  incompleteCheckout IncompleteCheckout?
 
   @@index([status, createdAt])
   @@index([trashedAt, createdAt])
   @@index([customerPhone, createdAt])
+  @@index([sourceIp, createdAt])
+  @@index([orderFingerprint, createdAt])
   @@index([courierName, status])
   @@index([customerId, createdAt])
   @@index([status, deliveredAt])
   @@index([status, returnedAt])
+}
+
+model OrderCourierLocation {
+  id                 String   @id @default(uuid())
+  orderId            String
+  provider           String   @db.VarChar(20)
+  districtExternalId String?  @db.VarChar(80)
+  thanaExternalId    String?  @db.VarChar(80)
+  areaExternalId     String?  @db.VarChar(80)
+  areaName           String?  @db.VarChar(100)
+  source             String   @default("UNRESOLVED") @db.VarChar(20)
+  updatedById        String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  order              Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, provider])
+}
+
+model CourierLocationAlias {
+  id              String   @id @default(uuid())
+  provider        String   @db.VarChar(20)
+  level           String   @db.VarChar(20)
+  locationId      String
+  alias           String   @db.VarChar(100)
+  normalizedAlias String   @db.VarChar(100)
+  createdAt       DateTime @default(now())
+
+  @@unique([provider, level, locationId, normalizedAlias])
+  @@index([provider, level, normalizedAlias])
+}
+
+model OrderProtectionSettings {
+  id                    String   @id @default("default")
+  duplicateWindowMinutes Int     @default(15)
+  phoneHourlyLimit      Int      @default(3)
+  phoneDailyLimit       Int      @default(6)
+  ipHourlyLimit         Int      @default(10)
+  autoBlockRejectCount  Int      @default(5)
+  autoBlockWindowMinutes Int     @default(15)
+  autoBlockMinutes      Int      @default(60)
+  sharedIpPhoneThreshold Int     @default(3)
+  sharedAddressPhoneThreshold Int @default(3)
+  updatedAt             DateTime @updatedAt
+}
+
+model IpBlock {
+  id         String   @id @default(uuid())
+  ipAddress  String   @unique @db.VarChar(45)
+  reason     String   @db.VarChar(500)
+  kind       String   @default("MANUAL") @db.VarChar(20)
+  expiresAt  DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model OrderRiskEvent {
+  id         String   @id @default(uuid())
+  orderId    String?
+  source     String   @db.VarChar(32)
+  decision   String   @db.VarChar(20)
+  phone      String?  @db.VarChar(20)
+  ipAddress  String?  @db.VarChar(45)
+  reasons    Json
+  createdAt  DateTime @default(now())
+
+  @@index([ipAddress, decision, createdAt])
+  @@index([phone, createdAt])
+  @@index([orderId, createdAt])
+}
+
+model OrderRateLock {
+  key       String   @id @db.VarChar(100)
+  updatedAt DateTime @updatedAt
+}
+
+model IncompleteCheckout {
+  id            String   @id @default(uuid())
+  tokenHash     String   @unique @db.VarChar(64)
+  source        String   @db.VarChar(32)
+  pageSlug      String?  @db.VarChar(120)
+  customerName  String   @db.VarChar(100)
+  customerPhone String   @db.VarChar(20)
+  address       String   @db.VarChar(300)
+  district      String?  @db.VarChar(80)
+  city          String?  @db.VarChar(80)
+  email         String?  @db.VarChar(160)
+  items         Json
+  deliveryArea  String?  @db.VarChar(30)
+  paymentMethod String   @default("COD") @db.VarChar(20)
+  couponCode    String?  @db.VarChar(40)
+  ipAddress     String?  @db.VarChar(45)
+  status        String   @default("OPEN") @db.VarChar(20)
+  staffNote     String?  @db.Text
+  orderId       String?  @unique
+  lastActivityAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  order         Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([status, lastActivityAt])
+  @@index([customerPhone, lastActivityAt])
 }
 
 model PaymentAttempt {

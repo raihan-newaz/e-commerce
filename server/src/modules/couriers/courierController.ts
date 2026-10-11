@@ -73,26 +73,11 @@ export const dispatchBulkOrders = async (req: AuthRequest, res: Response): Promi
 
     const results = [];
     const errors = [];
-    const redxAreas = courierName === 'REDX' ? await prisma.courierLocation.findMany({ where: { provider: 'REDX', level: 'AREA', active: true }, select: { externalId: true, normalizedName: true, districtName: true } }) : [];
-
     for (const orderId of orderIds) {
       try {
-        let areaId: number | undefined;
-        if (courierName === 'REDX') {
-          const order = await prisma.order.findUnique({ where: { id: orderId }, select: { area: true, district: true, city: true, customerAddress: true } });
-          if (!order) throw new Error('Order not found');
-          const district = normalizeLocation(order.district || order.city || '');
-          const candidates = redxAreas.filter(area => !district || !area.districtName || normalizeLocation(area.districtName) === district);
-          const explicit = normalizeLocation(order.area || '');
-          const address = ` ${normalizeLocation(order.customerAddress)} `;
-          const matches = candidates.filter(area => (explicit && area.normalizedName === explicit) || (area.normalizedName.length >= 4 && address.includes(` ${area.normalizedName} `)));
-          if (matches.length !== 1) throw new Error('RedX area is ambiguous or missing. Open the order and select its exact area.');
-          areaId = Number(matches[0].externalId);
-        }
         const updated = await dispatchOrderToCourier({
           orderId,
           courierName,
-          areaId,
           userId: req.user?.id,
           userName: req.user?.name,
         });

@@ -4,6 +4,8 @@ import prisma from '../../prisma';
 import { logAudit } from '../audit/auditService';
 import { sendOrderNotification } from '../messaging/messageService';
 import { io } from '../../server';
+import { evaluateOrderRisk, normalizeClientIp, normalizeOrderPhone, recordRiskDecision } from '../orders/orderProtection';
+import { saveOrderCourierSuggestions } from '../couriers/orderLocationService';
 
 export class WooCommerceService {
   private storeUrl: string;
@@ -58,10 +60,9 @@ export class WooCommerceService {
 
   async processIncomingOrder(wooOrder: any) {
     const wooOrderId = Number(wooOrder.id);
+    const existingOrder = await prisma.order.findUnique({ where: { wooOrderId } });
     const customerPhone =
-      wooOrder.billing?.phone ||
-      wooOrder.shipping?.phone ||
-      `017${Math.floor(10000000 + Math.random() * 90000000)}`;
+      normalizeOrderPhone(wooOrder.billing?.phone || wooOrder.shipping?.phone || '') || `WOO-MISSING-${wooOrderId}`;
 
     const firstName = wooOrder.billing?.first_name || wooOrder.shipping?.first_name || '';
     const lastName = wooOrder.billing?.last_name || wooOrder.shipping?.last_name || '';
@@ -78,21 +79,7 @@ export class WooCommerceService {
       where: { phone: customerPhone },
     });
 
-    let isFraudSuspect = false;
-    let isDuplicate = false;
-
-    if (customer) {
-      if (customer.isBlacklisted || customer.riskScore > 60 || customer.returnedOrders > 2) {
-        isFraudSuspect = true;
-      }
-      const recent = await prisma.order.findMany({
-        where: {
-          customerPhone,
-          createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
-        },
-      });
-      if (recent.length > 0) isDuplicate = true;
-    } else {
+    if (!customer) {
       customer = await prisma.customer.create({
         data: {
           name: customerName,
@@ -162,7 +149,7 @@ export class WooCommerceService {
           }
         }
 
-        if (variant) {
+        if (variant && !existingOrder) {
           color = color || variant.color;
           size = size || variant.size;
         }
@@ -197,7 +184,7 @@ export class WooCommerceService {
             data: { stockQuantity: { decrement: qty } },
           });
         }
-        if (product) {
+        if (product && !existingOrder) {
           await prisma.product.update({
             where: { id: product.id },
             data: { stockQuantity: { decrement: qty } },
@@ -222,6 +209,9 @@ export class WooCommerceService {
       failed: 'CANCELLED',
     };
     const mappedStatus = statusMap[wooOrder.status] || 'PENDING';
+    const riskInput = { phone: customerPhone, address: customerAddress, items: orderItems, ip: normalizeClientIp(wooOrder.customer_ip_address), source: 'WOOCOMMERCE' as const, external: true };
+    const risk = existingOrder ? null : await prisma.$transaction(tx => evaluateOrderRisk(tx, riskInput));
+    if (risk && !/^01[3-9]\d{8}$/.test(customerPhone)) { risk.reasons.push('MISSING_PHONE'); risk.decision = 'HOLD'; }
 
     const order = await prisma.order.upsert({
       where: { wooOrderId },
@@ -234,7 +224,7 @@ export class WooCommerceService {
         customerAddress,
         district: state || 'Dhaka',
         city: city || 'Dhaka',
-        status: mappedStatus,
+        status: risk?.decision === 'HOLD' ? 'HOLD' : mappedStatus,
         paymentMethod: wooOrder.payment_method_title || 'COD',
         paymentStatus: wooOrder.status === 'completed' ? 'PAID' : 'PENDING',
         subtotal,
@@ -244,8 +234,13 @@ export class WooCommerceService {
         codAmount: grandTotal,
         cogsCost: totalCogs,
         customerNote: wooOrder.customer_note || '',
-        isFraudSuspect,
-        isDuplicate,
+        sourceChannel: 'WOOCOMMERCE',
+        sourceIp: risk?.ip,
+        orderFingerprint: risk?.fingerprint,
+        riskReasons: risk?.reasons || [],
+        riskReviewStatus: risk?.decision === 'HOLD' ? 'REVIEW_REQUIRED' : 'CLEAR',
+        isFraudSuspect: Boolean(risk?.reasons.length),
+        isDuplicate: Boolean(risk?.reasons.includes('EXACT_DUPLICATE')),
         items: {
           create: orderItems,
         },
@@ -259,6 +254,10 @@ export class WooCommerceService {
       },
       include: { items: { include: { variant: true } } },
     });
+    if (!existingOrder) {
+      await saveOrderCourierSuggestions(order.id, order);
+      if (risk) await prisma.$transaction(tx => recordRiskDecision(tx, riskInput, risk, order.id));
+    }
 
     await logAudit({
       action: 'CREATE',

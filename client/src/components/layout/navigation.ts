@@ -44,6 +44,7 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { label: 'Overview', path: '/', icon: LayoutDashboard, description: 'Business health and action center' },
       { label: 'Live orders', path: '/orders', icon: ShoppingBag, description: 'Process, assign, and dispatch orders' },
+      { label: 'Incomplete Orders', path: '/incomplete-orders', icon: PackageSearch, description: 'Follow up abandoned checkouts and convert confirmed customers', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'CALL_CENTER_AGENT'] },
       { label: 'Courier & COD', path: '/courier-hub', icon: Truck, description: 'Delivery operations and reconciliation', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'DISPATCHER', 'ACCOUNTANT'] },
     ],
   },
@@ -78,6 +79,7 @@ export const navigationGroups: NavigationGroup[] = [
         { label: 'Staff Users', path: '/settings/users', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
         { label: 'Audit Log', path: '/settings/audit', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
         { label: 'Security', path: '/settings/security' },
+        { label: 'Order Protection', path: '/settings/order-protection', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
       ] },
     ],
   },
@@ -102,7 +104,7 @@ export const pageTitleForPath = (pathname: string) =>
   pathname.startsWith('/landing-pages/') ? 'Edit landing page' :
   pathname === '/pages/new' ? 'Create page' :
   pathname.startsWith('/pages/') ? 'Edit page' :
-  pathname.startsWith('/settings/') ? ({ woocommerce: 'WooCommerce Settings', couriers: 'Courier Settings', email: 'Email Notifications', payments: 'Payment Settings', users: 'Staff Users', audit: 'Audit Log', security: 'Security Settings' } as Record<string, string>)[pathname.split('/')[2]] || 'Settings' :
+  pathname.startsWith('/settings/') ? ({ woocommerce: 'WooCommerce Settings', couriers: 'Courier Settings', email: 'Email Notifications', payments: 'Payment Settings', users: 'Staff Users', audit: 'Audit Log', security: 'Security Settings', 'order-protection': 'Order Protection' } as Record<string, string>)[pathname.split('/')[2]] || 'Settings' :
   pathname.startsWith('/orders/') ? 'Order details' :
   pathname === '/products/new' ? 'Create product' :
   pathname.startsWith('/products/') ? 'Edit product' :

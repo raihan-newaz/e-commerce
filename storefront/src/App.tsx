@@ -1,7 +1,7 @@
 import { CSSProperties, FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronRight, ClipboardCheck, Heart, Menu, Minus, PackageCheck, Plus, Search, ShieldCheck, ShoppingBag, Trash2, Truck, UserRound, X } from 'lucide-react';
-import { addCustomerWishlist, getCachedLandingDesign, getCachedProduct, getCachedProducts, getCachedStorefrontSettings, getCachedStorePage, getLandingDesign, getPaymentResult, getProduct, getStorePage, getStorefrontSettings, listProducts, placeOrder, trackOrder, type LandingDesign } from './api';
+import { addCustomerWishlist, clearIncompleteToken, getCachedLandingDesign, getCachedProduct, getCachedProducts, getCachedStorefrontSettings, getCachedStorePage, getIncompleteToken, getLandingDesign, getPaymentResult, getProduct, getStorePage, getStorefrontSettings, listProducts, placeOrder, saveIncompleteCheckout, trackOrder, type LandingDesign } from './api';
 import { useCart } from './context/CartContext';
 import { useCustomerAuth } from './context/CustomerAuthContext';
 import { defaultStorefrontSettings, publicSupportPhone } from './store-config';
@@ -83,7 +83,7 @@ function AnalyticsLayer({ settings }: { settings: StorefrontSettings }) {
     trackAnalyticsEvent('page_view', { page_path: safePath, page_location: `${window.location.origin}${safePath}`, page_title: document.title });
   }, [pathname, settings.themeConfig.analytics, consent]);
   if (consent) return null;
-  return <aside className="analytics-consent" role="dialog" aria-label="Privacy preferences"><div><b>Privacy preferences</b><p>Allow analytics and marketing measurement. If enabled, store activity and limited order identifiers may be shared with Google and Meta; Meta may receive hashed contact details for completed orders.</p></div><div className="analytics-consent-actions"><button type="button" onClick={() => setAnalyticsConsent('rejected')}>Reject</button><button type="button" className="accept" onClick={() => setAnalyticsConsent('accepted')}>Allow analytics</button></div></aside>;
+  return <aside className="analytics-consent" role="region" aria-label="Privacy preferences"><div><b>Privacy preferences</b><p>Allow analytics and marketing measurement. If enabled, store activity and limited order identifiers may be shared with Google and Meta; Meta may receive hashed contact details for completed orders.</p></div><div className="analytics-consent-actions"><button type="button" onClick={() => setAnalyticsConsent('rejected')}>Reject</button><button type="button" className="accept" onClick={() => setAnalyticsConsent('accepted')}>Allow analytics</button></div></aside>;
 }
 
 function Header({ settings }: { settings: StorefrontSettings }) {
@@ -542,12 +542,19 @@ function CheckoutPage({ settings }: { settings: StorefrontSettings }) {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [paymentMethod, setPaymentMethod] = useState<'COD' | 'UDDOKTAPAY'>('COD');
   const [form, setForm] = useState<Record<string,string>>({ name: '', phone: '', email: '', address: '', district: 'Dhaka', city: '', note: '' });
+  const draftTouched = useRef(false);
+  const draftToken = useRef(getIncompleteToken('storefront'));
   const checkoutFields = settings.themeConfig.checkoutFields || fallbackCheckoutFields;
   const enabledFields = checkoutFields.filter((field) => field.enabled);
   const needsPaymentEmail = paymentMethod === 'UDDOKTAPAY' && !enabledFields.some((field) => field.key === 'email');
   const checkoutTracked = useRef(false);
   useEffect(() => { if (items.length && !checkoutTracked.current) { checkoutTracked.current = true; trackAnalyticsEvent('begin_checkout', { currency: 'BDT', value: subtotal, items: items.map((item) => ({ id: item.productId, name: item.name, price: item.unitPrice, quantity: item.quantity })) }); } }, [items, subtotal]);
   useEffect(() => { if (customer && !form.name && !form.phone) setForm((current) => ({ ...current, name: customer.name || '', phone: customer.phone || '', email: customer.email || '', address: customer.address || '', district: customer.district || 'Dhaka', city: customer.city || customer.area || '' })); }, [customer]);
+  useEffect(() => {
+    if (!draftTouched.current || form.name.trim().length < 2 || !/^01[3-9]\d{8}$/.test(form.phone.trim()) || form.address.trim().length < 8 || !items.length) return;
+    const timer = window.setTimeout(() => { void saveIncompleteCheckout({ token: draftToken.current, source: 'STOREFRONT', customerName: form.name.trim(), customerPhone: form.phone.trim(), address: form.address.trim(), district: form.district?.trim(), city: form.city?.trim(), email: form.email?.trim() || undefined, items: items.map(item => ({ productId: item.productId, variantId: item.variantId || null, quantity: item.quantity })), deliveryArea, paymentMethod }).catch(() => {}); }, 900);
+    return () => window.clearTimeout(timer);
+  }, [form, items, deliveryArea, paymentMethod]);
   const delivery = deliveryFeeForArea(deliveryArea, settings);
   if (!items.length) return <section className="section"><Empty title="Nothing to checkout" text="Add a product before starting checkout." action="Go shopping" /></section>;
   const submit = async (event: FormEvent) => {
@@ -558,7 +565,8 @@ function CheckoutPage({ settings }: { settings: StorefrontSettings }) {
       // Send _fbc/_fbp cookies and event ID for server-side CAPI deduplication
       const { fbc, fbp } = getMetaCookies();
       const _eventId = generateEventId();
-      const result = await placeOrder({ customer: { ...cleanedCustomer, ...(!enabledFields.some((field) => field.key === 'district') ? { district: undefined } : {}) }, paymentMethod, deliveryArea, items: items.map((item) => ({ productId: item.productId, variantId: item.variantId || null, quantity: item.quantity })), _fbc: fbc, _fbp: fbp, _eventId, _trackingConsent: isTrackingAllowed() });
+      const result = await placeOrder({ customer: { ...cleanedCustomer, ...(!enabledFields.some((field) => field.key === 'district') ? { district: undefined } : {}) }, paymentMethod, deliveryArea, items: items.map((item) => ({ productId: item.productId, variantId: item.variantId || null, quantity: item.quantity })), draftToken: draftToken.current, _fbc: fbc, _fbp: fbp, _eventId, _trackingConsent: isTrackingAllowed() });
+      clearIncompleteToken('storefront');
       if (paymentMethod === 'UDDOKTAPAY') {
         if (!result.paymentUrl) throw new Error('Payment link was not returned');
         try { sessionStorage.setItem('nix-pending-purchase', JSON.stringify({ orderNumber: result.order.orderNumber, eventId: _eventId, params: { currency: 'BDT', value: result.order.grandTotal, shipping: result.order.deliveryCharge, transaction_id: result.order.orderNumber, items: items.map((item) => ({ id: item.productId, name: item.name, price: item.unitPrice, quantity: item.quantity })) } })); } catch { /* server CAPI still records verified orders */ }
@@ -568,7 +576,7 @@ function CheckoutPage({ settings }: { settings: StorefrontSettings }) {
       try { sessionStorage.setItem('nix-last-order', JSON.stringify(result.order)); } catch { /* confirmation remains available in router state */ } clear(); navigate(`/order/${result.order.orderNumber}`, { state: result.order });
     } catch (e: any) { setError(e.message); } finally { setSubmitting(false); }
   };
-  const change = (key: string) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => { setForm({ ...form, [key]: event.target.value }); setFieldErrors((current) => { const next = { ...current }; delete next[key]; return next; }); };
+  const change = (key: string) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => { draftTouched.current = true; setForm({ ...form, [key]: event.target.value }); setFieldErrors((current) => { const next = { ...current }; delete next[key]; return next; }); };
   const invalidField = (key: string, label: string) => (event: React.FormEvent<HTMLElement>) => {
     event.preventDefault();
     const prompt = key === 'name' ? 'Enter your full name' : key === 'phone' ? 'Enter your mobile number' : key === 'address' ? 'Enter your full delivery address' : `Enter ${label.toLowerCase()}`;
@@ -580,7 +588,7 @@ function CheckoutPage({ settings }: { settings: StorefrontSettings }) {
     <div className="checkout-heading"><span className="eyebrow">QUICK CHECKOUT</span><h1>Delivery details</h1><p>No account needed. Complete your order in under a minute.</p></div>
     <form id="storefront-checkout-form" onSubmit={submit}><div className="field-grid">{enabledFields.map((field) => <label className={field.key === 'address' || field.key === 'note' || field.custom ? 'wide' : ''} key={field.key}>{field.label}{paymentMethod === 'UDDOKTAPAY' && field.key === 'email' && <small> (required for payment receipt)</small>}{field.type === 'textarea' ? <textarea required={field.required} minLength={field.key === 'address' ? 8 : undefined} className={fieldErrors[field.key] ? 'field-invalid' : ''} aria-invalid={Boolean(fieldErrors[field.key])} onInvalid={invalidField(field.key, field.label)} value={form[field.key] || ''} onChange={change(field.key)} placeholder={fieldErrors[field.key] || field.placeholder || ''}/> : field.type === 'select' ? <select required={field.required} className={fieldErrors[field.key] ? 'field-invalid' : ''} aria-invalid={Boolean(fieldErrors[field.key])} onInvalid={invalidField(field.key, field.label)} value={form[field.key] || ''} onChange={change(field.key)}><option value="">{fieldErrors[field.key] || `Choose ${field.label.toLowerCase()}`}</option>{(field.options || []).map((option) => <option key={option}>{option}</option>)}</select> : <input type={field.type} required={field.required || (paymentMethod === 'UDDOKTAPAY' && field.key === 'email')} minLength={field.key === 'name' ? 2 : undefined} className={fieldErrors[field.key] ? 'field-invalid' : ''} aria-invalid={Boolean(fieldErrors[field.key])} onInvalid={invalidField(field.key, field.label)} inputMode={field.type === 'tel' ? 'tel' : undefined} autoComplete={field.key === 'email' ? 'email' : undefined} value={form[field.key] || ''} onChange={change(field.key)} placeholder={fieldErrors[field.key] || field.placeholder || (field.key === 'phone' ? '01XXXXXXXXX' : '')}/>}</label>)}{needsPaymentEmail && <label className="wide">Email address <small>Required for secure online payment</small><input type="email" required className={fieldErrors.email ? 'field-invalid' : ''} aria-invalid={Boolean(fieldErrors.email)} onInvalid={invalidField('email', 'Email address')} autoComplete="email" value={form.email || ''} onChange={change('email')} placeholder={fieldErrors.email || 'you@example.com'}/></label>}</div></form>
     <div className="checkout-order-column"><aside className="summary checkout-summary"><h3>Your order</h3>{items.map((item) => <div className="mini-item" key={item.key}><ProductImage src={item.image} alt=""/><span>{item.name}<small>{item.variantName} · Qty {item.quantity}</small></span><b>{money(item.unitPrice * item.quantity)}</b></div>)}<div><span>Subtotal</span><b>{money(subtotal)}</b></div><DeliveryAreaPicker settings={settings} value={deliveryArea} onChange={setDeliveryArea} name="checkout-delivery-area"/><div><span>Delivery</span><b>{money(delivery)}</b></div><div className="summary-total"><span>Total</span><b>{money(subtotal + delivery)}</b></div></aside>
-      <div className="checkout-payment-block">{paymentOptions}{error && <p className="form-error">{error}</p>}<button className="button dark full place" type="submit" form="storefront-checkout-form" disabled={submitting}>{submitting ? 'Submitting…' : `${paymentMethod === 'COD' ? 'Place COD order' : 'Continue to secure payment'} · ${money(subtotal + delivery)}`}</button></div>
+      <div className="checkout-payment-block">{paymentOptions}<p className="text-xs text-slate-500">If you leave before placing your order, we may save these checkout details so our support team can follow up by phone.</p>{error && <p className="form-error">{error}</p>}<button className="button dark full place" type="submit" form="storefront-checkout-form" disabled={submitting}>{submitting ? 'Submitting…' : `${paymentMethod === 'COD' ? 'Place COD order' : 'Continue to secure payment'} · ${money(subtotal + delivery)}`}</button></div>
     </div>
   </section>;
 }
