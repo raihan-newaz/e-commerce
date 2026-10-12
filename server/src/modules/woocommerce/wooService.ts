@@ -79,23 +79,16 @@ export class WooCommerceService {
       where: { phone: customerPhone },
     });
 
-    if (!customer) {
-      customer = await prisma.customer.create({
-        data: {
-          name: customerName,
-          phone: customerPhone,
-          email: wooOrder.billing?.email || undefined,
-          address: customerAddress,
-          city,
-          district: state,
-        },
-      });
-    }
+    customer = await prisma.customer.upsert({
+      where: { phone: customerPhone },
+      create: { name: customerName, phone: customerPhone, email: wooOrder.billing?.email || undefined, address: customerAddress, city, district: state },
+      update: {},
+    });
 
     // Process line items with Fashion Variation (Color, Size) parsing
     let subtotal = 0;
     let totalCogs = 0;
-    const orderItems = [];
+    const orderItems: any[] = [];
 
     if (Array.isArray(wooOrder.line_items)) {
       for (const line of wooOrder.line_items) {
@@ -177,19 +170,6 @@ export class WooCommerceService {
           totalBuyPrice: lineCogs,
         });
 
-        // Deduct specific variant & parent stock
-        if (variant) {
-          await prisma.productVariant.update({
-            where: { id: variant.id },
-            data: { stockQuantity: { decrement: qty } },
-          });
-        }
-        if (product && !existingOrder) {
-          await prisma.product.update({
-            where: { id: product.id },
-            data: { stockQuantity: { decrement: qty } },
-          });
-        }
       }
     }
 
@@ -210,12 +190,28 @@ export class WooCommerceService {
     };
     const mappedStatus = statusMap[wooOrder.status] || 'PENDING';
     const riskInput = { phone: customerPhone, address: customerAddress, items: orderItems, ip: normalizeClientIp(wooOrder.customer_ip_address), source: 'WOOCOMMERCE' as const, external: true };
-    const risk = existingOrder ? null : await prisma.$transaction(tx => evaluateOrderRisk(tx, riskInput));
-    if (risk && !/^01[3-9]\d{8}$/.test(customerPhone)) { risk.reasons.push('MISSING_PHONE'); risk.decision = 'HOLD'; }
-
-    const order = await prisma.order.upsert({
-      where: { wooOrderId },
-      create: {
+    let risk: Awaited<ReturnType<typeof evaluateOrderRisk>> | null = null;
+    let order: any;
+    let createdNew = false;
+    const updateData = { customerName, customerPhone, customerAddress, grandTotal, paymentStatus: wooOrder.status === 'completed' ? 'PAID' : 'PENDING' };
+    if (existingOrder) {
+      order = await prisma.order.update({ where: { wooOrderId }, data: updateData, include: { items: { include: { variant: true } } } });
+    } else {
+      try {
+        const result = await prisma.$transaction(async tx => {
+          const concurrentOrder = await tx.order.findUnique({ where: { wooOrderId }, include: { items: { include: { variant: true } } } });
+          if (concurrentOrder) return { order: concurrentOrder, created: false };
+          risk = await evaluateOrderRisk(tx, riskInput);
+          if (!/^01[3-9]\d{8}$/.test(customerPhone)) { risk.reasons.push('MISSING_PHONE'); risk.decision = 'HOLD'; }
+          for (const item of orderItems) {
+            if (!item.productId) continue;
+            const quantity = Number(item.quantity);
+            if (item.variantId) await tx.productVariant.update({ where: { id: item.variantId }, data: { stockQuantity: { decrement: quantity } } });
+            const productAfter = await tx.product.update({ where: { id: item.productId }, data: { stockQuantity: { decrement: quantity } }, select: { stockQuantity: true } });
+            await tx.stockMovement.create({ data: { productId: item.productId, variantId: item.variantId, type: 'SALE_DEDUCTION', quantity: -quantity, previousStock: productAfter.stockQuantity + quantity, currentStock: productAfter.stockQuantity, note: `WooCommerce order ${wooOrderId} stock deduction` } });
+          }
+          const created = await tx.order.create({
+            data: {
         orderNumber,
         wooOrderId,
         customerId: customer.id,
@@ -224,7 +220,7 @@ export class WooCommerceService {
         customerAddress,
         district: state || 'Dhaka',
         city: city || 'Dhaka',
-        status: risk?.decision === 'HOLD' ? 'HOLD' : mappedStatus,
+        status: risk.decision === 'HOLD' ? 'HOLD' : mappedStatus,
         paymentMethod: wooOrder.payment_method_title || 'COD',
         paymentStatus: wooOrder.status === 'completed' ? 'PAID' : 'PENDING',
         subtotal,
@@ -235,28 +231,31 @@ export class WooCommerceService {
         cogsCost: totalCogs,
         customerNote: wooOrder.customer_note || '',
         sourceChannel: 'WOOCOMMERCE',
-        sourceIp: risk?.ip,
-        orderFingerprint: risk?.fingerprint,
-        riskReasons: risk?.reasons || [],
-        riskReviewStatus: risk?.decision === 'HOLD' ? 'REVIEW_REQUIRED' : 'CLEAR',
-        isFraudSuspect: Boolean(risk?.reasons.length),
-        isDuplicate: Boolean(risk?.reasons.includes('EXACT_DUPLICATE')),
+        sourceIp: risk.ip,
+        orderFingerprint: risk.fingerprint,
+        riskReasons: risk.reasons,
+        riskReviewStatus: risk.decision === 'HOLD' ? 'REVIEW_REQUIRED' : 'CLEAR',
+        isFraudSuspect: Boolean(risk.reasons.length),
+        isDuplicate: Boolean(risk.reasons.includes('EXACT_DUPLICATE')),
         items: {
           create: orderItems,
         },
       },
-      update: {
-        customerName,
-        customerPhone,
-        customerAddress,
-        grandTotal,
-        paymentStatus: wooOrder.status === 'completed' ? 'PAID' : 'PENDING',
-      },
       include: { items: { include: { variant: true } } },
-    });
-    if (!existingOrder) {
-      await saveOrderCourierSuggestions(order.id, order);
-      if (risk) await prisma.$transaction(tx => recordRiskDecision(tx, riskInput, risk, order.id));
+          });
+          await recordRiskDecision(tx, riskInput, risk, created.id);
+          return { order: created, created: true };
+        });
+        order = result.order;
+        createdNew = result.created;
+      } catch (error: any) {
+        if (error?.code !== 'P2002') throw error;
+        order = await prisma.order.findUniqueOrThrow({ where: { wooOrderId }, include: { items: { include: { variant: true } } } });
+      }
+    }
+    if (createdNew) {
+      try { await saveOrderCourierSuggestions(order.id, order); }
+      catch (error) { console.warn('Courier area matching was unavailable for WooCommerce order:', error); }
     }
 
     await logAudit({

@@ -3,10 +3,13 @@ import { Router, type Request, type Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import prisma from '../../prisma';
+import { config } from '../../config';
 import { authenticateToken, requireRole, type AuthRequest } from '../../middlewares/auth';
 import { logAudit } from '../audit/auditService';
 import { saveOrderCourierSuggestions } from '../couriers/orderLocationService';
 import { evaluateOrderRisk, normalizeClientIp, normalizeOrderPhone, recordRiskDecision } from './orderProtection';
+import { calculateLandingDiscount } from '../storefront/landingCouponController';
+import { landingDeliveryCharge } from '../storefront/deliveryPolicy';
 
 const router = Router();
 const run = (handler: (req: Request, res: Response) => Promise<void>) => (req: Request, res: Response) => { Promise.resolve(handler(req, res)).catch(error => res.status(error.status || 500).json({ success: false, message: error.message })); };
@@ -16,7 +19,7 @@ export const draftTokenHash = (token: string) => crypto.createHash('sha256').upd
 
 router.post('/public', rateLimit({ windowMs: 15 * 60_000, max: 60, standardHeaders: true, legacyHeaders: false }), run(async (req, res) => {
   const origin = req.get('origin');
-  if (origin && origin !== `${req.protocol}://${req.get('host')}`) { res.status(403).json({ success: false, message: 'Invalid checkout origin' }); return; }
+  if (!origin || origin !== `${req.protocol}://${req.get('host')}` && !config.clientUrls.includes(origin)) { res.status(403).json({ success: false, message: 'Invalid checkout origin' }); return; }
   const parsed = draftSchema.safeParse(req.body);
   if (!parsed.success || !/^01[3-9]\d{8}$/.test(normalizeOrderPhone(parsed.data?.customerPhone || ''))) { res.status(400).json({ success: false, message: 'Complete contact details and a product are required' }); return; }
   const input = parsed.data;
@@ -75,9 +78,28 @@ router.post('/:id/convert', requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'C
     const items = draft.items as Array<{ productId: string; variantId?: string | null; quantity: number }>;
     const riskInput = { phone: draft.customerPhone, address: draft.address, items, ip: draft.ipAddress, source: 'INCOMPLETE' as const, override: staff.user?.role === 'SUPER_ADMIN' && overrideReason.length >= 3 };
     const risk = await evaluateOrderRisk(tx, riskInput);
-    if (risk.decision === 'BLOCK') throw Object.assign(new Error(`Order blocked by protection rule: ${risk.reasons.join(', ')}`), { status: 409 });
+    if (risk.decision === 'BLOCK') { await recordRiskDecision(tx, riskInput, risk); return { blocked: risk.reasons, created: false as const }; }
     const settings = await tx.storefrontSettings.findUnique({ where: { id: 'default' } });
-    const deliveryCharge = draft.deliveryArea === 'OUTSIDE_DHAKA' ? settings?.outsideDhakaCharge || 150 : draft.deliveryArea === 'SUB_AREA' ? settings?.subAreaCharge || 130 : settings?.insideDhakaCharge || 60;
+    let freeDeliveryMinQuantity = 0;
+    let couponDiscount = 0;
+    let couponForConversion: { kind: string; value: number } | null = null;
+    if (draft.source === 'LANDING' && draft.pageSlug) {
+      const page = await tx.storePage.findUnique({ where: { slug: draft.pageSlug } });
+      if (!page || page.status !== 'PUBLISHED' || !page.isActive) throw Object.assign(new Error('The landing offer is no longer available. Review the order with the customer.'), { status: 409 });
+      const checkout = (JSON.parse(page.blocks) as Array<{ type: string; productIds?: string[]; selection?: string; minProducts?: number; maxProducts?: number; couponEnabled?: boolean; freeDeliveryMinQuantity?: number }>).find(block => block.type === 'CHECKOUT');
+      const distinctIds = new Set(items.map(item => item.productId));
+      const maximum = checkout?.selection === 'SINGLE' ? 1 : checkout?.maxProducts ?? checkout?.productIds?.length ?? 0;
+      if (!checkout || distinctIds.size !== items.length || distinctIds.size < (checkout.minProducts ?? 1) || distinctIds.size > maximum || items.some(item => !checkout.productIds?.includes(item.productId))) throw Object.assign(new Error('The selected products no longer match this landing offer.'), { status: 409 });
+      if (draft.couponCode) {
+        if (checkout.couponEnabled === false) throw Object.assign(new Error('Coupons are disabled on this landing offer.'), { status: 409 });
+        const coupon = await tx.landingCoupon.findUnique({ where: { pageId_code: { pageId: page.id, code: draft.couponCode } } });
+        if (!coupon?.isActive) throw Object.assign(new Error('The saved coupon has expired or is unavailable.'), { status: 409 });
+        couponForConversion = coupon;
+      }
+      freeDeliveryMinQuantity = checkout.freeDeliveryMinQuantity || 0;
+    }
+    const baseDeliveryCharge = draft.deliveryArea === 'OUTSIDE_DHAKA' ? settings?.outsideDhakaCharge || 150 : draft.deliveryArea === 'SUB_AREA' ? settings?.subAreaCharge || 130 : settings?.insideDhakaCharge || 60;
+    const deliveryCharge = landingDeliveryCharge(baseDeliveryCharge, freeDeliveryMinQuantity, items);
     let subtotal = 0;
     let cogsCost = 0;
     const orderItems = [];
@@ -98,15 +120,18 @@ router.post('/:id/convert', requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'C
       orderItems.push({ productId: product.id, variantId: variant?.id, productName: product.name, variantName: variant?.name, productSku: variant?.sku || product.sku, quantity: item.quantity, unitPrice: price, unitBuyPrice: variant?.buyPrice ?? product.buyPrice, totalPrice: price * item.quantity, totalBuyPrice: (variant?.buyPrice ?? product.buyPrice) * item.quantity });
       await tx.stockMovement.create({ data: { productId: product.id, variantId: variant?.id, type: 'SALE_DEDUCTION', quantity: -item.quantity, previousStock: product.stockQuantity, currentStock: product.stockQuantity - item.quantity, note: 'Incomplete checkout converted by staff', createdById: staff.user?.id } });
     }
+    if (couponForConversion) couponDiscount = calculateLandingDiscount(couponForConversion.kind, couponForConversion.value, subtotal);
     const customer = await tx.customer.upsert({ where: { phone: draft.customerPhone }, create: { name: draft.customerName, phone: draft.customerPhone, address: draft.address, district: draft.district, city: draft.city, totalOrders: 1 }, update: { totalOrders: { increment: 1 } } });
-    const grandTotal = subtotal + deliveryCharge;
-    const order = await tx.order.create({ data: { orderNumber: `IC-${draft.id.replace(/-/g, '').slice(0, 20).toUpperCase()}`, customerId: customer.id, customerName: draft.customerName, customerPhone: draft.customerPhone, customerEmail: draft.email, customerAddress: draft.address, district: draft.district, city: draft.city, status: risk.decision === 'HOLD' ? 'HOLD' : 'PENDING', paymentMethod: 'COD', paymentStatus: 'PENDING', subtotal, deliveryCharge, grandTotal, codAmount: grandTotal, cogsCost, sourceChannel: 'INCOMPLETE', sourceIp: risk.ip, orderFingerprint: risk.fingerprint, riskReasons: risk.reasons, riskReviewStatus: risk.decision === 'HOLD' ? 'REVIEW_REQUIRED' : 'CLEAR', isFraudSuspect: risk.reasons.length > 0, isDuplicate: risk.reasons.includes('EXACT_DUPLICATE'), internalNote: `Confirmed by phone from incomplete checkout${draft.staffNote ? `: ${draft.staffNote}` : ''}${overrideReason ? `; override: ${overrideReason}` : ''}`, items: { create: orderItems } } });
+    const grandTotal = subtotal + deliveryCharge - couponDiscount;
+    const order = await tx.order.create({ data: { orderNumber: `IC-${draft.id.replace(/-/g, '').slice(0, 20).toUpperCase()}`, customerId: customer.id, customerName: draft.customerName, customerPhone: draft.customerPhone, customerEmail: draft.email, customerAddress: draft.address, district: draft.district, city: draft.city, status: risk.decision === 'HOLD' ? 'HOLD' : 'PENDING', paymentMethod: 'COD', paymentStatus: 'PENDING', subtotal, discount: couponDiscount, deliveryCharge, grandTotal, codAmount: grandTotal, cogsCost, sourceChannel: 'INCOMPLETE', sourceIp: risk.ip, orderFingerprint: risk.fingerprint, riskReasons: risk.reasons, riskReviewStatus: risk.decision === 'HOLD' ? 'REVIEW_REQUIRED' : 'CLEAR', isFraudSuspect: risk.reasons.length > 0, isDuplicate: risk.reasons.includes('EXACT_DUPLICATE'), internalNote: `Confirmed by phone from incomplete checkout${draft.staffNote ? `: ${draft.staffNote}` : ''}${overrideReason ? `; override: ${overrideReason}` : ''}`, items: { create: orderItems } } });
     await tx.incompleteCheckout.update({ where: { id: draft.id }, data: { status: 'CONVERTED', orderId: order.id } });
     await recordRiskDecision(tx, riskInput, risk, order.id);
     return { order, created: true };
   });
+  if ('blocked' in result && result.blocked) { res.status(409).json({ success: false, message: `Order blocked by protection rules: ${result.blocked.join(', ')}` }); return; }
   if (result.created) {
-    await saveOrderCourierSuggestions(result.order.id, result.order);
+    try { await saveOrderCourierSuggestions(result.order.id, result.order); }
+    catch (error) { console.warn('Courier area matching was unavailable for converted order:', error); }
     await logAudit({ userId: staff.user?.id, userName: staff.user?.name, action: 'CREATE', entity: 'ORDER', entityId: result.order.id, details: { convertedFromIncomplete: String(req.params.id), overrideReason }, ipAddress: req.ip });
   }
   res.json({ success: true, order: result.order, created: result.created });

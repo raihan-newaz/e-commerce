@@ -52,7 +52,7 @@ export async function evaluateOrderRisk(tx: Tx, input: RiskInput): Promise<RiskR
     tx.order.count({ where: { customerPhone: phone, createdAt: { gte: from(1440) } } }),
     ip ? tx.order.count({ where: { sourceIp: ip, createdAt: { gte: from(60) } } }) : Promise.resolve(0),
     ip ? tx.order.findMany({ where: { sourceIp: ip, createdAt: { gte: from(1440) } }, select: { customerPhone: true }, take: 100 }) : Promise.resolve([]),
-    tx.order.findMany({ where: { customerAddress: input.address, createdAt: { gte: from(1440) } }, select: { customerPhone: true }, take: 100 }),
+    tx.order.findMany({ where: { customerAddress: { not: '' }, createdAt: { gte: from(1440) } }, select: { customerPhone: true, customerAddress: true }, take: 500 }),
   ]);
   const block: string[] = [];
   const hold: string[] = [];
@@ -64,7 +64,7 @@ export async function evaluateOrderRisk(tx: Tx, input: RiskInput): Promise<RiskR
   if (ip && hourlyIp >= settings.ipHourlyLimit) block.push('IP_HOURLY_LIMIT');
   if ((customer?.riskScore || 0) > 60 || (customer?.returnedOrders || 0) > 2) hold.push('CUSTOMER_HISTORY');
   if (new Set(recentIpOrders.map(row => row.customerPhone)).size >= settings.sharedIpPhoneThreshold) hold.push('SHARED_IP');
-  if (new Set(recentAddressOrders.map(row => row.customerPhone)).size >= settings.sharedAddressPhoneThreshold) hold.push('SHARED_ADDRESS');
+  if (new Set(recentAddressOrders.filter(row => normalizeAddress(row.customerAddress) === normalizeAddress(input.address)).map(row => row.customerPhone)).size >= settings.sharedAddressPhoneThreshold) hold.push('SHARED_ADDRESS');
   const reasons = [...block, ...hold];
   const decision = block.length && !input.override ? input.external ? 'HOLD' : 'BLOCK' : hold.length || (block.length && input.override) ? 'HOLD' : 'ALLOW';
   return { decision, reasons, fingerprint, phone, ip };
@@ -73,7 +73,7 @@ export async function evaluateOrderRisk(tx: Tx, input: RiskInput): Promise<RiskR
 export async function recordRiskDecision(tx: Tx, input: RiskInput, result: RiskResult, orderId?: string) {
   if (result.decision === 'ALLOW' && !result.reasons.length) return;
   await tx.orderRiskEvent.create({ data: { orderId, source: input.source, decision: result.decision, phone: result.phone, ipAddress: result.ip, reasons: result.reasons } });
-  if (result.decision !== 'BLOCK' || !result.ip || input.external) return;
+  if (result.decision !== 'BLOCK' || !result.ip || input.external || input.source === 'STAFF') return;
   const settings = await protectionSettings(tx);
   const recent = await tx.orderRiskEvent.count({ where: { ipAddress: result.ip, decision: 'BLOCK', createdAt: { gte: new Date(Date.now() - settings.autoBlockWindowMinutes * 60_000) } } });
   if (recent >= settings.autoBlockRejectCount) {

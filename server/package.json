@@ -11,6 +11,7 @@
     "catalog:add-borka-color-terms": "ts-node src/scripts/addBorkaColorTerms.ts",
     "test:catalog-edits": "ts-node src/scripts/verifyCatalogEdits.ts",
     "test:builder": "node --test --test-concurrency=1 -r ts-node/register src/modules/builder/tests/*.test.ts",
+    "test:orders": "node --test --test-concurrency=1 -r ts-node/register src/modules/couriers/tests/*.test.ts src/modules/orders/tests/*.test.ts",
     "typecheck": "tsc --noEmit",
     "dev": "nodemon --watch src --exec ts-node src/server.ts",
     "build": "tsc",

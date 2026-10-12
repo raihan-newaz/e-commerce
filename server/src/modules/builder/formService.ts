@@ -8,6 +8,9 @@ import { escapeHtml } from './core/registry';
 import type { PageDocument } from './core/schema';
 import { failure, validatedDocument } from './service';
 import { getNextOrderNumber } from '../orders/orderNumberService';
+import { evaluateOrderRisk, recordRiskDecision } from '../orders/orderProtection';
+import { saveOrderCourierSuggestions } from '../couriers/orderLocationService';
+import { draftTokenHash } from '../orders/incompleteOrderRoutes';
 
 const cookieName = 'nix_builder_form';
 const cookieValue = (req: Request) => (req.headers.cookie || '').split(';').map(value => value.trim()).find(value => value.startsWith(`${cookieName}=`))?.slice(cookieName.length + 1) || '';
@@ -29,119 +32,56 @@ export function formRenderContext(req: Request, res: Response, pageId: string, v
   let cookie = cookieValue(req);
   if (!/^[a-f\d]{64}$/.test(cookie)) cookie = randomBytes(32).toString('hex');
   res.cookie(cookieName, cookie, { httpOnly: true, secure: !config.isDev, sameSite: 'strict', path: '/b', maxAge: 24 * 60 * 60 * 1000 });
-  return Object.fromEntries(forms.map(({ node }) => [node.id, { action: `/b/${doc.slug}/forms/${node.id}`, token: createFormToken(cookie, pageId, node.id, version) }]));
+  return Object.fromEntries(forms.map(({ node }) => { const token = createFormToken(cookie, pageId, node.id, version); return [node.id, { action: `/b/${doc.slug}/forms/${node.id}`, token, draftToken: token.split('.')[1] }]; }));
 }
 const receipt = (title: string, messages: string[], slug: string) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${escapeHtml(title)}</title><style>body{font:16px/1.7 system-ui,sans-serif;color:#193d2c;background:#f3f7ef;margin:0;padding:clamp(24px,8vw,100px)}main{max-width:700px;margin:auto;padding:40px;background:white;border-radius:12px}a{color:#176b53}</style></head><body><main><h1>${escapeHtml(title)}</h1>${messages.map(value => `<p>${escapeHtml(value)}</p>`).join('')}<a href="/b/${escapeHtml(slug)}">Return to the page</a></main></body></html>`;
 
-async function processOrderFromSubmission(values: Record<string, string>, pageSlug: string) {
-  const customerName = (values.customer_name || values.name || 'Landing Page Customer').trim();
+async function processOrderFromSubmission(values: Record<string, string>, pageSlug: string, submissionId: string, draftToken: string, ip: string) {
+  const customerName = (values.customer_name || values.name || '').trim();
   const customerPhone = (values.customer_phone || values.phone || '').trim();
   const customerAddress = (values.customer_address || values.address || '').trim();
-
-  if (!customerPhone) return;
-
-  try {
-    let customer = await prisma.customer.findUnique({ where: { phone: customerPhone } });
-    if (!customer) {
-      customer = await prisma.customer.create({
-        data: {
-          name: customerName,
-          phone: customerPhone,
-          address: customerAddress || null
-        }
-      });
-    } else if (customerAddress && (!customer.address || customer.address.length < 5)) {
-      await prisma.customer.update({
-        where: { id: customer.id },
-        data: { address: customerAddress }
-      });
+  const productId = values.product_id || '';
+  const productSku = values.product_sku || '';
+  // Generic Studio forms remain contact submissions. Order forms need explicit product and contact fields.
+  if (!customerName || !customerPhone || !customerAddress || (!productId && !productSku)) return;
+  if (!/^01[3-9]\d{8}$/.test(customerPhone.replace(/\D/g, '').replace(/^880/, '0'))) throw failure(400, 'Enter a valid Bangladesh phone number before placing the order.');
+  const quantity = Number(values.quantity || '1');
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 10) throw failure(400, 'Order quantity must be between 1 and 10.');
+  const orderNumber = `ST-${submissionId.replace(/-/g, '').slice(0, 20).toUpperCase()}`;
+  const created = await prisma.$transaction(async tx => {
+    const prior = await tx.order.findUnique({ where: { orderNumber } });
+    if (prior) return prior;
+    const draft = await tx.incompleteCheckout.findUnique({ where: { tokenHash: draftTokenHash(draftToken) } });
+    if (draft) {
+      await tx.$queryRaw`SELECT id FROM IncompleteCheckout WHERE id = ${draft.id} FOR UPDATE`;
+      const fresh = await tx.incompleteCheckout.findUniqueOrThrow({ where: { id: draft.id } });
+      if (fresh.orderId) return tx.order.findUniqueOrThrow({ where: { id: fresh.orderId } });
     }
-
-    let product = null;
-    if (values.product_id) {
-      product = await prisma.product.findUnique({ where: { id: values.product_id } });
+    const product = productId ? await tx.product.findUnique({ where: { id: productId } }) : await tx.product.findUnique({ where: { sku: productSku } });
+    if (!product || product.status !== 'ACTIVE' || product.productType === 'VARIABLE') throw failure(409, 'The selected product is unavailable. Please choose an active simple product.');
+    const changed = await tx.product.updateMany({ where: { id: product.id, status: 'ACTIVE', stockQuantity: { gte: quantity } }, data: { stockQuantity: { decrement: quantity } } });
+    if (!changed.count) throw failure(409, 'The selected product is out of stock.');
+    const riskInput = { phone: customerPhone, address: customerAddress, items: [{ productId: product.id, quantity }], ip, source: 'STUDIO_FORM' as const };
+    const risk = await evaluateOrderRisk(tx, riskInput);
+    if (risk.decision === 'BLOCK') {
+      throw Object.assign(failure(409, `Order blocked by protection rule: ${risk.reasons.join(', ')}`), { riskInput, risk });
     }
-    if (!product && values.product_sku) {
-      product = await prisma.product.findUnique({ where: { sku: values.product_sku } });
-    }
-    if (!product) {
-      product = await prisma.product.findFirst({
-        where: {
-          OR: [
-            { name: { contains: 'Earbuds' } },
-            { status: 'ACTIVE' }
-          ]
-        }
-      });
-    }
-
-    const quantity = Math.max(1, parseInt(values.quantity || '1', 10) || 1);
-    const unitPrice = product?.salePrice && product.salePrice > 0 ? product.salePrice : 1390;
-    const unitBuyPrice = product?.buyPrice || 0;
+    const unitPrice = product.salePrice > 0 ? product.salePrice : product.regularPrice;
+    if (unitPrice <= 0) throw failure(409, 'The selected product has no valid selling price.');
     const subtotal = unitPrice * quantity;
-
     const shippingText = values.shipping_area || values.delivery_area || values.shipping_method || '';
-    let deliveryCharge = 70;
     const match = shippingText.match(/৳\s*(\d+)/) || shippingText.match(/(\d+)\s*(?:টাকা|tk|bdt)/i);
-    if (match) {
-      deliveryCharge = parseInt(match[1], 10);
-    } else if (shippingText.includes('বাইরে')) {
-      deliveryCharge = 150;
-    } else if (shippingText.includes('সাব')) {
-      deliveryCharge = 130;
-    } else {
-      deliveryCharge = 70;
-    }
-
+    const deliveryCharge = match ? Number(match[1]) : /বাইরে/.test(shippingText) ? 150 : /সাব/.test(shippingText) ? 130 : 70;
     const grandTotal = subtotal + deliveryCharge;
-    const codAmount = grandTotal;
-    const orderNumber = await getNextOrderNumber();
-
-    await prisma.order.create({
-      data: {
-        orderNumber,
-        customerId: customer.id,
-        customerName,
-        customerPhone,
-        customerAddress: customerAddress || 'N/A',
-        status: 'PENDING',
-        paymentMethod: 'COD',
-        paymentStatus: 'PENDING',
-        subtotal,
-        deliveryCharge,
-        grandTotal,
-        advancePaid: 0,
-        codAmount,
-        cogsCost: unitBuyPrice * quantity,
-        customerNote: `Landing page order (/b/${pageSlug})`,
-        checkoutDetails: JSON.stringify(values),
-        items: {
-          create: [
-            {
-              productId: product?.id || null,
-              productName: product?.name || 'Active Noise Cancelling Wireless Earbuds TWS',
-              productSku: product?.sku || 'EARBUD-TWS-PRO',
-              quantity,
-              unitPrice,
-              unitBuyPrice,
-              totalPrice: subtotal,
-              totalBuyPrice: unitBuyPrice * quantity
-            }
-          ]
-        }
-      }
-    });
-
-    await prisma.customer.update({
-      where: { id: customer.id },
-      data: {
-        totalOrders: { increment: 1 },
-        totalSpent: { increment: grandTotal }
-      }
-    });
-  } catch (err) {
-    console.error('Failed to create OMS order from submission:', err);
-  }
+    const customer = await tx.customer.upsert({ where: { phone: risk.phone }, create: { name: customerName, phone: risk.phone, address: customerAddress, totalOrders: 1, totalSpent: grandTotal }, update: { totalOrders: { increment: 1 }, totalSpent: { increment: grandTotal } } });
+    const order = await tx.order.create({ data: { orderNumber, customerId: customer.id, customerName, customerPhone: risk.phone, customerAddress, status: risk.decision === 'HOLD' ? 'HOLD' : 'PENDING', paymentMethod: 'COD', paymentStatus: 'PENDING', subtotal, deliveryCharge, grandTotal, codAmount: grandTotal, cogsCost: product.buyPrice * quantity, sourceChannel: 'STUDIO_FORM', sourceIp: risk.ip, orderFingerprint: risk.fingerprint, riskReasons: risk.reasons, riskReviewStatus: risk.decision === 'HOLD' ? 'REVIEW_REQUIRED' : 'CLEAR', isFraudSuspect: risk.reasons.length > 0, isDuplicate: risk.reasons.includes('EXACT_DUPLICATE'), customerNote: `Studio order (/b/${pageSlug})`, checkoutDetails: JSON.stringify(values), items: { create: [{ productId: product.id, productName: product.name, productSku: product.sku, quantity, unitPrice, unitBuyPrice: product.buyPrice, totalPrice: subtotal, totalBuyPrice: product.buyPrice * quantity }] } } });
+    await tx.stockMovement.create({ data: { productId: product.id, type: 'SALE_DEDUCTION', quantity: -quantity, previousStock: product.stockQuantity, currentStock: product.stockQuantity - quantity, note: 'Studio form order', createdById: null } });
+    if (draft) await tx.incompleteCheckout.update({ where: { id: draft.id }, data: { status: 'CONVERTED', orderId: order.id } });
+    await recordRiskDecision(tx, riskInput, risk, order.id);
+    return order;
+  });
+  try { await saveOrderCourierSuggestions(created.id, created); }
+  catch (error) { console.warn('Courier area matching was unavailable for Studio order:', error); }
 }
 
 export async function submitBuilderForm(req: Request, res: Response, next: NextFunction) {
@@ -166,10 +106,14 @@ export async function submitBuilderForm(req: Request, res: Response, next: NextF
     } catch (error) {
       // Replaying the exact signed submission token cannot create a second record.
       if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')) throw error;
+      if (await prisma.order.findUnique({ where: { orderNumber: `ST-${id.replace(/-/g, '').slice(0, 20).toUpperCase()}` } })) {
+        res.status(200).type('html').send(receipt('Response received', [String(form.node.props.successMessage || 'Thank you. Your response has been received.')], doc.slug)); return;
+      }
     }
 
     // Automatically create OMS order if submission contains customer order fields
-    await processOrderFromSubmission(values, doc.slug);
+    try { await processOrderFromSubmission(values, doc.slug, id, String(req.body._draft_token || id), req.ip || ''); }
+    catch (error) { if (error instanceof Error && 'status' in error && typeof error.status === 'number') { if ('riskInput' in error && 'risk' in error) await prisma.$transaction(tx => recordRiskDecision(tx, (error as any).riskInput, (error as any).risk)); res.status(error.status).type('html').send(receipt('Order needs attention', [error.message], doc.slug)); return; } throw error; }
 
     res.status(200).type('html').send(receipt('Response received', [String(form.node.props.successMessage || 'Thank you. Your response has been received.')], doc.slug));
   } catch (error) {

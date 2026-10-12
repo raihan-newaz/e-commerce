@@ -3,7 +3,8 @@ import { normalizeLocation } from './courierLocations';
 
 export type CourierProvider = 'STEADFAST' | 'PATHAO' | 'REDX';
 export type LocationInput = { customerAddress: string; district?: string | null; city?: string | null; zone?: string | null; area?: string | null };
-type LocationRow = { id: string; provider: string; level: string; externalId: string; parentExternalId: string | null; name: string; active: boolean };
+type LocationRow = { id: string; provider: string; level: string; externalId: string; parentExternalId: string | null; name: string; districtName?: string | null; active: boolean };
+type AliasRow = { locationId: string; normalizedAlias: string };
 type Match = { districtExternalId?: string; thanaExternalId?: string; areaExternalId?: string; areaName?: string; source: 'AUTO' | 'UNRESOLVED' };
 
 const hasPhrase = (haystack: string, phrase: string) => Boolean(phrase && ` ${haystack} `.includes(` ${phrase} `));
@@ -22,9 +23,13 @@ function uniqueMatch(rows: LocationRow[], aliases: Map<string, string[]>, hints:
 
 export async function suggestCourierLocations(input: LocationInput): Promise<Record<CourierProvider, Match>> {
   const [locations, aliases] = await Promise.all([
-    prisma.courierLocation.findMany({ where: { provider: { in: ['STEADFAST', 'PATHAO', 'REDX'] }, active: true }, select: { id: true, provider: true, level: true, externalId: true, parentExternalId: true, name: true, active: true } }),
+    prisma.courierLocation.findMany({ where: { provider: { in: ['STEADFAST', 'PATHAO', 'REDX'] }, active: true }, select: { id: true, provider: true, level: true, externalId: true, parentExternalId: true, name: true, districtName: true, active: true } }),
     prisma.courierLocationAlias.findMany({ select: { locationId: true, normalizedAlias: true } }),
   ]);
+  return matchCourierLocations(input, locations, aliases);
+}
+
+export function matchCourierLocations(input: LocationInput, locations: LocationRow[], aliases: AliasRow[]): Record<CourierProvider, Match> {
   const names = new Map<string, string[]>();
   for (const row of locations) names.set(row.id, [normalizeLocation(row.name)]);
   for (const alias of aliases) if (names.has(alias.locationId)) names.get(alias.locationId)!.push(alias.normalizedAlias);
@@ -36,7 +41,13 @@ export async function suggestCourierLocations(input: LocationInput): Promise<Rec
     const areaRows = own.filter(row => row.level === 'AREA');
     let district = uniqueMatch(districtRows, names, [input.district, input.city], input.customerAddress);
     let thana = uniqueMatch(thanaRows.filter(row => !district || row.parentExternalId === district.externalId), names, [input.zone], input.customerAddress);
-    const area = uniqueMatch(areaRows.filter(row => provider === 'REDX' || !thana || row.parentExternalId === thana.externalId), names, [input.area], input.customerAddress);
+    let redxAreas = areaRows;
+    if (provider === 'REDX') {
+      const divisionHints = [input.zone, input.city].map(value => normalizeLocation(value || '')).filter(Boolean);
+      const divisionMatched = redxAreas.filter(row => row.districtName && divisionHints.includes(normalizeLocation(row.districtName)));
+      if (divisionMatched.length) redxAreas = divisionMatched;
+    }
+    const area = uniqueMatch(provider === 'REDX' ? redxAreas : areaRows.filter(row => !thana || row.parentExternalId === thana.externalId), names, [input.area], input.customerAddress);
     if (provider === 'PATHAO' && area && !thana) thana = thanaRows.find(row => row.externalId === area.parentExternalId);
     if (thana && !district) district = districtRows.find(row => row.externalId === thana.parentExternalId);
     const valid = provider === 'REDX' ? Boolean(area) : provider === 'PATHAO' ? Boolean(district && thana && (!area || area.parentExternalId === thana.externalId)) : Boolean(district && thana);

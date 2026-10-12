@@ -8,6 +8,7 @@ import type { PathaoOrderPayload } from './adapters/pathao';
 import { getRedXAdapter } from './redxSession';
 import { logAudit } from '../audit/auditService';
 import { sendOrderNotification } from '../messaging/messageService';
+import { validateCourierSelection } from './orderLocationService';
 
 export interface SendToCourierOptions {
   orderId: string;
@@ -292,6 +293,7 @@ export async function dispatchBulkToPathao(orderIds: string[]) {
     }
     const saved = await prisma.orderCourierLocation.findUnique({ where: { orderId_provider: { orderId, provider: 'PATHAO' } } });
     if (!saved?.districtExternalId || !saved.thanaExternalId) { errors.push({ orderId, error: 'Select Pathao city and zone on the order first' }); continue; }
+    if (!await validateCourierSelection('PATHAO', saved.districtExternalId, saved.thanaExternalId, saved.areaExternalId)) { errors.push({ orderId, error: 'The saved Pathao location hierarchy is no longer valid; correct it on the order first' }); continue; }
     const claim = await prisma.order.updateMany({
       where: { id: orderId, courierName: null, courierConsignmentId: null },
       data: { courierName: 'PATHAO', courierStatus: 'BOOKING_REQUESTED', courierStoreId: config.storeId },

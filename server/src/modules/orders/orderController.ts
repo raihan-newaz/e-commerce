@@ -5,7 +5,7 @@ import { logAudit } from '../audit/auditService';
 import { notifyOrderStatus, sendOrderNotification } from '../messaging/messageService';
 import { revealSecret } from '../../utils/security';
 import { getNextOrderNumber } from './orderNumberService';
-import { evaluateOrderRisk, recordRiskDecision } from './orderProtection';
+import { evaluateOrderRisk, normalizeClientIp, recordRiskDecision } from './orderProtection';
 import { saveOrderCourierSuggestions } from '../couriers/orderLocationService';
 
 export const listOrders = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -563,7 +563,7 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
     }
 
     const overrideReason = typeof req.body.overrideReason === 'string' ? req.body.overrideReason.trim() : '';
-    const riskInput = { phone: customerPhone, address: customerAddress || '', items: items.map((item: any) => ({ productId: item.productId, variantId: item.variantId, quantity: Number(item.quantity || 1) })), source: 'STAFF' as const, override: req.user?.role === 'SUPER_ADMIN' && overrideReason.length >= 3 };
+    const riskInput = { phone: customerPhone, address: customerAddress || '', items: items.map((item: any) => ({ productId: item.productId, variantId: item.variantId, quantity: Number(item.quantity || 1) })), ip: normalizeClientIp(req.ip), source: 'STAFF' as const, override: req.user?.role === 'SUPER_ADMIN' && overrideReason.length >= 3 };
     const risk = await prisma.$transaction(tx => evaluateOrderRisk(tx, riskInput));
     if (risk.decision === 'BLOCK') { await prisma.$transaction(tx => recordRiskDecision(tx, riskInput, risk)); res.status(409).json({ success: false, message: 'Order blocked by protection rules. Super Admin can override with a reason.', reasons: risk.reasons }); return; }
     let customer = await prisma.customer.findUnique({
@@ -671,9 +671,10 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
         cogsCost: totalCogs,
         warehouseId,
         assignedToId,
-        internalNote,
+        internalNote: overrideReason ? `${internalNote || ''}${internalNote ? '\n' : ''}Protection override: ${overrideReason}` : internalNote,
         customerNote,
         sourceChannel: 'STAFF',
+        sourceIp: risk.ip,
         orderFingerprint: risk.fingerprint,
         riskReasons: risk.reasons,
         riskReviewStatus: risk.decision === 'HOLD' ? 'REVIEW_REQUIRED' : 'CLEAR',
@@ -687,7 +688,8 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
         items: true,
       },
     });
-    await saveOrderCourierSuggestions(newOrder.id, newOrder);
+    try { await saveOrderCourierSuggestions(newOrder.id, newOrder); }
+    catch (error) { console.warn('Courier area matching was unavailable for staff order:', error); }
     await prisma.$transaction(tx => recordRiskDecision(tx, riskInput, risk, newOrder.id));
 
     await prisma.customer.update({
@@ -703,7 +705,7 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
       action: 'CREATE',
       entity: 'ORDER',
       entityId: newOrder.id,
-      details: { orderNumber, grandTotal, itemsCount: items.length },
+      details: { orderNumber, grandTotal, itemsCount: items.length, ...(overrideReason ? { protectionOverrideReason: overrideReason } : {}) },
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'] as string | undefined,
     });

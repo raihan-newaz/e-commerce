@@ -15,6 +15,9 @@ import { generateEventId } from './metaConversionsApi';
 import { revealSecret } from '../../utils/security';
 import { productSlug } from '../inventory/productValidation';
 import { getCache, setCache } from '../../redis';
+import { evaluateOrderRisk, normalizeClientIp, recordRiskDecision } from '../orders/orderProtection';
+import { draftTokenHash } from '../orders/incompleteOrderRoutes';
+import { saveOrderCourierSuggestions } from '../couriers/orderLocationService';
 export { productSlug } from '../inventory/productValidation';
 
 const checkoutSchema = z.object({
@@ -45,6 +48,7 @@ const checkoutSchema = z.object({
   pageSlug: z.string().min(1).max(120).optional(),
   couponCode: z.string().trim().toUpperCase().max(40).optional(),
   idempotencyKey: z.string().trim().max(160).optional(),
+  draftToken: z.string().uuid().optional(),
   _eventId: z.string().regex(/^[A-Za-z0-9_-]{8,100}$/).optional(),
   _fbc: z.string().max(500).optional(),
   _fbp: z.string().max(500).optional(),
@@ -336,11 +340,13 @@ export const createStorefrontOrder = async (req: Request & { customer?: { id: st
 
     const order = await prisma.$transaction(async (tx) => {
       await tx.checkoutAttempt.create({data:{key:idempotencyKey,payloadHash:payloadFingerprint}});
+      let incompleteDraft = parsed.data.draftToken ? await tx.incompleteCheckout.findUnique({ where: { tokenHash: draftTokenHash(parsed.data.draftToken) } }) : null;
+      if (incompleteDraft) {
+        await tx.$queryRaw`SELECT id FROM IncompleteCheckout WHERE id = ${incompleteDraft.id} FOR UPDATE`;
+        incompleteDraft = await tx.incompleteCheckout.findUnique({ where: { id: incompleteDraft.id } });
+        if (incompleteDraft?.orderId) throw new Error('This checkout has already been converted to an order');
+      }
       const existingCustomer = await tx.customer.findUnique({ where: { phone } });
-      const recentOrder = await tx.order.findFirst({
-        where: { customerPhone: phone, createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
-      });
-
       const customer = await tx.customer.upsert({
         where: { phone },
         update: existingCustomer?.password && !accountCustomerId
@@ -431,6 +437,10 @@ export const createStorefrontOrder = async (req: Request & { customer?: { id: st
         });
       }
 
+      const riskInput = { phone, address: inputCustomer.address, items: orderItems.map(item => ({ productId: item.productId, variantId: item.variantId, quantity: item.quantity })), ip: normalizeClientIp(req.ip), source: pageSlug ? 'LANDING' as const : 'STOREFRONT' as const };
+      const risk = await evaluateOrderRisk(tx, riskInput);
+      if (risk.decision === 'BLOCK') throw Object.assign(new Error(`Order blocked by protection rules: ${risk.reasons.join(', ')}`), { riskInput, risk, protectionBlock: true });
+
       let discount = 0;
       if (couponCode && landingPageId) {
         const coupon = await tx.landingCoupon.findUnique({ where: { pageId_code: { pageId: landingPageId, code: couponCode } } });
@@ -451,7 +461,7 @@ export const createStorefrontOrder = async (req: Request & { customer?: { id: st
           customerNote: inputCustomer.note,
           checkoutDetails: JSON.stringify(checkoutDetails),
           customerEmail: inputCustomer.email || null,
-          status: 'PENDING',
+          status: risk.decision === 'HOLD' ? 'HOLD' : 'PENDING',
           paymentMethod,
           paymentStatus: 'PENDING',
           subtotal,
@@ -460,8 +470,13 @@ export const createStorefrontOrder = async (req: Request & { customer?: { id: st
           grandTotal,
           codAmount: paymentMethod === 'COD' ? grandTotal : 0,
           cogsCost,
-          isDuplicate: Boolean(recentOrder),
-          isFraudSuspect: Boolean(existingCustomer?.isBlacklisted || (existingCustomer?.riskScore || 0) > 60),
+          sourceChannel: pageSlug ? 'LANDING' : 'STOREFRONT',
+          sourceIp: risk.ip,
+          orderFingerprint: risk.fingerprint,
+          riskReasons: risk.reasons,
+          riskReviewStatus: risk.decision === 'HOLD' ? 'REVIEW_REQUIRED' : 'CLEAR',
+          isFraudSuspect: risk.reasons.length > 0,
+          isDuplicate: risk.reasons.includes('EXACT_DUPLICATE'),
           labels: JSON.stringify(pageSlug ? ['STOREFRONT', 'LANDING_PAGE'] : ['STOREFRONT']),
           items: { create: orderItems },
         },
@@ -469,8 +484,12 @@ export const createStorefrontOrder = async (req: Request & { customer?: { id: st
       });
       await queueOrderEmail(createdOrder.id, 'ORDER_PLACED', '', tx);
       await tx.checkoutAttempt.update({where:{key:idempotencyKey},data:{orderId:createdOrder.id}});
+      if (incompleteDraft) await tx.incompleteCheckout.update({ where: { id: incompleteDraft.id }, data: { status: 'CONVERTED', orderId: createdOrder.id } });
+      await recordRiskDecision(tx, riskInput, risk, createdOrder.id);
       return createdOrder;
     });
+    try { await saveOrderCourierSuggestions(order.id, order); }
+    catch (error) { console.warn('Courier area matching was unavailable for the new order:', error); }
 
     let payment: { paymentUrl: string; attemptId: string; returnToken: string } | undefined;
     if (paymentMethod === 'UDDOKTAPAY') {
@@ -563,8 +582,9 @@ export const createStorefrontOrder = async (req: Request & { customer?: { id: st
 
     res.status(201).json(responsePayload);
   } catch (error: any) {
+    if (error?.protectionBlock && error.riskInput && error.risk) await prisma.$transaction(tx => recordRiskDecision(tx, error.riskInput, error.risk));
     if (idempotencyKey && await replayCheckout(idempotencyKey,payloadFingerprint,res)) return;
-    const isClientError = /not available|not available for online purchase|select a variation|left for|out of stock|valid Bangladesh|Coupon|coupon/.test(error.message);
+    const isClientError = error?.protectionBlock || /already been converted|blocked by protection|not available|not available for online purchase|select a variation|left for|out of stock|valid Bangladesh|Coupon|coupon/.test(error.message);
     res.status(isClientError ? 409 : 500).json({ success: false, message: error.message || 'Checkout failed' });
   }
 };

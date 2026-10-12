@@ -67,6 +67,14 @@ router.get('/orders/:id/locations', run(async (req, res) => {
   const locations = await prisma.orderCourierLocation.findMany({ where: { orderId: String(req.params.id) } });
   res.json({ success: true, locations });
 }));
+router.get('/orders/:id/risk-history', run(async (req, res) => {
+  const id = String(req.params.id);
+  const [events, reviews] = await Promise.all([
+    prisma.orderRiskEvent.findMany({ where: { orderId: id }, orderBy: { createdAt: 'desc' }, take: 50 }),
+    prisma.auditLog.findMany({ where: { entity: 'ORDER', entityId: id }, orderBy: { createdAt: 'desc' }, take: 100, select: { id: true, action: true, userName: true, details: true, createdAt: true } }),
+  ]);
+  res.json({ success: true, events, reviews: reviews.filter(item => item.details?.includes('riskReview') || item.details?.includes('risk review') || item.details?.includes('override')) });
+}));
 router.post('/orders/:id/locations/rematch', requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'DISPATCHER']), run(async (req, res) => {
   const order = await prisma.order.findUnique({ where: { id: String(req.params.id) } });
   if (!order) { res.status(404).json({ success: false, message: 'Order not found' }); return; }

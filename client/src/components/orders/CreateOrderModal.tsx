@@ -4,6 +4,7 @@ import { Product, ProductVariant } from '../../types';
 import api from '../../lib/api';
 import { ShoppingBag, X, Plus, Trash2, Loader2, AlertCircle, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../context/AuthContext';
 
 const variantLabel = (variant: ProductVariant) => {
   try {
@@ -20,6 +21,7 @@ interface CreateOrderModalProps {
 }
 
 export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onSuccess }) => {
+  const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProductId, setSelectedProductId] = useState('');
   const [selectedVariantId, setSelectedVariantId] = useState('');
@@ -33,6 +35,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onS
   const [advancePaid, setAdvancePaid] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState('COD');
   const [internalNote, setInternalNote] = useState('');
+  const [overrideReason, setOverrideReason] = useState('');
+  const [riskBlocked, setRiskBlocked] = useState(false);
 
   const [orderItems, setOrderItems] = useState<
     {
@@ -147,6 +151,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onS
         advancePaid: Number(advancePaid),
         paymentMethod,
         internalNote,
+        ...(user?.role === 'SUPER_ADMIN' && overrideReason.trim().length >= 3 ? { overrideReason: overrideReason.trim() } : {}),
       });
 
       if (res.data?.success) {
@@ -157,6 +162,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onS
         toast.error(res.data?.message || 'Failed to create order');
       }
     } catch (err: any) {
+      if (Array.isArray(err.response?.data?.reasons)) setRiskBlocked(true);
       toast.error(err.response?.data?.message || err.message);
     } finally {
       setLoading(false);
@@ -366,6 +372,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onS
               <span className="font-black text-emerald-400 text-lg">{codAmount} ৳</span>
             </div>
           </div>
+
+          {riskBlocked && user?.role === 'SUPER_ADMIN' && <div className="rounded-xl border border-rose-700/50 bg-rose-950/30 p-3"><p className="text-xs text-rose-200">Protection rules blocked this order. A Super Admin can document a reason and retry; the order will stay on fraud review hold.</p><label className="mt-2 block text-xs font-semibold text-slate-200">Override reason<input value={overrideReason} onChange={event => setOverrideReason(event.target.value)} minLength={3} maxLength={1000} required className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm"/></label></div>}
 
           <div className="flex justify-end gap-3 pt-2">
             <button

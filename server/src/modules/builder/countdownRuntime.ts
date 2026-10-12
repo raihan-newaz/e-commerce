@@ -26,6 +26,41 @@ export const countdownRuntime = `(() => {
   else update();
   window.setInterval(update, 1000);
 
+  // Save product-bearing Studio order forms while customers fill them in.
+  const setupDrafts = () => {
+    document.querySelectorAll('form[action^="/b/"]').forEach((form) => {
+      let timer;
+      const value = (names) => {
+        for (const name of names) {
+          const field = form.elements.namedItem(name);
+          if (field && typeof field.value === 'string' && field.value.trim()) return field.value.trim();
+        }
+        return '';
+      };
+      const save = () => {
+        const customerName = value(['customer_name', 'name']);
+        const customerPhone = value(['customer_phone', 'phone']);
+        const address = value(['customer_address', 'address']);
+        const productId = value(['product_id']);
+        const quantity = Number(value(['quantity']) || 1);
+        if (customerName.length < 2 || !/^01[3-9]\\d{8}$/.test(customerPhone.replace(/\\D/g, '').replace(/^880/, '0')) || address.length < 8 || !/^[a-f\\d-]{36}$/i.test(productId) || !Number.isInteger(quantity) || quantity < 1 || quantity > 10) return;
+        const token = form.elements.namedItem('_draft_token');
+        if (!token || !token.value) return;
+        try {
+          const storageKey = 'nix-studio-draft:' + form.getAttribute('action');
+          const storedToken = sessionStorage.getItem(storageKey);
+          if (storedToken && /^[a-f\\d-]{36}$/i.test(storedToken)) token.value = storedToken;
+          else sessionStorage.setItem(storageKey, token.value);
+        } catch (_) {}
+        const body = { token: token.value, source: 'STUDIO_FORM', pageSlug: location.pathname.split('/')[2], customerName, customerPhone, address, items: [{ productId, quantity }] };
+        fetch('/api/incomplete-orders/public', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), keepalive: true }).catch(() => {});
+      };
+      form.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(save, 900); });
+      form.addEventListener('change', () => { clearTimeout(timer); timer = setTimeout(save, 900); });
+    });
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setupDrafts, { once: true }); else setupDrafts();
+
   // Smooth scroll handler for landing CTA buttons and order links
   const scrollToOrder = () => {
     let attempts = 0;

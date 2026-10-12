@@ -135,7 +135,7 @@ export interface RenderOptions {
   siteName?: string;
   sitePhone?: string;
   year?: string;
-  forms?: Record<string, { action: string; token: string }>;
+  forms?: Record<string, { action: string; token: string; draftToken?: string }>;
   loops?: LoopData;
   region?: Region;
   header?: Pick<RenderResult, 'html' | 'css'>;

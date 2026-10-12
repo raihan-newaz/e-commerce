@@ -45,7 +45,7 @@ export class FormInputError extends Error {
   constructor(public readonly fields: string[]) { super('Please check your form entries'); }
 }
 export function validateSubmission(form: DocumentForm, input: Record<string, unknown>): Record<string, string> {
-  const allowed = new Set(['_token', '_website', ...form.fields.map(field => String(field.props.fieldName))]);
+  const allowed = new Set(['_token', '_draft_token', '_website', ...form.fields.map(field => String(field.props.fieldName))]);
   if (Object.keys(input).some(key => !allowed.has(key))) throw new FormInputError(['The form contains an unexpected field. Reload the page and try again.']);
   const result: Record<string, string> = {}; const errors: string[] = [];
   for (const field of form.fields) {

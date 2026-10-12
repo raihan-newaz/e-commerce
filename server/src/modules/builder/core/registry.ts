@@ -24,7 +24,7 @@ export interface WidgetDefinition {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   defaults: Record<string, any>;
   controls: Control[];
-  render: (node: BuilderNode, children: string, attributes: string, context?: { form?: { action: string; token: string } }) => string;
+  render: (node: BuilderNode, children: string, attributes: string, context?: { form?: { action: string; token: string; draftToken?: string } }) => string;
   migrate?: (node: BuilderNode) => BuilderNode;
 }
 
@@ -637,7 +637,7 @@ add('form', 'Form', 'Forms', { formName: 'Contact form', successMessage: 'Thank 
   { key: 'successMessage', label: 'Success message', type: 'textarea' }
 ], (n, c, a, context) => {
   const form = context?.form;
-  return `<form${a} aria-label="${escapeHtml(n.props.formName)}" method="post"${form ? ` action="${urlAttribute(form.action)}"` : ''}>${form ? `<input type="hidden" name="_token" value="${escapeHtml(form.token)}"><div class="builder-honeypot" aria-hidden="true"><label>Leave this empty<input name="_website" tabindex="-1" autocomplete="off"></label></div>${c}` : `<fieldset disabled>${c}</fieldset>`}</form>`;
+  return `<form${a} aria-label="${escapeHtml(n.props.formName)}" method="post"${form ? ` action="${urlAttribute(form.action)}"` : ''}>${form ? `<input type="hidden" name="_token" value="${escapeHtml(form.token)}"><input type="hidden" name="_draft_token" value="${escapeHtml(form.draftToken || '')}"><div class="builder-honeypot" aria-hidden="true"><label>Leave this empty<input name="_website" tabindex="-1" autocomplete="off"></label></div>${c}<p class="builder-incomplete-notice">Your contact details and selected product may be saved securely if you leave before placing your order, so our team can follow up.</p>` : `<fieldset disabled>${c}</fieldset>`}</form>`;
 }, true);
 
 add('form-field', 'Form field', 'Forms', {
