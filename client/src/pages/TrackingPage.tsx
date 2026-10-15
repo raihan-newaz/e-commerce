@@ -37,6 +37,7 @@ interface TrackingConfig {
   metaCapiAccessToken: string;
   metaCapiAccessTokenSet: boolean;
   metaCapiTestCode: string;
+  googleSiteVerification: string;
   customEvents: CustomEventItem[];
 }
 
@@ -47,6 +48,7 @@ export const TrackingPage: React.FC = () => {
     metaCapiAccessToken: "",
     metaCapiAccessTokenSet: false,
     metaCapiTestCode: "",
+    googleSiteVerification: "",
     customEvents: [],
   });
 
@@ -93,6 +95,7 @@ export const TrackingPage: React.FC = () => {
         googleAnalyticsId: config.googleAnalyticsId,
         metaPixelId: config.metaPixelId,
         metaCapiTestCode: config.metaCapiTestCode,
+        googleSiteVerification: config.googleSiteVerification,
         customEvents: config.customEvents,
       };
 
@@ -306,6 +309,24 @@ export const TrackingPage: React.FC = () => {
                       />
             <p className="text-[11px] text-slate-500">
               Found in Google Analytics &gt; Admin &gt; Data Streams &gt; Web stream details.
+            </p>
+          </div>
+
+          <div className="mt-4 max-w-md space-y-1.5">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">
+              Google Search Console Verification Code <span className="font-normal text-slate-400">(Optional)</span>
+            </label>
+            <input
+              type="text"
+              value={config.googleSiteVerification}
+              onChange={(e) =>
+                setConfig((prev) => ({ ...prev, googleSiteVerification: e.target.value.trim() }))
+              }
+              placeholder="e.g. google-site-verification code or token"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-sm font-mono text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+            />
+            <p className="text-[11px] text-slate-500">
+              Google Search Console &gt; Settings &gt; Ownership verification &gt; HTML tag. Paste either the full meta tag or just the content value.
             </p>
           </div>
 

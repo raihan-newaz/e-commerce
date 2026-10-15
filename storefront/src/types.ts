@@ -66,7 +66,7 @@ export type ThemeConfig = {
   footerMenus?: Array<{ heading: string; items: Array<{ label: string; url: string }> }>;
   showcase?: Array<{ id: string; eyebrow: string; title: string; source: 'NEW' | 'BEST' | 'CATEGORY'; category?: string; limit: number; enabled: boolean }>;
   analytics?: {
-    googleAnalyticsId: string; metaPixelId: string; metaCapiEnabled?: boolean;
+    googleAnalyticsId: string; metaPixelId: string; metaCapiEnabled?: boolean; googleSiteVerification?: string;
     customEvents?: Array<{ name: string; selector: string; ga4Event?: string; metaEvent?: string; metaEventType?: 'custom' | 'standard' }>;
   };
 };

@@ -84,15 +84,44 @@ function AnalyticsLayer({ settings, settingsReady }: { settings: StorefrontSetti
   useEffect(() => {
     configureAnalytics(settings.themeConfig.analytics, settingsReady);
     const analytics = settings.themeConfig.analytics;
+
+    // Google Site Verification meta tag injection
+    if (analytics?.googleSiteVerification) {
+      let gsv = document.querySelector('meta[name="google-site-verification"]');
+      if (!gsv) {
+        gsv = document.createElement('meta');
+        gsv.setAttribute('name', 'google-site-verification');
+        document.head.appendChild(gsv);
+      }
+      gsv.setAttribute('content', analytics.googleSiteVerification);
+    }
+
+    // Organization Structured Data (JSON-LD)
+    let orgScript = document.getElementById('org-jsonld') as HTMLScriptElement | null;
+    if (!orgScript) {
+      orgScript = document.createElement('script');
+      orgScript.id = 'org-jsonld';
+      orgScript.type = 'application/ld+json';
+      document.head.appendChild(orgScript);
+    }
+    orgScript.textContent = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'OnlineStore',
+      name: settings.storeName || 'NIX Collection',
+      url: window.location.origin,
+      description: settings.aboutText || 'Modern everyday fashion, delivered across Bangladesh.',
+      telephone: settings.phone || '+8801701007333',
+      priceRange: '৳৳',
+      currenciesAccepted: 'BDT',
+      paymentAccepted: 'Cash on Delivery, UddoktaPay Online',
+    });
+
     const hasConfiguredDestination = Boolean(analytics?.googleAnalyticsId?.trim() || analytics?.metaPixelId?.trim());
-    // The first render uses local defaults while public settings load. Do not
-    // consume this route until a destination is configured, otherwise the
-    // later settings update cannot retry a page_view that had no gtag target.
     if (!settingsReady || !isTrackingAllowed() || !hasConfiguredDestination || lastTrackedPath.current === pathname || pathname === '/payment/result' && new URLSearchParams(window.location.search).has('token')) return;
     lastTrackedPath.current = pathname;
     const safePath = pathname.replace(/^\/product\/[^/]+/, '/product/:id').replace(/^\/order\/[^/]+/, '/order/:orderNumber');
     trackAnalyticsEvent('page_view', { page_path: safePath, page_location: `${window.location.origin}${safePath}`, page_title: document.title });
-  }, [pathname, settings.themeConfig.analytics, settingsReady, consent]);
+  }, [pathname, settings.themeConfig.analytics, settingsReady, consent, settings.storeName, settings.aboutText, settings.phone]);
   if (!showPreferences || consent) return null;
   return <aside className="analytics-consent" role="region" aria-label="Privacy preferences"><div><b>Privacy preferences</b><p>Allow analytics and marketing measurement. If enabled, store activity and limited order identifiers may be shared with Google and Meta; Meta may receive hashed contact details for completed orders.</p></div><div className="analytics-consent-actions"><button type="button" onClick={() => setAnalyticsConsent('rejected')}>Reject</button><button type="button" className="accept" onClick={() => setAnalyticsConsent('accepted')}>Allow analytics</button></div></aside>;
 }
@@ -317,9 +346,60 @@ function ProductDetail({ id, variationStyle, showColorName, buyNowText, storeNam
         if (location.pathname !== canonicalPath) navigate(canonicalPath, { replace: true });
         trackAnalyticsEvent('view_item', { currency: 'BDT', value: p.salePrice, items: [productAnalyticsItem(p)] });
         setActiveImage((current) => current || p.image || '');
-        document.title = `${p.metaTitle || p.name} | ${storeName}`;
-        const description = document.querySelector('meta[name="description"]');
-        if (description) description.setAttribute('content', p.metaDescription || p.description || `Shop modern fashion at ${storeName}.`);
+        const pageTitle = `${p.metaTitle || p.name} | ${storeName}`;
+        const pageDesc = p.metaDescription || p.description || `Shop ${p.name} at ${storeName}. Best price in Bangladesh.`;
+        const fullImageUrl = p.image ? (p.image.startsWith('http') ? p.image : `${window.location.origin}${p.image}`) : `${window.location.origin}/uploads/media/banner-city-overshirt.webp`;
+        const canonicalUrl = `${window.location.origin}/product/${encodeURIComponent(p.slug || p.id)}`;
+
+        document.title = pageTitle;
+        const setMeta = (name: string, content: string, isProp = false) => {
+          const attr = isProp ? 'property' : 'name';
+          let el = document.querySelector(`meta[${attr}="${name}"]`);
+          if (!el) { el = document.createElement('meta'); el.setAttribute(attr, name); document.head.appendChild(el); }
+          el.setAttribute('content', content);
+        };
+        setMeta('description', pageDesc);
+        setMeta('og:title', pageTitle, true);
+        setMeta('og:description', pageDesc, true);
+        setMeta('og:image', fullImageUrl, true);
+        setMeta('og:url', canonicalUrl, true);
+        setMeta('og:type', 'product', true);
+        setMeta('twitter:title', pageTitle);
+        setMeta('twitter:description', pageDesc);
+        setMeta('twitter:image', fullImageUrl);
+
+        let canonicalLink = document.querySelector('link[rel="canonical"]');
+        if (!canonicalLink) { canonicalLink = document.createElement('link'); canonicalLink.setAttribute('rel', 'canonical'); document.head.appendChild(canonicalLink); }
+        canonicalLink.setAttribute('href', canonicalUrl);
+
+        let schemaScript = document.getElementById('product-jsonld') as HTMLScriptElement | null;
+        if (!schemaScript) {
+          schemaScript = document.createElement('script');
+          schemaScript.id = 'product-jsonld';
+          schemaScript.type = 'application/ld+json';
+          document.head.appendChild(schemaScript);
+        }
+        const inStock = p.productType === 'VARIABLE' ? p.variants.some((v) => v.inStock) : (p.stock > 0);
+        schemaScript.textContent = JSON.stringify({
+          '@context': 'https://schema.org/',
+          '@type': 'Product',
+          name: p.name,
+          image: fullImageUrl,
+          description: pageDesc,
+          sku: p.sku || p.id,
+          offers: {
+            '@type': 'Offer',
+            url: canonicalUrl,
+            priceCurrency: 'BDT',
+            price: p.salePrice,
+            availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+            itemCondition: 'https://schema.org/NewCondition',
+            seller: {
+              '@type': 'Organization',
+              name: storeName,
+            },
+          },
+        });
         listProducts().then(({ products }) => { if (!cancelled) setRelated(products.filter((item) => item.id !== p.id && item.category === p.category).slice(0, 4)); }).catch(() => undefined);
         let previousIds: string[] = [];
         try { const stored: unknown = JSON.parse(localStorage.getItem('nix-recent-products-v1') || '[]'); previousIds = Array.isArray(stored) ? stored.filter((value): value is string => typeof value === 'string') : []; } catch { previousIds = []; }

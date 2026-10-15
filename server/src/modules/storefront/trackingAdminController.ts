@@ -44,6 +44,7 @@ export const getTrackingConfig = async (_req: Request, res: Response): Promise<v
         metaCapiAccessToken:     maskedToken,
         metaCapiAccessTokenSet:  Boolean(tokenRaw),
         metaCapiTestCode:        analytics.metaCapiTestCode || '',
+        googleSiteVerification:  analytics.googleSiteVerification || '',
         customEvents:            analytics.customEvents || [],
       },
     });
@@ -62,6 +63,7 @@ export const updateTrackingConfig = async (req: Request, res: Response): Promise
       metaPixelId: z.string().trim().regex(/^(|\d{5,20})$/).optional(),
       metaCapiAccessToken: z.string().trim().max(500).optional(),
       metaCapiTestCode: z.string().trim().max(40).optional(),
+      googleSiteVerification: z.string().trim().max(200).optional(),
       customEvents: z.array(z.object({
         name: z.string().trim().regex(/^[A-Za-z][A-Za-z0-9_]{0,59}$/),
         selector: z.string().trim().max(200).optional(),
@@ -77,6 +79,7 @@ export const updateTrackingConfig = async (req: Request, res: Response): Promise
       metaPixelId,
       metaCapiAccessToken,
       metaCapiTestCode,
+      googleSiteVerification,
       customEvents,
     } = parsed.data;
 
@@ -94,6 +97,7 @@ export const updateTrackingConfig = async (req: Request, res: Response): Promise
         ? { metaCapiAccessToken: protectSecret(metaCapiAccessToken.trim()) }
         : {}),
       ...(metaCapiTestCode !== undefined ? { metaCapiTestCode: metaCapiTestCode.trim() } : {}),
+      ...(googleSiteVerification !== undefined ? { googleSiteVerification: googleSiteVerification.trim() } : {}),
       ...(customEvents !== undefined ? { customEvents } : {}),
     };
 

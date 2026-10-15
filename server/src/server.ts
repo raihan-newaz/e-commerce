@@ -23,6 +23,7 @@ import authRoutes from './modules/auth/authRoutes';
 import orderRoutes from './modules/orders/orderRoutes';
 import courierRoutes from './modules/couriers/courierRoutes';
 import orderProtectionRoutes from './modules/orders/orderProtectionRoutes';
+import { getSitemapXml, getRobotsTxt } from './modules/storefront/seoController';
 import incompleteOrderRoutes from './modules/orders/incompleteOrderRoutes';
 import wooRoutes from './modules/woocommerce/wooRoutes';
 import inventoryRoutes from './modules/inventory/inventoryRoutes';
@@ -198,6 +199,9 @@ app.get('/api/builder/public-landings/:slug', publicLandingDesign);
 app.use('/api/builder', builderRoutes);
 app.get('/b/:slug', publicBuilderPage);
 app.post('/b/:slug/forms/:formId', rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false, message: 'Too many form submissions. Please try again later.' }), submitBuilderForm);
+
+app.get('/sitemap.xml', getSitemapXml);
+app.get('/robots.txt', getRobotsTxt);
 
 mountWebApps(app);
 

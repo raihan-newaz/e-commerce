@@ -27,9 +27,10 @@ const themeConfigSchema = z.object({
   showColorName: z.boolean().optional(),
   buyNowText: z.string().trim().min(2).max(30).optional(),
   checkoutFields: z.array(z.object({ key: z.string().min(1).max(40), label: z.string().min(1).max(80), type: z.enum(['text','email','tel','textarea','number','select']), enabled: z.boolean(), required: z.boolean(), placeholder: z.string().max(120).optional(), options: z.array(z.string().max(80)).max(20).optional(), custom: z.boolean().optional() })).max(20).optional(),
-  analytics: z.object({
+    analytics: z.object({
     googleAnalyticsId: z.string().trim().regex(/^(|G-[A-Z0-9]{4,})$/i, 'Enter a valid GA4 measurement ID (G-XXXXXXXXXX)').optional(),
     metaPixelId: z.string().trim().regex(/^(|\d{5,20})$/, 'Enter a valid Meta Pixel ID').optional(),
+    googleSiteVerification: z.string().trim().max(200).optional(),
     customEvents: z.array(z.object({
       name: z.string().min(1).max(60),
       selector: z.string().max(200).optional(),
@@ -124,7 +125,7 @@ export const updateStorefrontSettings = async (req: Request, res: Response): Pro
       const current = await prisma.storefrontSettings.findUnique({ where: { id: 'default' }, select: { themeConfig: true } });
       const currentTheme = parseJsonOr(current?.themeConfig, {});
       const nextAnalytics = { ...(themeConfig as any).analytics };
-      for (const key of ['metaCapiAccessToken', 'metaCapiTestCode']) {
+      for (const key of ['metaCapiAccessToken', 'metaCapiTestCode', 'googleSiteVerification']) {
         if (currentTheme.analytics?.[key] && nextAnalytics[key] === undefined) nextAnalytics[key] = currentTheme.analytics[key];
       }
       if (nextAnalytics.metaCapiAccessToken && !String(nextAnalytics.metaCapiAccessToken).startsWith('enc:v1:')) {
