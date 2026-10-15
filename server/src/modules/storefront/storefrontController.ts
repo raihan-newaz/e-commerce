@@ -487,7 +487,7 @@ export const createStorefrontOrder = async (req: Request & { customer?: { id: st
       if (incompleteDraft) await tx.incompleteCheckout.update({ where: { id: incompleteDraft.id }, data: { status: 'CONVERTED', orderId: createdOrder.id } });
       await recordRiskDecision(tx, riskInput, risk, createdOrder.id);
       return createdOrder;
-    });
+    }, { maxWait: 15000, timeout: 20000 });
     try { await saveOrderCourierSuggestions(order.id, order); }
     catch (error) { console.warn('Courier area matching was unavailable for the new order:', error); }
 
@@ -582,9 +582,15 @@ export const createStorefrontOrder = async (req: Request & { customer?: { id: st
 
     res.status(201).json(responsePayload);
   } catch (error: any) {
-    if (error?.protectionBlock && error.riskInput && error.risk) await prisma.$transaction(tx => recordRiskDecision(tx, error.riskInput, error.risk));
-    if (idempotencyKey && await replayCheckout(idempotencyKey,payloadFingerprint,res)) return;
-    const isClientError = error?.protectionBlock || /already been converted|blocked by protection|not available|not available for online purchase|select a variation|left for|out of stock|valid Bangladesh|Coupon|coupon/.test(error.message);
-    res.status(isClientError ? 409 : 500).json({ success: false, message: error.message || 'Checkout failed' });
+    try {
+      if (error?.protectionBlock && error.riskInput && error.risk) await prisma.$transaction(tx => recordRiskDecision(tx, error.riskInput, error.risk));
+      if (idempotencyKey && await replayCheckout(idempotencyKey,payloadFingerprint,res)) return;
+    } catch (cleanupErr: any) {
+      console.warn("Checkout error recovery fallback:", cleanupErr?.message || cleanupErr);
+    }
+    if (!res.headersSent) {
+      const isClientError = error?.protectionBlock || /already been converted|blocked by protection|not available|not available for online purchase|select a variation|left for|out of stock|valid Bangladesh|Coupon|coupon/.test(error?.message || "");
+      res.status(isClientError ? 409 : 500).json({ success: false, message: error?.message || 'Checkout failed' });
+    }
   }
 };

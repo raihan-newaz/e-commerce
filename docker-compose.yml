@@ -8,20 +8,21 @@ services:
     read_only: true
     tmpfs:
       - /tmp:size=64m,mode=1777
-    mem_limit: ${ECOMMERCE_MEMORY_LIMIT:-768m}
-    cpus: ${ECOMMERCE_CPUS:-1.0}
-    pids_limit: 128
+    mem_limit: ${ECOMMERCE_MEMORY_LIMIT:-1536m}
+    cpus: ${ECOMMERCE_CPUS:-2.5}
+    pids_limit: 512
     network_mode: host
     env_file: ./server/.env
     environment:
       NODE_ENV: production
       API_HOST: 127.0.0.1
       PORT: ${ECOMMERCE_PORT:-3010}
-      NODE_OPTIONS: --max-old-space-size=512
+      NODE_OPTIONS: --max-old-space-size=1024
       WEBP_QUALITY: ${WEBP_QUALITY:-82}
       WEBP_MAX_DIMENSION: ${WEBP_MAX_DIMENSION:-2560}
     volumes:
       - ./server/uploads:/app/server/uploads
+      - ./server/dist:/app/server/dist:ro
     security_opt:
       - no-new-privileges:true
     cap_drop:
