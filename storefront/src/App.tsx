@@ -52,9 +52,15 @@ function ScrollToTop() {
 function AnalyticsLayer({ settings }: { settings: StorefrontSettings }) {
   const { pathname } = useLocation();
   const [consent, setConsent] = useState(getAnalyticsConsent);
+  const [showPreferences, setShowPreferences] = useState(false);
   const lastTrackedPath = useRef('');
   useEffect(() => {
-    const sync = (event: Event) => setConsent((event as CustomEvent).detail ?? getAnalyticsConsent());
+    const sync = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      const nextConsent = detail ?? getAnalyticsConsent();
+      setConsent(nextConsent);
+      setShowPreferences(detail === null && nextConsent === null);
+    };
     window.addEventListener('nix-analytics-consent', sync);
     return () => window.removeEventListener('nix-analytics-consent', sync);
   }, []);
@@ -77,12 +83,17 @@ function AnalyticsLayer({ settings }: { settings: StorefrontSettings }) {
   }, [settings.themeConfig.analytics?.customEvents]);
   useEffect(() => {
     configureAnalytics(settings.themeConfig.analytics);
-    if (!isTrackingAllowed() || lastTrackedPath.current === pathname || pathname === '/payment/result' && new URLSearchParams(window.location.search).has('token')) return;
+    const analytics = settings.themeConfig.analytics;
+    const hasConfiguredDestination = Boolean(analytics?.googleAnalyticsId?.trim() || analytics?.metaPixelId?.trim());
+    // The first render uses local defaults while public settings load. Do not
+    // consume this route until a destination is configured, otherwise the
+    // later settings update cannot retry a page_view that had no gtag target.
+    if (!isTrackingAllowed() || !hasConfiguredDestination || lastTrackedPath.current === pathname || pathname === '/payment/result' && new URLSearchParams(window.location.search).has('token')) return;
     lastTrackedPath.current = pathname;
     const safePath = pathname.replace(/^\/product\/[^/]+/, '/product/:id').replace(/^\/order\/[^/]+/, '/order/:orderNumber');
     trackAnalyticsEvent('page_view', { page_path: safePath, page_location: `${window.location.origin}${safePath}`, page_title: document.title });
   }, [pathname, settings.themeConfig.analytics, consent]);
-  if (consent) return null;
+  if (!showPreferences || consent) return null;
   return <aside className="analytics-consent" role="region" aria-label="Privacy preferences"><div><b>Privacy preferences</b><p>Allow analytics and marketing measurement. If enabled, store activity and limited order identifiers may be shared with Google and Meta; Meta may receive hashed contact details for completed orders.</p></div><div className="analytics-consent-actions"><button type="button" onClick={() => setAnalyticsConsent('rejected')}>Reject</button><button type="button" className="accept" onClick={() => setAnalyticsConsent('accepted')}>Allow analytics</button></div></aside>;
 }
 

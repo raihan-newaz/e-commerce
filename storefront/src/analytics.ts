@@ -103,7 +103,14 @@ export function configureAnalytics(config?: { googleAnalyticsId?: string; metaPi
   if (/^G-[A-Z0-9]{4,}$/i.test(gaId) && !loadedGa.has(gaId)) {
     loadedGa.add(gaId);
     target.dataLayer = target.dataLayer || [];
-    target.gtag = target.gtag || function (...args: any[]) { target.dataLayer!.push(args); };
+    // Google Tag expects gtag calls to be queued as Arguments objects, like
+    // Google's standard bootstrap (`dataLayer.push(arguments)`). Arrays are
+    // silently ignored by the downloaded tag runtime, so no `collect` is sent.
+    target.gtag = target.gtag || function () { target.dataLayer!.push(arguments); };
+    // Consent Mode needs an initial state before the Google tag is configured.
+    // With only an `update` command, the tag can stay in an implicit consent
+    // state and queue events without sending any GA4 collect requests.
+    target.gtag('consent', 'default', { analytics_storage: 'granted', ad_storage: 'granted', ad_user_data: 'granted', ad_personalization: 'granted' });
     target.gtag('consent', 'update', { analytics_storage: 'granted', ad_storage: 'granted', ad_user_data: 'granted', ad_personalization: 'granted' });
     target.gtag('js', new Date());
     target.gtag('config', gaId, { send_page_view: false });
