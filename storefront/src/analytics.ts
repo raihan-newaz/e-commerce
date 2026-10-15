@@ -22,6 +22,8 @@ type AnalyticsWindow = Window & {
 
 let eventCounter = 0;
 let currentAnalytics: { googleAnalyticsId?: string; metaPixelId?: string; metaCapiEnabled?: boolean } = {};
+let analyticsSettingsReady = false;
+const pendingAnalyticsEvents: Array<{ name: string; params: Record<string, unknown>; eventId: string }> = [];
 
 /** Generate a unique event ID.  The same ID is sent from both the
  *  browser pixel and the server CAPI so Meta can deduplicate. */
@@ -90,10 +92,12 @@ function safeTrackingUrl(): string {
 
 // ── Script loading & configuration ──────────────────────────────────
 
-export function configureAnalytics(config?: { googleAnalyticsId?: string; metaPixelId?: string; metaCapiEnabled?: boolean }) {
+export function configureAnalytics(config?: { googleAnalyticsId?: string; metaPixelId?: string; metaCapiEnabled?: boolean }, settingsReady = true) {
   currentAnalytics = config || {};
   const target = window as AnalyticsWindow;
+  analyticsSettingsReady = settingsReady;
   if (!isTrackingAllowed()) {
+    pendingAnalyticsEvents.length = 0;
     target.gtag?.('consent', 'update', { analytics_storage: 'denied', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
     return;
   }
@@ -142,6 +146,12 @@ export function configureAnalytics(config?: { googleAnalyticsId?: string; metaPi
     }
     target.fbq?.('init', pixelId);
   }
+
+  if (settingsReady && pendingAnalyticsEvents.length) {
+    const hasDestination = Boolean(/^G-[A-Z0-9]{4,}$/i.test(gaId) || /^\d{5,20}$/.test(pixelId));
+    const queued = pendingAnalyticsEvents.splice(0);
+    if (hasDestination) queued.forEach(({ name, params, eventId }) => dispatchAnalyticsEvent(name, params, eventId));
+  }
 }
 
 // ── Event tracking ──────────────────────────────────────────────────
@@ -167,6 +177,15 @@ const relayToServer = (eventName: string, eventId: string, params: Record<string
 export function trackAnalyticsEvent(name: string, params: Record<string, unknown> = {}, sharedEventId?: string): string | undefined {
   if (!isTrackingAllowed()) return undefined;
   const eventId = sharedEventId || generateEventId();
+  if (!analyticsSettingsReady) {
+    if (pendingAnalyticsEvents.length < 100) pendingAnalyticsEvents.push({ name, params, eventId });
+    return eventId;
+  }
+  dispatchAnalyticsEvent(name, params, eventId);
+  return eventId;
+}
+
+function dispatchAnalyticsEvent(name: string, params: Record<string, unknown>, eventId: string): void {
   const target = window as AnalyticsWindow;
   const items = Array.isArray(params.items) ? params.items as AnalyticsItem[] : [];
   const value = typeof params.value === 'number' ? params.value : 0;
@@ -183,7 +202,7 @@ export function trackAnalyticsEvent(name: string, params: Record<string, unknown
   relayToServer(name, eventId, relayParams);
 
   const pixelName = pixelEvents[name];
-  if (!target.fbq) return eventId;
+  if (!target.fbq) return;
 
   if (pixelName === 'PageView') {
     target.fbq('track', 'PageView', {}, { eventID: eventId });
@@ -205,7 +224,6 @@ export function trackAnalyticsEvent(name: string, params: Record<string, unknown
       target.fbq('trackCustom', name === 'view_cart' ? 'ViewCart' : 'Login', pixelParams, { eventID: eventId });
     }
   }
-  return eventId;
 }
 
 export function trackPurchaseOnce(orderNumber: string, params: Record<string, unknown>, sharedEventId?: string): string | undefined {

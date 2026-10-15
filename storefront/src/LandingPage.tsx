@@ -75,6 +75,7 @@ export function LandingPage({ settings, slug: slugOverride, initialPage, initial
   const [submitting, setSubmitting] = useState(false);
   const viewedLanding = useRef('');
   const trackedCheckoutView = useRef('');
+  const paymentInfoTracked = useRef(false);
   useLayoutEffect(() => {
     document.body.classList.add('landing-route-active');
     return () => document.body.classList.remove('landing-route-active');
@@ -382,9 +383,14 @@ export function LandingPage({ settings, slug: slugOverride, initialPage, initial
   const choose = (id: string) => setPicked((current) => { const wasSelected = current[id]?.selected; if (!wasSelected && checkout?.selection === 'MULTI' && Object.values(current).filter((item) => item.selected).length >= maxProducts) { setError(`সর্বোচ্চ ${maxProducts}টি পণ্য বেছে নিতে পারবেন`); return current; } setError(''); return Object.fromEntries(Object.entries(current).map(([key, value]) => [key, { ...value, selected: checkout?.selection === 'SINGLE' ? key === id : key === id ? !value.selected : value.selected }])); });
   const applyCoupon = async () => { if (!page || !couponInput.trim() || !selectedItems.length) return; setCouponBusy(true); setCouponError(''); try { const quote = await quoteLandingCoupon({ pageSlug: page.slug, code: couponInput.trim(), items: selectedItems.map(({ productId, variantId, quantity }) => ({ productId, variantId, quantity })) }); setAppliedCoupon({ code: quote.code, discount: quote.discount }); } catch (err: any) { setCouponError(err.message || 'Coupon code is invalid'); setAppliedCoupon(null); } finally { setCouponBusy(false); } };
   const total = Math.max(0, subtotal + delivery - (appliedCoupon?.discount || 0));
+  const trackPaymentInfoOnce = (method: 'COD' | 'UDDOKTAPAY', amount: number) => {
+    if (paymentInfoTracked.current) return;
+    paymentInfoTracked.current = true;
+    trackAnalyticsEvent('add_payment_info', { currency: 'BDT', value: amount, payment_type: method === 'COD' ? 'Cash on Delivery' : 'UddoktaPay Online', items: selectedItems.map((item) => ({ id: item.productId, name: item.name, price: item.price, quantity: item.quantity })) });
+  };
   const chooseLandingPayment = (method: 'COD' | 'UDDOKTAPAY') => {
     setPaymentMethod(method);
-    trackAnalyticsEvent('add_payment_info', { currency: 'BDT', value: total, payment_type: method === 'COD' ? 'Cash on Delivery' : 'UddoktaPay Online', items: selectedItems.map((item) => ({ id: item.productId, name: item.name, price: item.price, quantity: item.quantity })) });
+    trackPaymentInfoOnce(method, total);
   };
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -413,6 +419,7 @@ export function LandingPage({ settings, slug: slugOverride, initialPage, initial
         _trackingConsent: isTrackingAllowed(),
         idempotencyKey,
       }, idempotencyKey);
+      trackPaymentInfoOnce(paymentMethod, result.order.grandTotal);
       clearIncompleteToken(`landing:${slug}`);
       if (paymentMethod === 'UDDOKTAPAY') {
         if (!result.paymentUrl) throw new Error('Payment link was not returned');

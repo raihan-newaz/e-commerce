@@ -49,7 +49,7 @@ function ScrollToTop() {
   return null;
 }
 
-function AnalyticsLayer({ settings }: { settings: StorefrontSettings }) {
+function AnalyticsLayer({ settings, settingsReady }: { settings: StorefrontSettings; settingsReady: boolean }) {
   const { pathname } = useLocation();
   const [consent, setConsent] = useState(getAnalyticsConsent);
   const [showPreferences, setShowPreferences] = useState(false);
@@ -82,17 +82,17 @@ function AnalyticsLayer({ settings }: { settings: StorefrontSettings }) {
     return () => document.removeEventListener('click', onClick);
   }, [settings.themeConfig.analytics?.customEvents]);
   useEffect(() => {
-    configureAnalytics(settings.themeConfig.analytics);
+    configureAnalytics(settings.themeConfig.analytics, settingsReady);
     const analytics = settings.themeConfig.analytics;
     const hasConfiguredDestination = Boolean(analytics?.googleAnalyticsId?.trim() || analytics?.metaPixelId?.trim());
     // The first render uses local defaults while public settings load. Do not
     // consume this route until a destination is configured, otherwise the
     // later settings update cannot retry a page_view that had no gtag target.
-    if (!isTrackingAllowed() || !hasConfiguredDestination || lastTrackedPath.current === pathname || pathname === '/payment/result' && new URLSearchParams(window.location.search).has('token')) return;
+    if (!settingsReady || !isTrackingAllowed() || !hasConfiguredDestination || lastTrackedPath.current === pathname || pathname === '/payment/result' && new URLSearchParams(window.location.search).has('token')) return;
     lastTrackedPath.current = pathname;
     const safePath = pathname.replace(/^\/product\/[^/]+/, '/product/:id').replace(/^\/order\/[^/]+/, '/order/:orderNumber');
     trackAnalyticsEvent('page_view', { page_path: safePath, page_location: `${window.location.origin}${safePath}`, page_title: document.title });
-  }, [pathname, settings.themeConfig.analytics, consent]);
+  }, [pathname, settings.themeConfig.analytics, settingsReady, consent]);
   if (!showPreferences || consent) return null;
   return <aside className="analytics-consent" role="region" aria-label="Privacy preferences"><div><b>Privacy preferences</b><p>Allow analytics and marketing measurement. If enabled, store activity and limited order identifiers may be shared with Google and Meta; Meta may receive hashed contact details for completed orders.</p></div><div className="analytics-consent-actions"><button type="button" onClick={() => setAnalyticsConsent('rejected')}>Reject</button><button type="button" className="accept" onClick={() => setAnalyticsConsent('accepted')}>Allow analytics</button></div></aside>;
 }
@@ -534,7 +534,12 @@ function TrackOrderPage() {
 
 function CartPage({ settings }: { settings: StorefrontSettings }) {
   const { items, subtotal, deliveryArea, setDeliveryArea, setQuantity, remove } = useCart();
-  useEffect(() => { if (items.length) trackAnalyticsEvent('view_cart', { currency: 'BDT', value: subtotal, items: items.map((item) => ({ id: item.productId, name: item.name, price: item.unitPrice, quantity: item.quantity })) }); }, []);
+  const cartViewTracked = useRef(false);
+  useEffect(() => {
+    if (!items.length || cartViewTracked.current) return;
+    cartViewTracked.current = true;
+    trackAnalyticsEvent('view_cart', { currency: 'BDT', value: subtotal, items: items.map((item) => ({ id: item.productId, name: item.name, price: item.unitPrice, quantity: item.quantity })) });
+  }, [items, subtotal]);
   if (!items.length) return <section className="section"><Empty title="Your bag is empty" text={`Discover the latest ${settings.storeName} edit and add something you love.`} action="Explore collection" /></section>;
   return <section className="cart-layout section"><div><span className="eyebrow">YOUR SELECTION</span><h1>Shopping bag <small>{items.length}</small></h1><div className="cart-items">{items.map((item) => <article className="cart-item" key={item.key}><ProductImage src={item.image} alt="" /><div><h3>{item.name}</h3>{item.variantName && <p>{item.variantName}</p>}<b>{money(item.unitPrice)}</b><div className="qty compact"><button onClick={() => setQuantity(item.key, item.quantity - 1)}><Minus size={14} /></button><span>{item.quantity}</span><button onClick={() => setQuantity(item.key, item.quantity + 1)}><Plus size={14} /></button></div></div><button className="remove" onClick={() => remove(item.key)} aria-label="Remove"><Trash2 size={18} /></button></article>)}</div></div><OrderSummary subtotal={subtotal} settings={settings} deliveryArea={deliveryArea} setDeliveryArea={setDeliveryArea} /></section>;
 }
@@ -559,6 +564,12 @@ function CheckoutPage({ settings }: { settings: StorefrontSettings }) {
   const enabledFields = checkoutFields.filter((field) => field.enabled);
   const needsPaymentEmail = paymentMethod === 'UDDOKTAPAY' && !enabledFields.some((field) => field.key === 'email');
   const checkoutTracked = useRef(false);
+  const paymentInfoTracked = useRef(false);
+  const trackPaymentInfoOnce = (method: 'COD' | 'UDDOKTAPAY', total: number) => {
+    if (paymentInfoTracked.current) return;
+    paymentInfoTracked.current = true;
+    trackAnalyticsEvent('add_payment_info', { currency: 'BDT', value: total, payment_type: method === 'COD' ? 'Cash on Delivery' : 'UddoktaPay Online', items: items.map((item) => ({ id: item.productId, name: item.name, price: item.unitPrice, quantity: item.quantity })) });
+  };
   useEffect(() => { if (items.length && !checkoutTracked.current) { checkoutTracked.current = true; trackAnalyticsEvent('begin_checkout', { currency: 'BDT', value: subtotal, items: items.map((item) => ({ id: item.productId, name: item.name, price: item.unitPrice, quantity: item.quantity })) }); } }, [items, subtotal]);
   useEffect(() => { if (customer && !form.name && !form.phone) setForm((current) => ({ ...current, name: customer.name || '', phone: customer.phone || '', email: customer.email || '', address: customer.address || '', district: customer.district || 'Dhaka', city: customer.city || customer.area || '' })); }, [customer]);
   useEffect(() => {
@@ -577,6 +588,7 @@ function CheckoutPage({ settings }: { settings: StorefrontSettings }) {
       const { fbc, fbp } = getMetaCookies();
       const _eventId = generateEventId();
       const result = await placeOrder({ customer: { ...cleanedCustomer, ...(!enabledFields.some((field) => field.key === 'district') ? { district: undefined } : {}) }, paymentMethod, deliveryArea, items: items.map((item) => ({ productId: item.productId, variantId: item.variantId || null, quantity: item.quantity })), draftToken: draftToken.current, _fbc: fbc, _fbp: fbp, _eventId, _trackingConsent: isTrackingAllowed() });
+      trackPaymentInfoOnce(paymentMethod, result.order.grandTotal);
       clearIncompleteToken('storefront');
       if (paymentMethod === 'UDDOKTAPAY') {
         if (!result.paymentUrl) throw new Error('Payment link was not returned');
@@ -593,7 +605,7 @@ function CheckoutPage({ settings }: { settings: StorefrontSettings }) {
     const prompt = key === 'name' ? 'Enter your full name' : key === 'phone' ? 'Enter your mobile number' : key === 'address' ? 'Enter your full delivery address' : `Enter ${label.toLowerCase()}`;
     setFieldErrors((current) => ({ ...current, [key]: prompt }));
   };
-  const selectPayment = (method: 'COD' | 'UDDOKTAPAY') => { setPaymentMethod(method); trackAnalyticsEvent('add_payment_info', { currency: 'BDT', value: subtotal + delivery, payment_type: method === 'COD' ? 'Cash on Delivery' : 'UddoktaPay Online', items: items.map((item) => ({ id: item.productId, name: item.name, price: item.unitPrice, quantity: item.quantity })) }); };
+  const selectPayment = (method: 'COD' | 'UDDOKTAPAY') => { setPaymentMethod(method); trackPaymentInfoOnce(method, subtotal + delivery); };
   const paymentOptions = <div className="checkout-payment-options"><h3>Payment method</h3><label><input type="radio" name="payment-method" checked={paymentMethod === 'COD'} onChange={() => selectPayment('COD')} /><span><b>Cash on delivery</b><small>Pay when your order arrives</small></span></label>{settings.onlinePaymentEnabled && <label><input type="radio" name="payment-method" checked={paymentMethod === 'UDDOKTAPAY'} onChange={() => selectPayment('UDDOKTAPAY')} /><span><b>Pay securely online</b><small>Continue to UddoktaPay after submitting your order</small></span></label>}</div>;
   return <section className="checkout section">
     <div className="checkout-heading"><span className="eyebrow">QUICK CHECKOUT</span><h1>Delivery details</h1><p>No account needed. Complete your order in under a minute.</p></div>
@@ -663,7 +675,8 @@ export default function App() {
   const location = useLocation();
   const { pathname } = location;
   const [settings, setSettings] = useState<StorefrontSettings>(() => getCachedStorefrontSettings() || defaultStorefrontSettings);
-  useEffect(() => { getStorefrontSettings().then(({ settings: next }) => setSettings(next)).catch(() => undefined); }, []);
+  const [settingsReady, setSettingsReady] = useState(false);
+  useEffect(() => { getStorefrontSettings().then(({ settings: next }) => setSettings(next)).catch(() => undefined).finally(() => setSettingsReady(true)); }, []);
   useEffect(() => { document.title = settings.themeConfig.maintenanceMode ? `We'll be right back | ${settings.storeName}` : `${settings.storeName} — Online Store`; }, [settings.storeName, settings.themeConfig.maintenanceMode]);
   const safeOrderRoute = pathname.startsWith('/payment/result') || /^\/order\//.test(pathname);
   if (settings.themeConfig.maintenanceMode && !safeOrderRoute) return <MaintenancePage settings={settings} />;
@@ -672,7 +685,7 @@ export default function App() {
   return (
     <>
       <ScrollToTop />
-      <AnalyticsLayer settings={settings} />
+      <AnalyticsLayer settings={settings} settingsReady={settingsReady} />
       <Routes>
         <Route path="/" element={<Layout settings={settings}><HomePage settings={settings} /></Layout>} />
         <Route path="/shop" element={<Layout settings={settings}><ShopPage settings={settings} /></Layout>} />
