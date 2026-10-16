@@ -1,3 +1,4 @@
+import { courierAvailability } from './availability';
 import { Router } from 'express';
 import {
   dispatchSingleOrder,
@@ -61,6 +62,7 @@ router.post('/redx/orders/:orderId/refresh', authenticateToken, redxRefresh);
 router.patch('/redx/orders/:orderId', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'DISPATCHER']), redxUpdateParcel);
 router.post('/redx/orders/:orderId/resolve', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER']), redxResolveBooking);
 router.get('/redx/events', authenticateToken, redxEvents);
+router.get('/availability', authenticateToken, courierAvailability);
 router.get('/locations/:provider', authenticateToken, listCourierLocations);
 router.post('/locations/:provider/refresh', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER']), refreshCourierLocations);
 

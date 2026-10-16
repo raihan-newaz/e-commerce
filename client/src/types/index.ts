@@ -31,6 +31,7 @@ export interface OrderItem {
 }
 
 export interface Order {
+  trashedAt?: string | null;
   id: string;
   orderNumber: string;
   wooOrderId?: number;

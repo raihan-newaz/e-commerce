@@ -23,24 +23,24 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, orders, onClo
   const isBulk = orderList.length > 1;
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+    <div className="admin-form-dialog fixed inset-0 z-[9999] bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-800/40 shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl">
               <FileText className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-slate-100 text-lg">Print Invoice & Shipping Label</h3>
-              <p className="text-xs text-slate-400">
+              <h3 className="font-bold text-slate-900 dark:text-slate-100 text-lg">Print Invoice & Shipping Label</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 {isBulk ? `${orderList.length} orders selected for printing` : `Order #${orderList[0].orderNumber}`}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             {/* Format Toggle */}
-            <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+            <div className="flex bg-slate-50 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
               <button
                 onClick={() => setPrintFormat('POS_80MM')}
                 className={`px-3 py-1 rounded-lg font-medium transition-all ${

@@ -1,3 +1,4 @@
+import { AdminSelect } from '../components/admin/AdminSelect';
 import { Component, type ReactNode, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
@@ -1248,7 +1249,7 @@ export function StudioPage() {
             <span><span className="studio-live-dot" />{device} <span className="studio-muted">/ {width}px</span></span>
           </div>
           <div>
-            <label>Zoom <select value={zoom} onChange={event => setZoom(Number(event.target.value))}>{[0.4, 0.5, 0.6, 0.7, 0.8, 1].map(value => <option value={value} key={value}>{Math.round(value * 100)}%</option>)}</select></label>
+            <label>Zoom <AdminSelect dropdownKey="builder.StudioPage.tsx.1" value={zoom} onChange={event => setZoom(Number(event.target.value))}>{[0.4, 0.5, 0.6, 0.7, 0.8, 1].map(value => <option value={value} key={value}>{Math.round(value * 100)}%</option>)}</AdminSelect></label>
             <button onClick={() => setZoom(Math.min(1, Math.max(0.3, (window.innerWidth - 660) / width)))}>Fit</button>
           </div>
         </div>

@@ -1,3 +1,4 @@
+import { AdminSelect } from '../components/admin/AdminSelect';
 import { useEffect, useState } from 'react';
 import { LayoutTemplate, Palette, RotateCcw, Save, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -315,7 +316,7 @@ export const ThemeCustomizerPage = () => {
             <div className="grid gap-4 md:grid-cols-2">
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
                 Font Family
-                <select
+                <AdminSelect dropdownKey="pages.ThemeCustomizerPage.tsx.1"
                   value={theme.fontFamily}
                   onChange={(e) => update('fontFamily', e.target.value)}
                   className="field h-9 text-xs"
@@ -323,24 +324,24 @@ export const ThemeCustomizerPage = () => {
                   <option>Manrope</option>
                   <option>Inter</option>
                   <option>Plus Jakarta Sans</option>
-                </select>
+                </AdminSelect>
               </label>
 
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
                 Header Behavior
-                <select
+                <AdminSelect dropdownKey="pages.ThemeCustomizerPage.tsx.2"
                   value={theme.headerMode}
                   onChange={(e) => update('headerMode', e.target.value)}
                   className="field h-9 text-xs"
                 >
                   <option value="STICKY">Sticky header</option>
                   <option value="STATIC">Static header</option>
-                </select>
+                </AdminSelect>
               </label>
 
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
                 Button Shape
-                <select
+                <AdminSelect dropdownKey="pages.ThemeCustomizerPage.tsx.3"
                   value={theme.buttonRadius}
                   onChange={(e) => update('buttonRadius', e.target.value)}
                   className="field h-9 text-xs"
@@ -348,24 +349,24 @@ export const ThemeCustomizerPage = () => {
                   <option value="square">Square</option>
                   <option value="soft">Soft corners</option>
                   <option value="round">Pill</option>
-                </select>
+                </AdminSelect>
               </label>
 
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
                 Product-card Density
-                <select
+                <AdminSelect dropdownKey="pages.ThemeCustomizerPage.tsx.4"
                   value={theme.productDensity}
                   onChange={(e) => update('productDensity', e.target.value)}
                   className="field h-9 text-xs"
                 >
                   <option value="COMFORTABLE">Comfortable</option>
                   <option value="COMPACT">Compact</option>
-                </select>
+                </AdminSelect>
               </label>
 
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
                 Card Shape
-                <select
+                <AdminSelect dropdownKey="pages.ThemeCustomizerPage.tsx.5"
                   value={theme.cardRadius}
                   onChange={(e) => update('cardRadius', e.target.value)}
                   className="field h-9 text-xs"
@@ -373,7 +374,7 @@ export const ThemeCustomizerPage = () => {
                   <option value="square">Square</option>
                   <option value="soft">Soft corners</option>
                   <option value="round">Rounded</option>
-                </select>
+                </AdminSelect>
               </label>
             </div>
           </section>

@@ -54,6 +54,7 @@ export type StorePageBlock = { id: string; type: 'TEXT' | 'IMAGE' | 'BUTTON' | '
 export type StorePage = { id: string; title: string; slug: string; eyebrow: string; excerpt: string; coverImage: string; blocks: StorePageBlock[]; metaTitle: string; metaDescription: string; status: 'PUBLISHED'; isActive: boolean; aliases: string[] };
 
 export type ThemeConfig = {
+  heroDesktopHeight?: number; heroMobileHeight?: number;
   primaryColor: string; accentColor: string; backgroundColor: string; textColor: string; mutedColor: string;
   fontFamily: 'Manrope' | 'Inter' | 'Plus Jakarta Sans'; buttonRadius: 'square' | 'soft' | 'round'; cardRadius: 'square' | 'soft' | 'round';
   headerMode: 'STICKY' | 'STATIC'; productDensity: 'COMFORTABLE' | 'COMPACT'; showAnnouncement: boolean; showTrustBar: boolean; showBestSellers: boolean; showAbout: boolean;

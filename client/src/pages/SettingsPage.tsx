@@ -1,3 +1,4 @@
+import { AdminSelect } from '../components/admin/AdminSelect';
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../lib/api';
@@ -552,10 +553,10 @@ export const SettingsPage: React.FC = () => {
             </h3>
             <p className="text-xs text-slate-500">Save merchant credentials, load your approved stores, then select a pickup store and enable dispatch.</p>
             <label className="block text-xs text-slate-700 dark:text-slate-300">Environment
-              <select value={pathaoBaseUrl} onChange={(e) => { setPathaoBaseUrl(e.target.value); setPathaoStores([]); setPathaoStoreId(''); setPathaoEnabled(false); }} className="mt-1 w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-slate-100">
+              <AdminSelect dropdownKey="pages.SettingsPage.tsx.1" value={pathaoBaseUrl} onChange={(e) => { setPathaoBaseUrl(e.target.value); setPathaoStores([]); setPathaoStoreId(''); setPathaoEnabled(false); }} className="mt-1 w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-slate-100">
                 <option value="https://api-hermes.pathao.com">Live</option>
                 <option value="https://courier-api-sandbox.pathao.com">Sandbox</option>
-              </select>
+              </AdminSelect>
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div>
@@ -587,11 +588,11 @@ export const SettingsPage: React.FC = () => {
             </div>
             <div className="flex flex-wrap items-end gap-3">
               <label className="min-w-[220px] flex-1 text-xs text-slate-700 dark:text-slate-300">Pickup store
-                <select value={pathaoStoreId} onChange={(e) => setPathaoStoreId(e.target.value)} className="mt-1 w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-slate-100">
+                <AdminSelect dropdownKey="pages.SettingsPage.tsx.2" value={pathaoStoreId} onChange={(e) => setPathaoStoreId(e.target.value)} className="mt-1 w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-slate-100">
                   <option value="">Select an approved store</option>
                   {pathaoStoreId && !pathaoStores.some((store) => String(store.store_id) === pathaoStoreId) && <option value={pathaoStoreId}>Current store #{pathaoStoreId}</option>}
                   {pathaoStores.filter((store) => Number(store.is_active) === 1).map((store) => <option key={store.store_id} value={store.store_id}>{store.store_name} (#{store.store_id})</option>)}
-                </select>
+                </AdminSelect>
               </label>
               <button type="button" disabled={pathaoBusy} onClick={loadPathaoStores} className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold dark:border-slate-700">Load stores</button>
             </div>
@@ -625,9 +626,9 @@ export const SettingsPage: React.FC = () => {
               <button type="button" onClick={showNewPathaoStore ? () => setShowNewPathaoStore(false) : openPathaoStoreForm} className="text-xs font-bold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400">{showNewPathaoStore ? 'Close new store form' : 'Create a new Pathao store'}</button>
               {showNewPathaoStore && <div className="mt-3 grid gap-3 text-xs sm:grid-cols-2">
                 {(['name', 'contact_name', 'contact_number', 'secondary_contact', 'otp_number', 'address'] as const).map((field) => <label key={field} className="block text-slate-700 dark:text-slate-300">{{ name: 'Store name', contact_name: 'Contact name', contact_number: 'Contact phone', secondary_contact: 'Secondary phone (optional)', otp_number: 'OTP phone (optional)', address: 'Pickup address' }[field]}<input value={newPathaoStore[field]} onChange={(event) => setNewPathaoStore({ ...newPathaoStore, [field]: event.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950" /></label>)}
-                <label className="text-slate-700 dark:text-slate-300">City<select value={newPathaoStore.city_id} onChange={(event) => changePathaoStoreCity(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950"><option value="">Select city</option>{pathaoCities.map((city) => <option key={city.city_id} value={city.city_id}>{city.city_name}</option>)}</select></label>
-                <label className="text-slate-700 dark:text-slate-300">Zone<select value={newPathaoStore.zone_id} disabled={!newPathaoStore.city_id} onChange={(event) => changePathaoStoreZone(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950"><option value="">Select zone</option>{pathaoZones.map((zone) => <option key={zone.zone_id} value={zone.zone_id}>{zone.zone_name}</option>)}</select></label>
-                <label className="text-slate-700 dark:text-slate-300">Area<select value={newPathaoStore.area_id} disabled={!newPathaoStore.zone_id} onChange={(event) => setNewPathaoStore({ ...newPathaoStore, area_id: event.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950"><option value="">Select area</option>{pathaoAreas.map((area) => <option key={area.area_id} value={area.area_id}>{area.area_name}</option>)}</select></label>
+                <label className="text-slate-700 dark:text-slate-300">City<AdminSelect dropdownKey="pages.SettingsPage.tsx.3" value={newPathaoStore.city_id} onChange={(event) => changePathaoStoreCity(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950"><option value="">Select city</option>{pathaoCities.map((city) => <option key={city.city_id} value={city.city_id}>{city.city_name}</option>)}</AdminSelect></label>
+                <label className="text-slate-700 dark:text-slate-300">Zone<AdminSelect dropdownKey="pages.SettingsPage.tsx.4" value={newPathaoStore.zone_id} disabled={!newPathaoStore.city_id} onChange={(event) => changePathaoStoreZone(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950"><option value="">Select zone</option>{pathaoZones.map((zone) => <option key={zone.zone_id} value={zone.zone_id}>{zone.zone_name}</option>)}</AdminSelect></label>
+                <label className="text-slate-700 dark:text-slate-300">Area<AdminSelect dropdownKey="pages.SettingsPage.tsx.5" value={newPathaoStore.area_id} disabled={!newPathaoStore.zone_id} onChange={(event) => setNewPathaoStore({ ...newPathaoStore, area_id: event.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950"><option value="">Select area</option>{pathaoAreas.map((area) => <option key={area.area_id} value={area.area_id}>{area.area_name}</option>)}</AdminSelect></label>
                 <div className="flex items-end"><button type="button" disabled={pathaoBusy} onClick={createNewPathaoStore} className="rounded-xl border border-emerald-300 px-4 py-2 font-bold text-emerald-700 dark:border-emerald-600 dark:text-emerald-300 disabled:opacity-50">Submit store to Pathao</button></div>
               </div>}
             </div>
@@ -640,10 +641,10 @@ export const SettingsPage: React.FC = () => {
               RedX OpenAPI
             </h3>
             <label className="block text-xs text-slate-700 dark:text-slate-300">Environment
-              <select value={redxBaseUrl} onChange={e => setRedxBaseUrl(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-white">
+              <AdminSelect dropdownKey="pages.SettingsPage.tsx.6" value={redxBaseUrl} onChange={e => setRedxBaseUrl(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-white">
                 <option value="https://sandbox.redx.com.bd/v1.0.0-beta">Sandbox — simulated parcels</option>
                 <option value="https://openapi.redx.com.bd/v1.0.0-beta">Production — live parcels</option>
-              </select>
+              </AdminSelect>
             </label>
             <div className="text-xs">
               <label className="block text-slate-700 dark:text-slate-300 mb-1">Token for selected environment</label>
@@ -831,7 +832,7 @@ export const SettingsPage: React.FC = () => {
 
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Assigned Role</label>
-                <select
+                <AdminSelect dropdownKey="pages.SettingsPage.tsx.7"
                   value={userRole}
                   onChange={(e) => setUserRole(e.target.value)}
                   className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-slate-100"
@@ -842,9 +843,9 @@ export const SettingsPage: React.FC = () => {
                   <option value="INVENTORY_MANAGER">Inventory Manager</option>
                   <option value="DISPATCHER">Dispatcher</option>
                   <option value="SUPER_ADMIN">Super Administrator</option>
-                </select>
+                </AdminSelect>
               </div>
-              {editingUser && <div><label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Account status</label><select value={editingStatus} onChange={(e) => setEditingStatus(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-slate-100"><option value="ACTIVE">Active</option><option value="SUSPENDED">Suspended</option><option value="INACTIVE">Inactive</option></select></div>}
+              {editingUser && <div><label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Account status</label><AdminSelect dropdownKey="pages.SettingsPage.tsx.8" value={editingStatus} onChange={(e) => setEditingStatus(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-slate-100"><option value="ACTIVE">Active</option><option value="SUSPENDED">Suspended</option><option value="INACTIVE">Inactive</option></AdminSelect></div>}
 
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
                 <button

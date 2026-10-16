@@ -1,3 +1,5 @@
+import { invalidateCourierCatalog, queueLocationSync } from './locationQueue';
+import { availableCouriers } from './availability';
 import { Request, Response } from 'express';
 import prisma from '../../prisma';
 import { callPathao } from './pathaoSession';
@@ -9,17 +11,19 @@ type Location = { provider: string; level: Level; externalId: string; parentExte
 export const normalizeLocation = (value: string) => value.toLowerCase().normalize('NFKC').replace(/\b(district|zila|zilla)\b/g, ' ').replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ');
 
 async function saveLocations(items: Location[]) {
-  for (let i = 0; i < items.length; i += 25) {
-    await Promise.all(items.slice(i, i + 25).map((item) => prisma.courierLocation.upsert({
+  if (!items.length) throw new Error('Courier returned an empty location catalog. Existing locations were retained.');
+  for (let i = 0; i < items.length; i += 5) {
+    await Promise.all(items.slice(i, i + 5).map((item) => prisma.courierLocation.upsert({
       where: { provider_level_externalId: { provider: item.provider, level: item.level, externalId: item.externalId } },
       create: item,
       update: { parentExternalId: item.parentExternalId, name: item.name, normalizedName: item.normalizedName, districtName: item.districtName, active: item.active ?? true },
     })));
   }
+  invalidateCourierCatalog();
   return items.length;
 }
 
-export async function syncSteadfastLocations() {
+async function performSteadfastLocations() {
   const { adapter } = await getSteadfastAdapter();
   const result = await adapter.getPoliceStations();
   if (!result.success || !Array.isArray(result.data?.data)) throw new Error(!result.success ? result.message : 'Steadfast did not return districts and police stations');
@@ -35,13 +39,13 @@ export async function syncSteadfastLocations() {
       items.push({ provider: 'STEADFAST', level: 'THANA', externalId: String(station.id), parentExternalId: districtId, name, normalizedName: normalizeLocation(name), districtName, active: true });
     }
   }
-  await prisma.courierLocation.updateMany({ where: { provider: 'STEADFAST' }, data: { active: false } });
   const count = await saveLocations(items);
+  for (const level of ['DISTRICT','THANA'] as const) await prisma.courierLocation.updateMany({ where: { provider:'STEADFAST',level,externalId:{notIn:items.filter(item=>item.level===level).map(item=>item.externalId)} },data:{active:false} });
   await prisma.courierLocationSync.upsert({ where: { provider_level_parentKey: { provider: 'STEADFAST', level: 'DISTRICT', parentKey: '' } }, create: { provider: 'STEADFAST', level: 'DISTRICT', parentKey: '', itemCount: count }, update: { itemCount: count, syncedAt: new Date() } });
   return count;
 }
 
-export async function syncPathaoLocations(level: Level, parentId?: string) {
+async function performPathaoLocations(level: Level, parentId?: string) {
   if (level !== 'DISTRICT' && (!parentId || !/^\d+$/.test(parentId))) throw new Error('A Pathao parent location is required');
   const result = level === 'DISTRICT' ? await callPathao((adapter, token) => adapter.getCities(token)) :
     level === 'THANA' ? await callPathao((adapter, token) => adapter.getZones(Number(parentId), token)) :
@@ -53,13 +57,13 @@ export async function syncPathaoLocations(level: Level, parentId?: string) {
     const name = String(entry[nameKey]).trim();
     return { provider: 'PATHAO', level, externalId: String(entry[idKey]), parentExternalId: parentId, name, normalizedName: normalizeLocation(name), active: entry.home_delivery_available !== false };
   });
-  await prisma.courierLocation.updateMany({ where: { provider: 'PATHAO', level, ...(level !== 'DISTRICT' ? { parentExternalId: parentId } : {}) }, data: { active: false } });
   const count = await saveLocations(items);
+  await prisma.courierLocation.updateMany({ where: { provider: 'PATHAO', level, externalId:{notIn:items.map(item=>item.externalId)}, ...(level !== 'DISTRICT' ? { parentExternalId: parentId } : {}) }, data: { active:false } });
   await prisma.courierLocationSync.upsert({ where: { provider_level_parentKey: { provider: 'PATHAO', level, parentKey: parentId || '' } }, create: { provider: 'PATHAO', level, parentKey: parentId || '', itemCount: count }, update: { itemCount: count, syncedAt: new Date() } });
   return count;
 }
 
-export async function syncRedXAreas() {
+async function performRedXAreas() {
   const { adapter } = await getRedXAdapter();
   const result = await adapter.getAreas();
   if (!result.success) throw new Error(result.message || 'RedX areas are unavailable');
@@ -68,12 +72,18 @@ export async function syncRedXAreas() {
     normalizedName: normalizeLocation(String(area.name)), districtName: String(area.division_name || '').trim() || undefined,
     active: true,
   }));
-  await prisma.courierLocation.updateMany({ where: { provider: 'REDX', level: 'AREA' }, data: { active: false } });
   const count = await saveLocations(items);
+  await prisma.courierLocation.updateMany({ where:{provider:'REDX',level:'AREA',externalId:{notIn:items.map(item=>item.externalId)}},data:{active:false} });
   await prisma.courierLocationSync.upsert({ where: { provider_level_parentKey: { provider: 'REDX', level: 'AREA', parentKey: '' } },
     create: { provider: 'REDX', level: 'AREA', parentKey: '', itemCount: count }, update: { itemCount: count, syncedAt: new Date() } });
   return count;
 }
+
+export const syncSteadfastLocations = (force = false) => queueLocationSync('STEADFAST', performSteadfastLocations, force);
+export const syncRedXAreas = (force = false) => queueLocationSync('REDX', performRedXAreas, force);
+export const syncPathaoLocations = (level: Level, parentId?: string, force = false) => queueLocationSync('PATHAO:'+level+':'+(parentId || ''), () => performPathaoLocations(level,parentId), force);
+const resultCache = new Map<string,{ at: number; rows: unknown[] }>();
+const reads = new Map<string,Promise<unknown[]>>();
 
 export const listCourierLocations = async (req: Request, res: Response): Promise<void> => {
   const provider = String(req.params.provider || '').toUpperCase();
@@ -84,17 +94,31 @@ export const listCourierLocations = async (req: Request, res: Response): Promise
   }
   if (provider === 'STEADFAST' && level === 'AREA') { res.json({ success: true, locations: [] }); return; }
   try {
+    const readiness = (await availableCouriers()).find(item => item.provider === provider);
+    if (!readiness?.ready) { res.status(409).json({ success:false, message: provider+' is not completely configured and enabled' }); return; }
+    const key = provider+':'+level+':'+(parentId || '');
+    const cached = resultCache.get(key);
+    if (cached && Date.now()-cached.at < 300_000) { res.json({ success:true,locations:cached.rows }); return; }
+    let read = reads.get(key);
+    if (!read) { read = (async () => {
     const where = { provider, level, active: true, ...(level !== 'DISTRICT' && provider !== 'REDX' ? { parentExternalId: parentId } : {}) };
     let locations = await prisma.courierLocation.findMany({ where, orderBy: { name: 'asc' }, take: provider === 'REDX' ? 10000 : 2000 });
     const synced = await prisma.courierLocationSync.findUnique({ where: { provider_level_parentKey: { provider, level, parentKey: level === 'DISTRICT' || provider === 'REDX' ? '' : parentId || '' } } });
-    if (!locations.length && !synced) {
+    if (!locations.length || !synced) {
+      try {
       if (provider === 'STEADFAST') await syncSteadfastLocations();
       else if (provider === 'REDX') await syncRedXAreas();
       else await syncPathaoLocations(level, parentId);
+      } catch (error) { if (!locations.length) throw error; }
       locations = await prisma.courierLocation.findMany({ where, orderBy: { name: 'asc' }, take: provider === 'REDX' ? 10000 : 2000 });
     }
+      if (resultCache.size >= 512) resultCache.delete(resultCache.keys().next().value!);
+      resultCache.set(key,{ at:Date.now(),rows:locations });
+      return locations;
+    })().finally(() => { reads.delete(key); }); reads.set(key,read); }
+    const locations = await read;
     res.json({ success: true, locations });
-  } catch (error: any) { res.status(503).json({ success: false, message: error.message }); }
+  } catch (error: any) { res.setHeader('Retry-After','60'); res.status(503).json({ success: false, message: error.message }); }
 };
 
 export const refreshCourierLocations = async (req: Request, res: Response): Promise<void> => {
@@ -102,8 +126,9 @@ export const refreshCourierLocations = async (req: Request, res: Response): Prom
   const level = String(req.body?.level || 'DISTRICT').toUpperCase() as Level;
   const parentId = req.body?.parentId ? String(req.body.parentId) : undefined;
   try {
-    const count = provider === 'STEADFAST' ? await syncSteadfastLocations() : provider === 'REDX' && level === 'AREA' ? await syncRedXAreas() : provider === 'PATHAO' && ['DISTRICT', 'THANA', 'AREA'].includes(level) ? await syncPathaoLocations(level, parentId) : null;
+    const count = provider === 'STEADFAST' ? await syncSteadfastLocations(true) : provider === 'REDX' && level === 'AREA' ? await syncRedXAreas(true) : provider === 'PATHAO' && ['DISTRICT', 'THANA', 'AREA'].includes(level) ? await syncPathaoLocations(level, parentId, true) : null;
     if (count === null) { res.status(400).json({ success: false, message: 'Unsupported location provider or level' }); return; }
+    for (const key of resultCache.keys()) if (key.startsWith(provider+':')) resultCache.delete(key);
     res.json({ success: true, count });
   } catch (error: any) { res.status(503).json({ success: false, message: error.message }); }
 };

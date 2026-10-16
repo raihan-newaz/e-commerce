@@ -1,3 +1,4 @@
+import { AdminSelect } from '../components/admin/AdminSelect';
 import { useState } from 'react';
 import { MediaPicker } from '../components/MediaPicker';
 import { IconLibraryModal } from './IconLibraryModal';
@@ -255,12 +256,12 @@ export function Inspector({ node, document: _document, device, command, onDesele
 
       <label className="studio-field">
         <span>Family</span>
-        <select
+        <AdminSelect dropdownKey="builder.Inspector.tsx.1"
           value={local['font-family'] || ''}
           onChange={e => style('font-family', e.target.value)}
         >
           {fontFamilies.map(f => <option key={f.label} value={f.value}>{f.label}</option>)}
-        </select>
+        </AdminSelect>
       </label>
 
       <div className="elementor-slider-row">
@@ -287,17 +288,17 @@ export function Inspector({ node, document: _document, device, command, onDesele
 
       <label className="studio-field">
         <span>Weight</span>
-        <select
+        <AdminSelect dropdownKey="builder.Inspector.tsx.2"
           value={local['font-weight'] || ''}
           onChange={e => style('font-weight', e.target.value)}
         >
           {fontWeights.map(w => <option key={w.label} value={w.value}>{w.label}</option>)}
-        </select>
+        </AdminSelect>
       </label>
 
       <label className="studio-field">
         <span>Transform</span>
-        <select
+        <AdminSelect dropdownKey="builder.Inspector.tsx.3"
           value={local['text-transform'] || ''}
           onChange={e => style('text-transform', e.target.value)}
         >
@@ -306,7 +307,7 @@ export function Inspector({ node, document: _document, device, command, onDesele
           <option value="lowercase">Lowercase</option>
           <option value="capitalize">Capitalize</option>
           <option value="none">Normal</option>
-        </select>
+        </AdminSelect>
       </label>
 
       <div className="elementor-slider-row">
@@ -446,7 +447,7 @@ export function Inspector({ node, document: _document, device, command, onDesele
 
                   <label className="studio-field">
                     <span>Image Resolution</span>
-                    <select
+                    <AdminSelect dropdownKey="builder.Inspector.tsx.4"
                       value={String(node.props.imageSize || 'full')}
                       onChange={e => update({ props: { ...node.props, imageSize: e.target.value } })}
                     >
@@ -454,7 +455,7 @@ export function Inspector({ node, document: _document, device, command, onDesele
                       <option value="medium">Medium - 300 x 300</option>
                       <option value="large">Large - 1024 x 1024</option>
                       <option value="full">Full</option>
-                    </select>
+                    </AdminSelect>
                   </label>
 
                   <Field
@@ -527,7 +528,7 @@ export function Inspector({ node, document: _document, device, command, onDesele
                   />
                   <label className="studio-field">
                     <span>HTML Tag</span>
-                    <select
+                    <AdminSelect dropdownKey="builder.Inspector.tsx.5"
                       value={String(node.props.level ?? '2')}
                       onChange={e => update({ props: { ...node.props, level: Number(e.target.value) } })}
                     >
@@ -540,7 +541,7 @@ export function Inspector({ node, document: _document, device, command, onDesele
                       <option value="div">div</option>
                       <option value="span">span</option>
                       <option value="p">p</option>
-                    </select>
+                    </AdminSelect>
                   </label>
                   {renderAlignmentControl(local['text-align'] || 'left', (align) => style('text-align', align))}
                 </div>
@@ -554,7 +555,7 @@ export function Inspector({ node, document: _document, device, command, onDesele
                 <div className="elementor-group-content">
                   <label className="studio-field">
                     <span>Type</span>
-                    <select
+                    <AdminSelect dropdownKey="builder.Inspector.tsx.6"
                       value={String(node.props.type || 'default')}
                       onChange={e => update({ props: { ...node.props, type: e.target.value } })}
                     >
@@ -563,7 +564,7 @@ export function Inspector({ node, document: _document, device, command, onDesele
                       <option value="success">Success</option>
                       <option value="warning">Warning</option>
                       <option value="danger">Danger</option>
-                    </select>
+                    </AdminSelect>
                   </label>
                   <Field
                     label="Text"
@@ -589,7 +590,7 @@ export function Inspector({ node, document: _document, device, command, onDesele
 
                   <label className="studio-field">
                     <span>Size</span>
-                    <select
+                    <AdminSelect dropdownKey="builder.Inspector.tsx.7"
                       value={String(node.props.size || 'medium')}
                       onChange={e => update({ props: { ...node.props, size: e.target.value } })}
                     >
@@ -597,7 +598,7 @@ export function Inspector({ node, document: _document, device, command, onDesele
                       <option value="medium">Medium</option>
                       <option value="large">Large</option>
                       <option value="xl">Extra Large</option>
-                    </select>
+                    </AdminSelect>
                   </label>
 
                   <div className="elementor-control-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
@@ -643,13 +644,13 @@ export function Inspector({ node, document: _document, device, command, onDesele
                     <>
                       <label className="studio-field">
                         <span>Icon Position</span>
-                        <select
+                        <AdminSelect dropdownKey="builder.Inspector.tsx.8"
                           value={String(node.props.iconPosition || 'before')}
                           onChange={e => update({ props: { ...node.props, iconPosition: e.target.value } })}
                         >
                           <option value="before">Before (Left)</option>
                           <option value="after">After (Right)</option>
-                        </select>
+                        </AdminSelect>
                       </label>
 
                       <div className="elementor-slider-row">
@@ -719,7 +720,7 @@ export function Inspector({ node, document: _document, device, command, onDesele
 
                   <label className="studio-field">
                     <span>Aspect Ratio</span>
-                    <select
+                    <AdminSelect dropdownKey="builder.Inspector.tsx.9"
                       value={String(node.props.aspectRatio || 'auto')}
                       onChange={e => update({ props: { ...node.props, aspectRatio: e.target.value } })}
                     >
@@ -732,7 +733,7 @@ export function Inspector({ node, document: _document, device, command, onDesele
                       <option value="4/3">4:3 Classic Standard</option>
                       <option value="21/9">21:9 Ultrawide Banner</option>
                       <option value="custom">Custom Ratio</option>
-                    </select>
+                    </AdminSelect>
                   </label>
 
                   {node.props.aspectRatio === 'custom' && (
@@ -746,7 +747,7 @@ export function Inspector({ node, document: _document, device, command, onDesele
 
                   <label className="studio-field">
                     <span>Object Fit</span>
-                    <select
+                    <AdminSelect dropdownKey="builder.Inspector.tsx.10"
                       value={String(node.props.objectFit || 'cover')}
                       onChange={e => update({ props: { ...node.props, objectFit: e.target.value } })}
                     >
@@ -755,7 +756,7 @@ export function Inspector({ node, document: _document, device, command, onDesele
                       <option value="fill">Fill (Stretch to fit)</option>
                       <option value="scale-down">Scale Down</option>
                       <option value="none">None (Natural size)</option>
-                    </select>
+                    </AdminSelect>
                   </label>
 
                   <Field label="Alt Text" value={String(node.props.alt ?? '')} onChange={alt => update({ props: { ...node.props, alt } })} />
@@ -797,26 +798,26 @@ export function Inspector({ node, document: _document, device, command, onDesele
 
                   <label className="studio-field">
                     <span>View</span>
-                    <select
+                    <AdminSelect dropdownKey="builder.Inspector.tsx.11"
                       value={String(node.props.view || 'default')}
                       onChange={e => update({ props: { ...node.props, view: e.target.value } })}
                     >
                       <option value="default">Default</option>
                       <option value="stacked">Stacked</option>
                       <option value="framed">Framed</option>
-                    </select>
+                    </AdminSelect>
                   </label>
 
                   {['stacked', 'framed'].includes(String(node.props.view)) && (
                     <label className="studio-field">
                       <span>Shape</span>
-                      <select
+                      <AdminSelect dropdownKey="builder.Inspector.tsx.12"
                         value={String(node.props.shape || 'circle')}
                         onChange={e => update({ props: { ...node.props, shape: e.target.value } })}
                       >
                         <option value="circle">Circle</option>
                         <option value="square">Square</option>
-                      </select>
+                      </AdminSelect>
                     </label>
                   )}
 
@@ -839,7 +840,7 @@ export function Inspector({ node, document: _document, device, command, onDesele
                 <div className="elementor-group-content">
                   <label className="studio-field">
                     <span>Direction</span>
-                    <select
+                    <AdminSelect dropdownKey="builder.Inspector.tsx.13"
                       value={local['flex-direction'] || 'column'}
                       onChange={e => style('flex-direction', e.target.value)}
                     >
@@ -847,12 +848,12 @@ export function Inspector({ node, document: _document, device, command, onDesele
                       <option value="column">Column (Vertical)</option>
                       <option value="row-reverse">Row Reverse</option>
                       <option value="column-reverse">Column Reverse</option>
-                    </select>
+                    </AdminSelect>
                   </label>
 
                   <label className="studio-field">
                     <span>Justify Content</span>
-                    <select
+                    <AdminSelect dropdownKey="builder.Inspector.tsx.14"
                       value={local['justify-content'] || 'flex-start'}
                       onChange={e => style('justify-content', e.target.value)}
                     >
@@ -862,12 +863,12 @@ export function Inspector({ node, document: _document, device, command, onDesele
                       <option value="space-between">Space Between</option>
                       <option value="space-around">Space Around</option>
                       <option value="space-evenly">Space Evenly</option>
-                    </select>
+                    </AdminSelect>
                   </label>
 
                   <label className="studio-field">
                     <span>Align Items</span>
-                    <select
+                    <AdminSelect dropdownKey="builder.Inspector.tsx.15"
                       value={local['align-items'] || 'stretch'}
                       onChange={e => style('align-items', e.target.value)}
                     >
@@ -875,7 +876,7 @@ export function Inspector({ node, document: _document, device, command, onDesele
                       <option value="flex-start">Start</option>
                       <option value="center">Center</option>
                       <option value="flex-end">End</option>
-                    </select>
+                    </AdminSelect>
                   </label>
 
                   <div className="elementor-slider-row">
@@ -901,7 +902,7 @@ export function Inspector({ node, document: _document, device, command, onDesele
 
                   <label className="studio-field">
                     <span>HTML Tag</span>
-                    <select
+                    <AdminSelect dropdownKey="builder.Inspector.tsx.16"
                       value={String(node.props.tag || 'div')}
                       onChange={e => update({ props: { ...node.props, tag: e.target.value } })}
                     >
@@ -912,7 +913,7 @@ export function Inspector({ node, document: _document, device, command, onDesele
                       <option value="header">header</option>
                       <option value="footer">footer</option>
                       <option value="nav">nav</option>
-                    </select>
+                    </AdminSelect>
                   </label>
                 </div>
               </details>
@@ -958,13 +959,13 @@ export function Inspector({ node, document: _document, device, command, onDesele
                         {control.type === 'select' ? (
                           <label className="studio-field">
                             <span>{control.label}</span>
-                            <select value={String(value)} onChange={event => change(event.target.value)}>
+                            <AdminSelect dropdownKey="builder.Inspector.tsx.17" value={String(value)} onChange={event => change(event.target.value)}>
                               {control.options?.map(opt => {
                                 const optVal = typeof opt === 'string' ? opt : opt.value;
                                 const optLabel = typeof opt === 'string' ? opt : opt.label;
                                 return <option key={optVal} value={optVal}>{optLabel}</option>;
                               })}
-                            </select>
+                            </AdminSelect>
                           </label>
                         ) : control.type === 'color' ? (
                           <label className="studio-field">
@@ -1005,10 +1006,10 @@ export function Inspector({ node, document: _document, device, command, onDesele
                 <i className={device === 'desktop' ? 'eicon-device-desktop' : device === 'tablet' ? 'eicon-device-tablet' : 'eicon-device-mobile'} />
                 {device === 'desktop' ? 'Desktop' : device}
               </span>
-              <select aria-label="Style state" value={state} disabled={device !== 'desktop'} onChange={event => setState(event.target.value)}>
+              <AdminSelect dropdownKey="builder.Inspector.tsx.18" aria-label="Style state" value={state} disabled={device !== 'desktop'} onChange={event => setState(event.target.value)}>
                 <option value="normal">Normal</option>
                 {states.map(val => <option key={val} value={val}>{val}</option>)}
-              </select>
+              </AdminSelect>
             </div>
 
             {/* Testimonial Style Sections */}
@@ -1119,13 +1120,13 @@ export function Inspector({ node, document: _document, device, command, onDesele
                   <strong style={{ display: 'block', margin: '8px 0 4px' }}>Top Shape Divider</strong>
                   <label className="studio-field">
                     <span>Type</span>
-                    <select
+                    <AdminSelect dropdownKey="builder.Inspector.tsx.19"
                       value={node.shapeDividers?.top?.type || ''}
                       onChange={event => updateShapeDivider('top', { type: event.target.value })}
                     >
                       <option value="">None</option>
                       {Object.keys(shapes).map(key => <option key={key} value={key}>{shapes[key].name}</option>)}
-                    </select>
+                    </AdminSelect>
                   </label>
                   {node.shapeDividers?.top?.type && (
                     <>
@@ -1145,13 +1146,13 @@ export function Inspector({ node, document: _document, device, command, onDesele
                   <strong style={{ display: 'block', margin: '12px 0 4px' }}>Bottom Shape Divider</strong>
                   <label className="studio-field">
                     <span>Type</span>
-                    <select
+                    <AdminSelect dropdownKey="builder.Inspector.tsx.20"
                       value={node.shapeDividers?.bottom?.type || ''}
                       onChange={event => updateShapeDivider('bottom', { type: event.target.value })}
                     >
                       <option value="">None</option>
                       {Object.keys(shapes).map(key => <option key={key} value={key}>{shapes[key].name}</option>)}
-                    </select>
+                    </AdminSelect>
                   </label>
                   {node.shapeDividers?.bottom?.type && (
                     <>
@@ -1302,7 +1303,7 @@ export function Inspector({ node, document: _document, device, command, onDesele
               <div className="elementor-group-content">
                 <label className="studio-field">
                   <span>Entrance Animation</span>
-                  <select
+                  <AdminSelect dropdownKey="builder.Inspector.tsx.21"
                     value={local.animation || ''}
                     onChange={event => style('animation', event.target.value ? `${event.target.value} 0.8s ease-out forwards` : '')}
                   >
@@ -1316,7 +1317,7 @@ export function Inspector({ node, document: _document, device, command, onDesele
                     <option value="builderBounceIn">Bounce In</option>
                     <option value="builderSlideInLeft">Slide In Left</option>
                     <option value="builderSlideInRight">Slide In Right</option>
-                  </select>
+                  </AdminSelect>
                 </label>
                 <Field label="Transition" value={local.transition || ''} placeholder="e.g. all 0.3s ease" onChange={val => style('transition', val)} />
               </div>

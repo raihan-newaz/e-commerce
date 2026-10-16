@@ -193,7 +193,7 @@ export class WooCommerceService {
     let risk: Awaited<ReturnType<typeof evaluateOrderRisk>> | null = null;
     let order: any;
     let createdNew = false;
-    const updateData = { customerName, customerPhone, customerAddress, grandTotal, paymentStatus: wooOrder.status === 'completed' ? 'PAID' : 'PENDING' };
+    const updateData = { ...(!existingOrder?.sourceIp && riskInput.ip ? { sourceIp: riskInput.ip } : {}), customerName, customerPhone, customerAddress, grandTotal, paymentStatus: wooOrder.status === 'completed' ? 'PAID' : 'PENDING' };
     if (existingOrder) {
       order = await prisma.order.update({ where: { wooOrderId }, data: updateData, include: { items: { include: { variant: true } } } });
     } else {
@@ -254,7 +254,7 @@ export class WooCommerceService {
       }
     }
     if (createdNew) {
-      try { await saveOrderCourierSuggestions(order.id, order); }
+      try { void saveOrderCourierSuggestions(order.id, order).catch(() => console.warn('Courier address matching queued task failed')); }
       catch (error) { console.warn('Courier area matching was unavailable for WooCommerce order:', error); }
     }
 

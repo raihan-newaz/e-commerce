@@ -1,3 +1,4 @@
+import { AdminSelect } from '../components/admin/AdminSelect';
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -314,7 +315,7 @@ export const TrackingPage: React.FC = () => {
 
           <div className="mt-4 max-w-md space-y-1.5">
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">
-              Google Search Console Verification Code <span className="font-normal text-slate-400">(Optional)</span>
+              Google Search Console Verification Code <span className="font-normal text-slate-500 dark:text-slate-400">(Optional)</span>
             </label>
             <input
               type="text"
@@ -500,7 +501,7 @@ export const TrackingPage: React.FC = () => {
             {/* Test Event Code */}
             <div className="space-y-1.5">
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">
-                Test Event Code <span className="font-normal text-slate-400">(Optional for debugging)</span>
+                Test Event Code <span className="font-normal text-slate-500 dark:text-slate-400">(Optional for debugging)</span>
               </label>
               <input
                 type="text"
@@ -582,11 +583,11 @@ export const TrackingPage: React.FC = () => {
 
           {config.customEvents.length === 0 ? (
             <div className="mt-5 rounded-xl border border-dashed border-slate-200 p-8 text-center dark:border-slate-800">
-              <Sparkles className="mx-auto h-8 w-8 text-slate-300 dark:text-slate-600" />
+              <Sparkles className="mx-auto h-8 w-8 text-slate-700 dark:text-slate-300 dark:text-slate-600" />
               <p className="mt-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
                 No custom events registered
               </p>
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 All standard e-commerce events (PageView, AddToCart, Purchase, etc.) are already tracked automatically.
               </p>
               <button
@@ -620,7 +621,7 @@ export const TrackingPage: React.FC = () => {
                   <div className="min-w-[180px] flex-1">
                     <label className="block text-[11px] font-semibold text-slate-500">Click selector</label>
                     <input type="text" value={event.selector || ""} onChange={(e) => updateCustomEvent(idx, { selector: e.target.value })} placeholder='.checkout-button or [data-track="whatsapp"]' className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-mono text-slate-900 focus:border-emerald-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white" />
-                    <span className="text-[10px] text-slate-400">Track clicks on matching storefront elements</span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400">Track clicks on matching storefront elements</span>
                   </div>
 
                   <div className="min-w-[140px] flex-1">
@@ -653,7 +654,7 @@ export const TrackingPage: React.FC = () => {
                     <label className="block text-[11px] font-semibold text-slate-500">
                       Meta Type
                     </label>
-                    <select
+                    <AdminSelect dropdownKey="pages.TrackingPage.tsx.1"
                       value={event.metaEventType || "custom"}
                       onChange={(e) =>
                         updateCustomEvent(idx, { metaEventType: e.target.value as any })
@@ -662,7 +663,7 @@ export const TrackingPage: React.FC = () => {
                     >
                       <option value="custom">trackCustom</option>
                       <option value="standard">track (Standard)</option>
-                    </select>
+                    </AdminSelect>
                   </div>
 
                   <div className="pt-4">
@@ -683,7 +684,7 @@ export const TrackingPage: React.FC = () => {
           {/* Developer snippet note */}
           <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/60 p-3 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-950/30">
             <span className="font-semibold text-slate-700 dark:text-slate-300">How to call in storefront code:</span>
-            <code className="mt-1 block rounded bg-slate-900 p-2 font-mono text-[11px] text-emerald-400 dark:bg-black">
+            <code className="mt-1 block rounded bg-white dark:bg-slate-900 p-2 font-mono text-[11px] text-emerald-400 dark:bg-black">
               import &#123; trackCustomEvent &#125; from './analytics';<br />
               trackCustomEvent('promo_banner_click', &#123; banner_id: 'summer_sale_2026' &#125;);
             </code>

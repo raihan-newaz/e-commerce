@@ -1,3 +1,4 @@
+import { AdminSelect } from '../components/admin/AdminSelect';
 import React, { useState, useEffect, useRef } from 'react';
 import { Order, User } from '../types';
 import api from '../lib/api';
@@ -121,7 +122,7 @@ export const OrdersPage: React.FC = () => {
   // Load staff list for assignment
   useEffect(() => {
     let cancelled = false;
-    api.get('/users')
+    api.get('/auth/users')
       .then((res) => {
         if (!cancelled && res.data?.users) {
           setStaffList(res.data.users.filter((u: User) => u.status === 'ACTIVE'));
@@ -186,7 +187,7 @@ export const OrdersPage: React.FC = () => {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const params: any = { page, limit: 50, sortBy, sortOrder };
+      const params: any = { page, limit: 20, sortBy, sortOrder };
       if (activeTab === 'TRASH') {
         params.trash = 'true';
       } else if (activeTab !== 'ALL') {
@@ -578,9 +579,9 @@ export const OrdersPage: React.FC = () => {
 
         <div className="orders-toolbar-actions">
           <button type="button" className={`orders-button ${filtersOpen ? 'is-active' : ''}`} aria-expanded={filtersOpen} aria-controls="orders-filters" onClick={() => setFiltersOpen(open => !open)}><SlidersHorizontal size={15} /> Filters {activeFilters.length > 0 && <span className="orders-count">{activeFilters.length}</span>}</button>
-          <label><span className="sr-only">Sort orders</span><select aria-label="Sort orders" value={`${sortBy}:${sortOrder}`} onChange={event => { const [field, direction] = event.target.value.split(':'); updateFilter(() => { setSortBy(field); setSortOrder(direction); }); }}>
+          <label><span className="sr-only">Sort orders</span><AdminSelect dropdownKey="pages.OrdersPage.tsx.1" aria-label="Sort orders" value={`${sortBy}:${sortOrder}`} onChange={event => { const [field, direction] = event.target.value.split(':'); updateFilter(() => { setSortBy(field); setSortOrder(direction); }); }}>
             <option value="createdAt:desc">Date: newest first</option><option value="createdAt:asc">Date: oldest first</option><option value="orderNumber:asc">Order number: ascending</option><option value="orderNumber:desc">Order number: descending</option><option value="grandTotal:desc">Total: high to low</option><option value="grandTotal:asc">Total: low to high</option><option value="status:asc">Status: A–Z</option><option value="status:desc">Status: Z–A</option>
-          </select></label>
+          </AdminSelect></label>
           <button type="button" className="orders-button orders-icon-button" onClick={fetchOrders} aria-label="Refresh orders"><RotateCcw size={15} /></button>
         </div>
       </div>
@@ -588,7 +589,7 @@ export const OrdersPage: React.FC = () => {
       <div id="orders-filters" hidden={!filtersOpen} className="orders-filter-panel">
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
           {/* Assignee Filter */}
-          <select
+          <AdminSelect dropdownKey="pages.OrdersPage.tsx.2"
             aria-label="Assignee"
             value={selectedAssignee}
             onChange={(e) => updateFilter(() => setSelectedAssignee(e.target.value))}
@@ -601,10 +602,10 @@ export const OrdersPage: React.FC = () => {
                 {s.name} ({s.role.replace(/_/g, ' ')})
               </option>
             ))}
-          </select>
+          </AdminSelect>
 
           {/* Priority Filter */}
-          <select
+          <AdminSelect dropdownKey="pages.OrdersPage.tsx.3"
             aria-label="Priority"
             value={selectedPriority}
             onChange={(e) => updateFilter(() => setSelectedPriority(e.target.value))}
@@ -613,10 +614,10 @@ export const OrdersPage: React.FC = () => {
             <option value="ALL">All Priority</option>
             <option value="NORMAL">Normal</option>
             <option value="URGENT">⚡ Urgent</option>
-          </select>
+          </AdminSelect>
 
           {/* Courier Filter */}
-          <select
+          <AdminSelect dropdownKey="pages.OrdersPage.tsx.4"
             aria-label="Courier"
             value={selectedCourier}
             onChange={(e) => updateFilter(() => setSelectedCourier(e.target.value))}
@@ -626,10 +627,10 @@ export const OrdersPage: React.FC = () => {
             <option value="STEADFAST">Steadfast</option>
             <option value="PATHAO">Pathao</option>
             <option value="REDX">RedX</option>
-          </select>
+          </AdminSelect>
 
           {/* Order Age Filter */}
-          <select
+          <AdminSelect dropdownKey="pages.OrdersPage.tsx.5"
             aria-label="Order age"
             value={selectedOrderAge}
             onChange={(e) => updateFilter(() => setSelectedOrderAge(e.target.value))}
@@ -641,10 +642,10 @@ export const OrdersPage: React.FC = () => {
             <option value="24h">&gt; 24 Hours</option>
             <option value="48h">&gt; 48 Hours</option>
             <option value="7d">&gt; 7 Days</option>
-          </select>
+          </AdminSelect>
 
           {/* Settlement Filter */}
-          <select
+          <AdminSelect dropdownKey="pages.OrdersPage.tsx.6"
             aria-label="Settlement"
             value={selectedSettlement}
             onChange={(e) => updateFilter(() => setSelectedSettlement(e.target.value))}
@@ -654,7 +655,7 @@ export const OrdersPage: React.FC = () => {
             <option value="PENDING">Settlement Pending</option>
             <option value="RECONCILED">Reconciled</option>
             <option value="DISCREPANCY">Discrepancy</option>
-          </select>
+          </AdminSelect>
 
         </div>
       </div>
@@ -673,7 +674,7 @@ export const OrdersPage: React.FC = () => {
               <button onClick={() => handlePermanentDeleteOrders()} className="inline-flex items-center gap-1 px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold rounded-xl"><Trash2 className="h-3.5 w-3.5"/> Delete permanently</button>
             </> : <>
             {/* Bulk Assign Dropdown */}
-            <select
+            <AdminSelect dropdownKey="pages.OrdersPage.tsx.7"
               onChange={(e) => {
                 if (e.target.value !== '') {
                   handleBulkAssign(e.target.value === 'UNASSIGN' ? null : e.target.value);
@@ -690,7 +691,7 @@ export const OrdersPage: React.FC = () => {
                   {s.name}
                 </option>
               ))}
-            </select>
+            </AdminSelect>
 
             {/* Bulk Priority Toggle */}
             <button
@@ -762,7 +763,7 @@ export const OrdersPage: React.FC = () => {
           </div>
         ) : (
           <div className="overflow-x-auto min-h-[340px]" role="region" aria-label="Orders table" tabIndex={0}>
-            <table className="w-full text-left text-xs min-w-[1040px]">
+            <table className="w-full text-left text-xs min-w-[920px]">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 text-slate-500 dark:text-slate-400 font-semibold uppercase">
                   <th className="p-3.5 w-10 text-center">
@@ -779,9 +780,8 @@ export const OrdersPage: React.FC = () => {
                   <th className="py-3.5 px-3 min-w-[150px]">Customer</th>
                   <th className="py-3.5 px-3 min-w-[180px]">Items & Variations</th>
                   <th className="py-3.5 px-4 text-right whitespace-nowrap min-w-[120px]">COD Due</th>
-                  <th className="py-3.5 px-3 min-w-[120px]">Assignee</th>
                   <th className="py-3.5 px-3 min-w-[100px] text-center">Priority</th>
-                  <th className="py-3.5 px-3 min-w-[130px]">Fulfillment</th>
+                  <th className="py-3.5 px-3 min-w-[130px]">Status</th>
                   <th className="py-3.5 px-3 min-w-[120px]">Courier</th>
                   <th className="py-3.5 px-3 text-center min-w-[70px] w-16">Actions</th>
                 </tr>
@@ -873,36 +873,12 @@ export const OrdersPage: React.FC = () => {
                       </div>
                     </td>
 
-                    {/* Assignee Inline Selector */}
-                    <td className="py-3.5 px-3 min-w-[120px] whitespace-nowrap" onClick={(event) => event.stopPropagation()}>
-                      {activeTab !== 'TRASH' ? (
-                        <select
-                          aria-label={`Assign order ${o.orderNumber}`}
-                          value={o.assignedTo?.id || ''}
-                          onChange={(e) => handleSingleAssign(o.id, e.target.value ? e.target.value : null)}
-                          className={`h-8 text-xs font-medium rounded-lg px-2 border focus:outline-none transition-colors cursor-pointer inline-flex items-center w-full max-w-[130px] ${
-                            o.assignedTo
-                              ? 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700'
-                              : 'bg-amber-50/50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/40 font-semibold'
-                          }`}
-                        >
-                          <option value="">Unassigned</option>
-                          {staffList.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.name}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="text-[11px] text-slate-400">{o.assignedTo?.name || '—'}</span>
-                      )}
-                    </td>
-
                     {/* Priority Toggle */}
                     <td className="py-3.5 px-3 min-w-[100px] text-center whitespace-nowrap" onClick={(event) => event.stopPropagation()}>
                       {activeTab !== 'TRASH' ? (
                         <button
                           onClick={() => handleSinglePriority(o.id, o.priority === 'URGENT' ? 'NORMAL' : 'URGENT')}
+                          data-priority={o.priority}
                           title="Click to toggle priority"
                           className={`px-2 py-1 rounded-lg text-[10px] font-bold tracking-tight transition-all ${
                             o.priority === 'URGENT'
@@ -919,9 +895,9 @@ export const OrdersPage: React.FC = () => {
 
                     {/* Status Dropdown */}
                     <td className="py-3.5 px-3 min-w-[130px] whitespace-nowrap" onClick={(event) => event.stopPropagation()}>
-                      {activeTab !== 'TRASH' && <select
+                      {activeTab !== 'TRASH' && <AdminSelect dropdownKey="pages.OrdersPage.tsx.8"
                         data-status={o.status}
-                        aria-label={`Fulfillment for order ${o.orderNumber}`}
+                        aria-label={`Status for order ${o.orderNumber}`}
                         value={o.status}
                         onChange={(e) => handleStatusChange(o.id, e.target.value)}
                         className={`h-9 text-xs font-medium rounded-xl px-3 py-0 border focus:outline-none transition-colors cursor-pointer inline-flex items-center ${
@@ -949,12 +925,12 @@ export const OrdersPage: React.FC = () => {
                         <option value="CANCELLED">Cancelled</option>
                         <option value="HOLD">Hold</option>
                         {!['PENDING', 'CONFIRMED', 'PACKAGING', 'IN_TRANSIT', 'DELIVERED', 'RETURNED', 'CANCELLED', 'HOLD'].includes(o.status) && <option value={o.status} disabled>{o.status.replace(/_/g, ' ')}</option>}
-                      </select>}
+                      </AdminSelect>}
                       {activeTab === 'TRASH' && <span className="orders-payment-pill payment-refunded">{o.status.replace(/_/g, ' ')}</span>}
                     </td>
 
                     {/* Courier Logistics */}
-                    <td className="py-3.5 px-3 min-w-[120px] whitespace-nowrap" onClick={(event) => event.stopPropagation()}>
+                    <td data-column="courier" className="py-3.5 px-3 min-w-[120px] whitespace-nowrap" onClick={(event) => event.stopPropagation()}>
                       {o.courierName ? (
                         <div className="h-9 flex flex-col justify-center">
                           <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs leading-none">{o.courierName}</span>
@@ -999,6 +975,23 @@ export const OrdersPage: React.FC = () => {
 
                         {openActionMenuId === o.id && (
                           <OrderActionsPopover id={`order-actions-${o.id}`} onClose={() => setOpenActionMenuId(null)}>
+                            {activeTab !== 'TRASH' && <label className="block border-b border-slate-100 p-3 text-xs font-semibold dark:border-slate-800">Assignee<span className="mb-2 block text-[10px] font-normal text-slate-500">{o.assignedTo?.name || 'Unassigned'}</span><AdminSelect dropdownKey="pages.OrdersPage.tsx.9"
+                          aria-label={`Assign order ${o.orderNumber}`}
+                          value={o.assignedTo?.id || ''}
+                          onChange={(e) => { void handleSingleAssign(o.id, e.target.value || null); setOpenActionMenuId(null); }}
+                          className={`h-8 text-xs font-medium rounded-lg px-2 border focus:outline-none transition-colors cursor-pointer inline-flex items-center w-full max-w-full ${
+                            o.assignedTo
+                              ? 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+                              : 'bg-amber-50/50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/40 font-semibold'
+                          }`}
+                        >
+                          <option value="">Unassigned</option>
+                          {staffList.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name}
+                            </option>
+                          ))}
+                        </AdminSelect></label>}
                             {activeTab === 'TRASH' ? (
                               <>
                                 <button

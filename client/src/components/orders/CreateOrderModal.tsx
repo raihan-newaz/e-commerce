@@ -1,3 +1,4 @@
+import { AdminSelect } from '../admin/AdminSelect';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Product, ProductVariant } from '../../types';
@@ -155,7 +156,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onS
       });
 
       if (res.data?.success) {
-        toast.success('Fashion Order created successfully!');
+        toast.success('Order created successfully!');
         onSuccess();
         onClose();
       } else {
@@ -170,79 +171,79 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onS
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] bg-slate-900/60 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden my-8 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-800/40 sticky top-0 bg-slate-900/95 backdrop-blur-sm z-10">
+    <div className="admin-form-dialog fixed inset-0 z-[9999] bg-slate-900/60 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+      <div role="dialog" aria-modal="true" aria-labelledby="create-order-heading" className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden my-8 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm z-10">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl">
+            <div className="p-2 bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded-xl">
               <ShoppingBag className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-slate-100 text-lg">Create Fashion Order</h3>
-              <p className="text-xs text-slate-400">Direct Call-Center / Social Media Booking with Variations</p>
+              <h3 id="create-order-heading" className="font-bold text-slate-900 dark:text-slate-100 text-lg">Create Order</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Create a customer order with products, delivery and payment details.</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white rounded-xl">
+          <button type="button" aria-label="Close create order" onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-xl">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {/* Customer Details */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Customer Name *</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Customer Name *</label>
               <input
                 type="text"
                 required
                 placeholder="e.g. Nusrat Jahan"
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-100 focus:border-emerald-500"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-900 dark:text-slate-100 focus:border-emerald-500"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Phone Number *</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Phone Number *</label>
               <input
                 type="text"
                 required
                 placeholder="017xxxxxxxx"
                 value={customerPhone}
                 onChange={(e) => setCustomerPhone(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-100 focus:border-emerald-500 font-mono"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-900 dark:text-slate-100 focus:border-emerald-500 font-mono"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">Delivery Address *</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Delivery Address *</label>
             <input
               type="text"
               required
               placeholder="House, Road, Area, City"
               value={customerAddress}
               onChange={(e) => setCustomerAddress(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-100 focus:border-emerald-500"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-900 dark:text-slate-100 focus:border-emerald-500"
             />
           </div>
 
           {/* Product & Variant Selector */}
-          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
-            <label className="block text-xs font-bold text-emerald-400 uppercase tracking-wider">
-              Add Fashion Item & Select Color / Size
+          <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
+            <label className="block text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
+              Add product & choose options
             </label>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Product Select */}
               <div>
-                <label className="block text-[11px] text-slate-400 mb-1">Select Product</label>
-                <select
+                <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">Select Product</label>
+                <AdminSelect dropdownKey="components.orders.CreateOrderModal.tsx.1"
                   value={selectedProductId}
                   onChange={(e) => {
                     setSelectedProductId(e.target.value);
                     setSelectedVariantId('');
                   }}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:border-emerald-500"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-200 focus:border-emerald-500"
                 >
                   <option value="">-- Choose Product --</option>
                   {products.map((p) => (
@@ -250,17 +251,17 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onS
                       {p.name} (Stock: {p.stockQuantity}) - {p.salePrice || p.regularPrice} ৳
                     </option>
                   ))}
-                </select>
+                </AdminSelect>
               </div>
 
               {/* Variant Select (if available) */}
               <div>
-                <label className="block text-[11px] text-slate-400 mb-1">Color & Size Variation</label>
-                <select
+                <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">Color & Size Variation</label>
+                <AdminSelect dropdownKey="components.orders.CreateOrderModal.tsx.2"
                   disabled={!activeProduct || !activeProduct.variants?.length}
                   value={selectedVariantId}
                   onChange={(e) => setSelectedVariantId(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:border-emerald-500 disabled:opacity-40"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-200 focus:border-emerald-500 disabled:opacity-40"
                 >
                   <option value="">
                     {activeProduct?.variants?.length ? '-- Select variation --' : 'Standard Item (No variations)'}
@@ -270,7 +271,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onS
                       {variantLabel(v)} (Stock: {v.stockQuantity} pcs) - {v.salePrice || v.regularPrice} ৳
                     </option>
                   ))}
-                </select>
+                </AdminSelect>
               </div>
             </div>
 
@@ -278,7 +279,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onS
               type="button"
               onClick={handleAddCurrentItem}
               disabled={!selectedProductId}
-              className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 font-semibold text-xs rounded-xl border border-slate-700 transition-all flex items-center justify-center gap-1.5 disabled:opacity-40"
+              className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-emerald-700 dark:text-emerald-400 hover:text-emerald-300 font-semibold text-xs rounded-xl border border-slate-700 transition-all flex items-center justify-center gap-1.5 disabled:opacity-40"
             >
               <Plus className="w-4 h-4" />
               Add Item to Cart
@@ -286,13 +287,13 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onS
 
             {/* Added Items List */}
             {orderItems.length > 0 && (
-              <div className="border border-slate-800 rounded-xl overflow-hidden divide-y divide-slate-800/80 mt-3">
+              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden divide-y divide-slate-800/80 mt-3">
                 {orderItems.map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-xs bg-slate-900/70 p-3">
+                  <div key={idx} className="flex items-center justify-between text-xs bg-slate-50 dark:bg-slate-900/70 p-3">
                     <div className="flex-1">
-                      <p className="font-bold text-slate-200">{item.productName}</p>
+                      <p className="font-bold text-slate-800 dark:text-slate-200">{item.productName}</p>
                       {item.variantName && (
-                        <span className="inline-block mt-0.5 text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                        <span className="inline-block mt-0.5 text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                           {item.variantName}
                         </span>
                       )}
@@ -300,7 +301,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onS
                     </div>
 
                     <div className="flex items-center gap-3">
-                      <span className="text-slate-400 text-xs">{item.unitPrice} ৳ x</span>
+                      <span className="text-slate-500 dark:text-slate-400 text-xs">{item.unitPrice} ৳ x</span>
                       <input
                         type="number"
                         min="1"
@@ -311,9 +312,9 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onS
                             prev.map((it, i) => (i === idx ? { ...it, quantity: val } : it))
                           );
                         }}
-                        className="w-14 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-center font-bold text-slate-100"
+                        className="w-14 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-center font-bold text-slate-900 dark:text-slate-100"
                       />
-                      <span className="font-black text-emerald-400 w-16 text-right">
+                      <span className="font-black text-emerald-700 dark:text-emerald-400 w-16 text-right">
                         {item.quantity * item.unitPrice} ৳
                       </span>
                       <button
@@ -331,55 +332,55 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onS
           </div>
 
           {/* Pricing & Discounts */}
-          <div className="grid grid-cols-3 gap-3 bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 dark:bg-slate-950/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
             <div>
-              <label className="block text-[11px] text-slate-400 mb-1">Delivery Charge (৳)</label>
+              <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">Delivery Charge (৳)</label>
               <input
                 type="number"
                 value={deliveryCharge}
                 onChange={(e) => setDeliveryCharge(parseFloat(e.target.value) || 0)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200"
+                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200"
               />
             </div>
             <div>
-              <label className="block text-[11px] text-slate-400 mb-1">Discount (৳)</label>
+              <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">Discount (৳)</label>
               <input
                 type="number"
                 value={discount}
                 onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200"
+                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200"
               />
             </div>
             <div>
-              <label className="block text-[11px] text-slate-400 mb-1">Advance Paid (৳)</label>
+              <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">Advance Paid (৳)</label>
               <input
                 type="number"
                 value={advancePaid}
                 onChange={(e) => setAdvancePaid(parseFloat(e.target.value) || 0)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200"
+                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200"
               />
             </div>
           </div>
 
           {/* Summary Box */}
-          <div className="flex justify-between items-center bg-slate-950 border border-slate-800 p-3.5 rounded-xl text-sm">
+          <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl text-sm">
             <div>
-              <span className="text-xs text-slate-400">Grand Total: </span>
-              <span className="font-bold text-slate-100">{grandTotal} ৳</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">Grand Total: </span>
+              <span className="font-bold text-slate-900 dark:text-slate-100">{grandTotal} ৳</span>
             </div>
             <div>
-              <span className="text-xs text-emerald-400 font-semibold">COD Collection Due: </span>
-              <span className="font-black text-emerald-400 text-lg">{codAmount} ৳</span>
+              <span className="text-xs text-emerald-700 dark:text-emerald-400 font-semibold">COD Collection Due: </span>
+              <span className="font-black text-emerald-700 dark:text-emerald-400 text-lg">{codAmount} ৳</span>
             </div>
           </div>
 
-          {riskBlocked && user?.role === 'SUPER_ADMIN' && <div className="rounded-xl border border-rose-700/50 bg-rose-950/30 p-3"><p className="text-xs text-rose-200">Protection rules blocked this order. A Super Admin can document a reason and retry; the order will stay on fraud review hold.</p><label className="mt-2 block text-xs font-semibold text-slate-200">Override reason<input value={overrideReason} onChange={event => setOverrideReason(event.target.value)} minLength={3} maxLength={1000} required className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm"/></label></div>}
+          {riskBlocked && user?.role === 'SUPER_ADMIN' && <div className="rounded-xl border border-rose-700/50 bg-rose-950/30 p-3"><p className="text-xs text-rose-200">Protection rules blocked this order. A Super Admin can document a reason and retry; the order will stay on fraud review hold.</p><label className="mt-2 block text-xs font-semibold text-slate-800 dark:text-slate-200">Override reason<input value={overrideReason} onChange={event => setOverrideReason(event.target.value)} minLength={3} maxLength={1000} required className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-3 py-2 text-sm"/></label></div>}
 
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm text-slate-400 hover:text-white"
+              className="px-4 py-2 text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
             >
               Cancel
             </button>

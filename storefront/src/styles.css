@@ -333,3 +333,7 @@ input[type="number"],
 @media(max-width:560px){.hero.carousel{height:clamp(180px,51vw,240px);max-height:none}.hero.carousel + .trust-row + .collection,.hero.carousel + .collection{padding-top:28px}}
 
 @media(max-width:560px){.hero.carousel .carousel-dots button,.hero.carousel .carousel-dots button.active{background:transparent}.site-header{grid-template-columns:auto minmax(0,1fr) auto}.site-header .brand{max-width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(16px,5.6vw,22px)}.delivery-art-label{max-width:100%;font-size:clamp(48px,18vw,64px)}}
+
+.hero.carousel{height:var(--hero-desktop-height,clamp(240px,25vw,360px));max-height:none}
+@media(max-width:900px){.hero.carousel{height:var(--hero-desktop-height,clamp(210px,32vw,280px))}}
+@media(max-width:560px){.hero.carousel{height:var(--hero-mobile-height,clamp(180px,51vw,240px))}}

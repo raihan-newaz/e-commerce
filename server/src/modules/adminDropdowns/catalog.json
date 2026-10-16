@@ -1,0 +1,2171 @@
+[
+  {
+    "key": "builder.DesignPanel.tsx.1",
+    "label": "Class Name",
+    "page": "DesignPanel",
+    "options": [
+      {
+        "value": "",
+        "label": "Select a class…"
+      }
+    ]
+  },
+  {
+    "key": "builder.DesignPanel.tsx.2",
+    "label": "Property",
+    "page": "DesignPanel",
+    "options": []
+  },
+  {
+    "key": "builder.Inspector.tsx.1",
+    "label": "Local",
+    "page": "Inspector",
+    "options": []
+  },
+  {
+    "key": "builder.Inspector.tsx.2",
+    "label": "Local",
+    "page": "Inspector",
+    "options": []
+  },
+  {
+    "key": "builder.Inspector.tsx.3",
+    "label": "Local",
+    "page": "Inspector",
+    "options": [
+      {
+        "value": "",
+        "label": "Default"
+      },
+      {
+        "value": "uppercase",
+        "label": "Uppercase"
+      },
+      {
+        "value": "lowercase",
+        "label": "Lowercase"
+      },
+      {
+        "value": "capitalize",
+        "label": "Capitalize"
+      },
+      {
+        "value": "none",
+        "label": "Normal"
+      }
+    ]
+  },
+  {
+    "key": "builder.Inspector.tsx.4",
+    "label": "String",
+    "page": "Inspector",
+    "options": [
+      {
+        "value": "thumbnail",
+        "label": "Thumbnail - 150 x 150"
+      },
+      {
+        "value": "medium",
+        "label": "Medium - 300 x 300"
+      },
+      {
+        "value": "large",
+        "label": "Large - 1024 x 1024"
+      },
+      {
+        "value": "full",
+        "label": "Full"
+      }
+    ]
+  },
+  {
+    "key": "builder.Inspector.tsx.5",
+    "label": "String",
+    "page": "Inspector",
+    "options": [
+      {
+        "value": "1",
+        "label": "H1"
+      },
+      {
+        "value": "2",
+        "label": "H2"
+      },
+      {
+        "value": "3",
+        "label": "H3"
+      },
+      {
+        "value": "4",
+        "label": "H4"
+      },
+      {
+        "value": "5",
+        "label": "H5"
+      },
+      {
+        "value": "6",
+        "label": "H6"
+      },
+      {
+        "value": "div",
+        "label": "div"
+      },
+      {
+        "value": "span",
+        "label": "span"
+      },
+      {
+        "value": "p",
+        "label": "p"
+      }
+    ]
+  },
+  {
+    "key": "builder.Inspector.tsx.6",
+    "label": "String",
+    "page": "Inspector",
+    "options": [
+      {
+        "value": "default",
+        "label": "Default"
+      },
+      {
+        "value": "info",
+        "label": "Info"
+      },
+      {
+        "value": "success",
+        "label": "Success"
+      },
+      {
+        "value": "warning",
+        "label": "Warning"
+      },
+      {
+        "value": "danger",
+        "label": "Danger"
+      }
+    ]
+  },
+  {
+    "key": "builder.Inspector.tsx.7",
+    "label": "String",
+    "page": "Inspector",
+    "options": [
+      {
+        "value": "small",
+        "label": "Small"
+      },
+      {
+        "value": "medium",
+        "label": "Medium"
+      },
+      {
+        "value": "large",
+        "label": "Large"
+      },
+      {
+        "value": "xl",
+        "label": "Extra Large"
+      }
+    ]
+  },
+  {
+    "key": "builder.Inspector.tsx.8",
+    "label": "String",
+    "page": "Inspector",
+    "options": [
+      {
+        "value": "before",
+        "label": "Before (Left)"
+      },
+      {
+        "value": "after",
+        "label": "After (Right)"
+      }
+    ]
+  },
+  {
+    "key": "builder.Inspector.tsx.9",
+    "label": "String",
+    "page": "Inspector",
+    "options": [
+      {
+        "value": "auto",
+        "label": "Auto (Original)"
+      },
+      {
+        "value": "1/1",
+        "label": "1:1 Square (Instagram Post)"
+      },
+      {
+        "value": "4/5",
+        "label": "4:5 Portrait (Instagram Feed)"
+      },
+      {
+        "value": "3/4",
+        "label": "3:4 Fashion Portrait"
+      },
+      {
+        "value": "16/9",
+        "label": "16:9 Landscape / Video"
+      },
+      {
+        "value": "9/16",
+        "label": "9:16 Story / Mobile Vertical"
+      },
+      {
+        "value": "4/3",
+        "label": "4:3 Classic Standard"
+      },
+      {
+        "value": "21/9",
+        "label": "21:9 Ultrawide Banner"
+      },
+      {
+        "value": "custom",
+        "label": "Custom Ratio"
+      }
+    ]
+  },
+  {
+    "key": "builder.Inspector.tsx.10",
+    "label": "String",
+    "page": "Inspector",
+    "options": [
+      {
+        "value": "cover",
+        "label": "Cover (Fill container, crop overflow)"
+      },
+      {
+        "value": "contain",
+        "label": "Contain (Preserve entire image)"
+      },
+      {
+        "value": "fill",
+        "label": "Fill (Stretch to fit)"
+      },
+      {
+        "value": "scale-down",
+        "label": "Scale Down"
+      },
+      {
+        "value": "none",
+        "label": "None (Natural size)"
+      }
+    ]
+  },
+  {
+    "key": "builder.Inspector.tsx.11",
+    "label": "String",
+    "page": "Inspector",
+    "options": [
+      {
+        "value": "default",
+        "label": "Default"
+      },
+      {
+        "value": "stacked",
+        "label": "Stacked"
+      },
+      {
+        "value": "framed",
+        "label": "Framed"
+      }
+    ]
+  },
+  {
+    "key": "builder.Inspector.tsx.12",
+    "label": "String",
+    "page": "Inspector",
+    "options": [
+      {
+        "value": "circle",
+        "label": "Circle"
+      },
+      {
+        "value": "square",
+        "label": "Square"
+      }
+    ]
+  },
+  {
+    "key": "builder.Inspector.tsx.13",
+    "label": "Local",
+    "page": "Inspector",
+    "options": [
+      {
+        "value": "row",
+        "label": "Row (Horizontal)"
+      },
+      {
+        "value": "column",
+        "label": "Column (Vertical)"
+      },
+      {
+        "value": "row-reverse",
+        "label": "Row Reverse"
+      },
+      {
+        "value": "column-reverse",
+        "label": "Column Reverse"
+      }
+    ]
+  },
+  {
+    "key": "builder.Inspector.tsx.14",
+    "label": "Local",
+    "page": "Inspector",
+    "options": [
+      {
+        "value": "flex-start",
+        "label": "Start"
+      },
+      {
+        "value": "center",
+        "label": "Center"
+      },
+      {
+        "value": "flex-end",
+        "label": "End"
+      },
+      {
+        "value": "space-between",
+        "label": "Space Between"
+      },
+      {
+        "value": "space-around",
+        "label": "Space Around"
+      },
+      {
+        "value": "space-evenly",
+        "label": "Space Evenly"
+      }
+    ]
+  },
+  {
+    "key": "builder.Inspector.tsx.15",
+    "label": "Local",
+    "page": "Inspector",
+    "options": [
+      {
+        "value": "stretch",
+        "label": "Stretch"
+      },
+      {
+        "value": "flex-start",
+        "label": "Start"
+      },
+      {
+        "value": "center",
+        "label": "Center"
+      },
+      {
+        "value": "flex-end",
+        "label": "End"
+      }
+    ]
+  },
+  {
+    "key": "builder.Inspector.tsx.16",
+    "label": "String",
+    "page": "Inspector",
+    "options": [
+      {
+        "value": "div",
+        "label": "div"
+      },
+      {
+        "value": "section",
+        "label": "section"
+      },
+      {
+        "value": "main",
+        "label": "main"
+      },
+      {
+        "value": "article",
+        "label": "article"
+      },
+      {
+        "value": "header",
+        "label": "header"
+      },
+      {
+        "value": "footer",
+        "label": "footer"
+      },
+      {
+        "value": "nav",
+        "label": "nav"
+      }
+    ]
+  },
+  {
+    "key": "builder.Inspector.tsx.17",
+    "label": "String",
+    "page": "Inspector",
+    "options": []
+  },
+  {
+    "key": "builder.Inspector.tsx.18",
+    "label": "Style state",
+    "page": "Inspector",
+    "options": [
+      {
+        "value": "normal",
+        "label": "Normal"
+      }
+    ]
+  },
+  {
+    "key": "builder.Inspector.tsx.19",
+    "label": "Shape Dividers",
+    "page": "Inspector",
+    "options": [
+      {
+        "value": "",
+        "label": "None"
+      }
+    ]
+  },
+  {
+    "key": "builder.Inspector.tsx.20",
+    "label": "Shape Dividers",
+    "page": "Inspector",
+    "options": [
+      {
+        "value": "",
+        "label": "None"
+      }
+    ]
+  },
+  {
+    "key": "builder.Inspector.tsx.21",
+    "label": "Animation",
+    "page": "Inspector",
+    "options": [
+      {
+        "value": "",
+        "label": "None"
+      },
+      {
+        "value": "builderFadeIn",
+        "label": "Fade In"
+      },
+      {
+        "value": "builderFadeInUp",
+        "label": "Fade In Up"
+      },
+      {
+        "value": "builderFadeInDown",
+        "label": "Fade In Down"
+      },
+      {
+        "value": "builderFadeInLeft",
+        "label": "Fade In Left"
+      },
+      {
+        "value": "builderFadeInRight",
+        "label": "Fade In Right"
+      },
+      {
+        "value": "builderZoomIn",
+        "label": "Zoom In"
+      },
+      {
+        "value": "builderBounceIn",
+        "label": "Bounce In"
+      },
+      {
+        "value": "builderSlideInLeft",
+        "label": "Slide In Left"
+      },
+      {
+        "value": "builderSlideInRight",
+        "label": "Slide In Right"
+      }
+    ]
+  },
+  {
+    "key": "builder.StudioPage.tsx.1",
+    "label": "Zoom",
+    "page": "StudioPage",
+    "options": []
+  },
+  {
+    "key": "builder.SubmissionsPanel.tsx.1",
+    "label": "Status",
+    "page": "SubmissionsPanel",
+    "options": [
+      {
+        "value": "",
+        "label": "All Statuses"
+      },
+      {
+        "value": "NEW",
+        "label": "NEW"
+      },
+      {
+        "value": "REVIEWED",
+        "label": "REVIEWED"
+      },
+      {
+        "value": "SPAM",
+        "label": "SPAM"
+      }
+    ]
+  },
+  {
+    "key": "builder.SubmissionsPanel.tsx.2",
+    "label": "Status",
+    "page": "SubmissionsPanel",
+    "options": [
+      {
+        "value": "NEW",
+        "label": "Status: NEW"
+      },
+      {
+        "value": "REVIEWED",
+        "label": "Status: REVIEWED"
+      },
+      {
+        "value": "SPAM",
+        "label": "Status: SPAM"
+      }
+    ]
+  },
+  {
+    "key": "builder.ThemePanel.tsx.1",
+    "label": "Region",
+    "page": "ThemePanel",
+    "options": [
+      {
+        "value": "header",
+        "label": "Header"
+      },
+      {
+        "value": "footer",
+        "label": "Footer"
+      }
+    ]
+  },
+  {
+    "key": "builder.ThemePanel.tsx.2",
+    "label": "Template page",
+    "page": "ThemePanel",
+    "options": [
+      {
+        "value": "",
+        "label": "Select page"
+      }
+    ]
+  },
+  {
+    "key": "builder.ThemePanel.tsx.3",
+    "label": "Preview page",
+    "page": "ThemePanel",
+    "options": [
+      {
+        "value": "",
+        "label": "Choose a preview page"
+      }
+    ]
+  },
+  {
+    "key": "components.couriers.RedXPanel.tsx.1",
+    "label": "Area_id",
+    "page": "RedXPanel",
+    "options": [
+      {
+        "value": "",
+        "label": "Select area"
+      }
+    ]
+  },
+  {
+    "key": "components.couriers.SteadfastPanel.tsx.1",
+    "label": "Police_station_id",
+    "page": "SteadfastPanel",
+    "options": [
+      {
+        "value": "",
+        "label": "Police station"
+      }
+    ]
+  },
+  {
+    "key": "components.MediaPicker.tsx.1",
+    "label": "Sort media",
+    "page": "MediaPicker",
+    "options": [
+      {
+        "value": "recent",
+        "label": "Newest"
+      },
+      {
+        "value": "name",
+        "label": "Name"
+      }
+    ]
+  },
+  {
+    "key": "components.orders.CourierDispatchModal.tsx.1",
+    "label": "District / City",
+    "page": "CourierDispatchModal",
+    "options": [
+      {
+        "value": "",
+        "label": "Select district"
+      }
+    ]
+  },
+  {
+    "key": "components.orders.CourierDispatchModal.tsx.2",
+    "label": "Thana / Zone",
+    "page": "CourierDispatchModal",
+    "options": [
+      {
+        "value": "",
+        "label": "Select thana"
+      }
+    ]
+  },
+  {
+    "key": "components.orders.CourierDispatchModal.tsx.3",
+    "label": "Area",
+    "page": "CourierDispatchModal",
+    "options": [
+      {
+        "value": "",
+        "label": "Select area (optional)"
+      }
+    ]
+  },
+  {
+    "key": "components.orders.CourierDispatchModal.tsx.4",
+    "label": "Redx Area Id",
+    "page": "CourierDispatchModal",
+    "options": [
+      {
+        "value": "",
+        "label": "Select the exact RedX area"
+      }
+    ]
+  },
+  {
+    "key": "components.orders.CourierDispatchModal.tsx.5",
+    "label": "Pickup store",
+    "page": "CourierDispatchModal",
+    "options": [
+      {
+        "value": "",
+        "label": "Use RedX default pickup store"
+      }
+    ]
+  },
+  {
+    "key": "components.orders.CourierDispatchModal.tsx.6",
+    "label": "Delivery Type",
+    "page": "CourierDispatchModal",
+    "options": [
+      {
+        "value": "0",
+        "label": "Home delivery"
+      },
+      {
+        "value": "1",
+        "label": "Point delivery"
+      }
+    ]
+  },
+  {
+    "key": "components.orders.CourierDispatchModal.tsx.7",
+    "label": "Store",
+    "page": "CourierDispatchModal",
+    "options": [
+      {
+        "value": "",
+        "label": "Use configured default store"
+      }
+    ]
+  },
+  {
+    "key": "components.orders.CourierDispatchModal.tsx.8",
+    "label": "Delivery Type",
+    "page": "CourierDispatchModal",
+    "options": [
+      {
+        "value": "48",
+        "label": "Normal (48h)"
+      },
+      {
+        "value": "12",
+        "label": "On demand (12h)"
+      }
+    ]
+  },
+  {
+    "key": "components.orders.CourierDispatchModal.tsx.9",
+    "label": "Item Type",
+    "page": "CourierDispatchModal",
+    "options": [
+      {
+        "value": "2",
+        "label": "Parcel"
+      },
+      {
+        "value": "1",
+        "label": "Document"
+      }
+    ]
+  },
+  {
+    "key": "components.orders.CourierLocationCard.tsx.1",
+    "label": "District",
+    "page": "CourierLocationCard",
+    "options": [
+      {
+        "value": "",
+        "label": "District"
+      }
+    ]
+  },
+  {
+    "key": "components.orders.CourierLocationCard.tsx.2",
+    "label": "Thana",
+    "page": "CourierLocationCard",
+    "options": [
+      {
+        "value": "",
+        "label": "Thana / zone"
+      }
+    ]
+  },
+  {
+    "key": "components.orders.CourierLocationCard.tsx.3",
+    "label": "Area",
+    "page": "CourierLocationCard",
+    "options": [
+      {
+        "value": "",
+        "label": ""
+      }
+    ]
+  },
+  {
+    "key": "components.orders.CreateOrderModal.tsx.1",
+    "label": "Product Id",
+    "page": "CreateOrderModal",
+    "options": [
+      {
+        "value": "",
+        "label": "-- Choose Product --"
+      }
+    ]
+  },
+  {
+    "key": "components.orders.CreateOrderModal.tsx.2",
+    "label": "Variant Id",
+    "page": "CreateOrderModal",
+    "options": [
+      {
+        "value": "",
+        "label": ""
+      }
+    ]
+  },
+  {
+    "key": "components.orders.OrderEditModal.tsx.1",
+    "label": "Payment",
+    "page": "OrderEditModal",
+    "options": [
+      {
+        "value": "COD",
+        "label": "COD"
+      },
+      {
+        "value": "BKASH",
+        "label": "BKASH"
+      },
+      {
+        "value": "NAGAD",
+        "label": "NAGAD"
+      },
+      {
+        "value": "BANK",
+        "label": "BANK"
+      },
+      {
+        "value": "PREPAID",
+        "label": "PREPAID"
+      }
+    ]
+  },
+  {
+    "key": "components.purchases.PurchaseCreateModal.tsx.1",
+    "label": "Supplier Id",
+    "page": "PurchaseCreateModal",
+    "options": [
+      {
+        "value": "",
+        "label": "Choose supplier"
+      }
+    ]
+  },
+  {
+    "key": "components.purchases.PurchaseCreateModal.tsx.2",
+    "label": "Warehouse Id",
+    "page": "PurchaseCreateModal",
+    "options": [
+      {
+        "value": "",
+        "label": "Default / unassigned"
+      }
+    ]
+  },
+  {
+    "key": "components.purchases.PurchaseCreateModal.tsx.3",
+    "label": "Account Id",
+    "page": "PurchaseCreateModal",
+    "options": [
+      {
+        "value": "",
+        "label": "Unpaid"
+      }
+    ]
+  },
+  {
+    "key": "pages.AccountingPage.tsx.1",
+    "label": "Timezone",
+    "page": "AccountingPage",
+    "options": [
+      {
+        "value": "360",
+        "label": "Bangladesh (UTC+6)"
+      },
+      {
+        "value": "330",
+        "label": "UTC+5:30"
+      },
+      {
+        "value": "0",
+        "label": "UTC"
+      }
+    ]
+  },
+  {
+    "key": "pages.AccountingPage.tsx.2",
+    "label": "From account",
+    "page": "AccountingPage",
+    "options": [
+      {
+        "value": "",
+        "label": "Select account"
+      }
+    ]
+  },
+  {
+    "key": "pages.AccountingPage.tsx.3",
+    "label": "To account",
+    "page": "AccountingPage",
+    "options": [
+      {
+        "value": "",
+        "label": "Select account"
+      }
+    ]
+  },
+  {
+    "key": "pages.AccountingPage.tsx.4",
+    "label": "Currency",
+    "page": "AccountingPage",
+    "options": [
+      {
+        "value": "BDT",
+        "label": "BDT"
+      },
+      {
+        "value": "USD",
+        "label": "USD"
+      },
+      {
+        "value": "EUR",
+        "label": "EUR"
+      },
+      {
+        "value": "GBP",
+        "label": "GBP"
+      }
+    ]
+  },
+  {
+    "key": "pages.AccountingPage.tsx.5",
+    "label": "Pay from account (optional)",
+    "page": "AccountingPage",
+    "options": [
+      {
+        "value": "",
+        "label": "Not linked to account"
+      }
+    ]
+  },
+  {
+    "key": "pages.AnalyticsPage.tsx.1",
+    "label": "Timezone",
+    "page": "AnalyticsPage",
+    "options": [
+      {
+        "value": "360",
+        "label": "Bangladesh (UTC+6)"
+      },
+      {
+        "value": "330",
+        "label": "UTC+5:30"
+      },
+      {
+        "value": "0",
+        "label": "UTC"
+      }
+    ]
+  },
+  {
+    "key": "pages.AttributesPage.tsx.1",
+    "label": "Attribute type",
+    "page": "AttributesPage",
+    "options": [
+      {
+        "value": "TEXT",
+        "label": "Text"
+      },
+      {
+        "value": "COLOR",
+        "label": "Color swatches"
+      },
+      {
+        "value": "SIZE_TEXT",
+        "label": "Size · text (XS, S, M…)"
+      },
+      {
+        "value": "SIZE_NUMBER",
+        "label": "Size · number (38, 40…)"
+      },
+      {
+        "value": "NUMBER",
+        "label": "Number"
+      }
+    ]
+  },
+  {
+    "key": "pages.AttributesPage.tsx.2",
+    "label": "Storefront option shape",
+    "page": "AttributesPage",
+    "options": [
+      {
+        "value": "SOFT",
+        "label": "Soft rounded"
+      },
+      {
+        "value": "CIRCLE",
+        "label": "Circle"
+      },
+      {
+        "value": "SQUARE",
+        "label": "Square"
+      }
+    ]
+  },
+  {
+    "key": "pages.AttributesPage.tsx.3",
+    "label": "Default sort order",
+    "page": "AttributesPage",
+    "options": [
+      {
+        "value": "MENU_ORDER",
+        "label": "Custom ordering"
+      },
+      {
+        "value": "NAME",
+        "label": "Name"
+      },
+      {
+        "value": "NAME_NUM",
+        "label": "Name (numeric)"
+      },
+      {
+        "value": "ID",
+        "label": "Original term order"
+      }
+    ]
+  },
+  {
+    "key": "pages.CategoriesPage.tsx.1",
+    "label": "Parent category",
+    "page": "CategoriesPage",
+    "options": [
+      {
+        "value": "",
+        "label": "None"
+      }
+    ]
+  },
+  {
+    "key": "pages.EmailSettingsPage.tsx.1",
+    "label": "Port",
+    "page": "EmailSettingsPage",
+    "options": [
+      {
+        "value": "587",
+        "label": "587 — STARTTLS"
+      },
+      {
+        "value": "465",
+        "label": "465 — SSL/TLS"
+      },
+      {
+        "value": "2525",
+        "label": "2525 — STARTTLS"
+      },
+      {
+        "value": "25",
+        "label": "25 — STARTTLS"
+      }
+    ]
+  },
+  {
+    "key": "pages.EmailSettingsPage.tsx.2",
+    "label": "Notification event",
+    "page": "EmailSettingsPage",
+    "options": []
+  },
+  {
+    "key": "pages.ExpensesPage.tsx.1",
+    "label": "Category filter",
+    "page": "ExpensesPage",
+    "options": [
+      {
+        "value": "",
+        "label": "All categories"
+      }
+    ]
+  },
+  {
+    "key": "pages.ExpensesPage.tsx.2",
+    "label": "Account filter",
+    "page": "ExpensesPage",
+    "options": [
+      {
+        "value": "",
+        "label": "All accounts"
+      }
+    ]
+  },
+  {
+    "key": "pages.ExpensesPage.tsx.3",
+    "label": "Category",
+    "page": "ExpensesPage",
+    "options": [
+      {
+        "value": "",
+        "label": "Choose category"
+      }
+    ]
+  },
+  {
+    "key": "pages.ExpensesPage.tsx.4",
+    "label": "Pay from account",
+    "page": "ExpensesPage",
+    "options": [
+      {
+        "value": "",
+        "label": "Choose account"
+      }
+    ]
+  },
+  {
+    "key": "pages.IncompleteOrdersPage.tsx.1",
+    "label": "Status for",
+    "page": "IncompleteOrdersPage",
+    "options": []
+  },
+  {
+    "key": "pages.InventoryPage.tsx.1",
+    "label": "Movement type",
+    "page": "InventoryPage",
+    "options": [
+      {
+        "value": "MANUAL_ADJUSTMENT",
+        "label": "Manual adjustment"
+      },
+      {
+        "value": "PURCHASE_IN",
+        "label": "Purchase received"
+      },
+      {
+        "value": "RETURN_RESTOCK",
+        "label": "Customer return"
+      },
+      {
+        "value": "DAMAGE_LOSS",
+        "label": "Damage / loss"
+      }
+    ]
+  },
+  {
+    "key": "pages.LandingPagesPage.tsx.1",
+    "label": "Alignment",
+    "page": "LandingPagesPage",
+    "options": [
+      {
+        "value": "left",
+        "label": "Left"
+      },
+      {
+        "value": "center",
+        "label": "Center"
+      }
+    ]
+  },
+  {
+    "key": "pages.LandingPagesPage.tsx.2",
+    "label": "Spacing",
+    "page": "LandingPagesPage",
+    "options": [
+      {
+        "value": "compact",
+        "label": "Compact"
+      },
+      {
+        "value": "normal",
+        "label": "Normal"
+      },
+      {
+        "value": "spacious",
+        "label": "Spacious"
+      }
+    ]
+  },
+  {
+    "key": "pages.LandingPagesPage.tsx.3",
+    "label": "Content width",
+    "page": "LandingPagesPage",
+    "options": [
+      {
+        "value": "normal",
+        "label": "Normal"
+      },
+      {
+        "value": "wide",
+        "label": "Wide"
+      }
+    ]
+  },
+  {
+    "key": "pages.LandingPagesPage.tsx.4",
+    "label": "Text font",
+    "page": "LandingPagesPage",
+    "options": [
+      {
+        "value": "inherit",
+        "label": "Theme default"
+      },
+      {
+        "value": "Manrope",
+        "label": "Manrope"
+      },
+      {
+        "value": "Hind Siliguri",
+        "label": "Hind Siliguri · বাংলা"
+      }
+    ]
+  },
+  {
+    "key": "pages.LandingPagesPage.tsx.5",
+    "label": "Edit discount type",
+    "page": "LandingPagesPage",
+    "options": [
+      {
+        "value": "PERCENT",
+        "label": "%"
+      },
+      {
+        "value": "FIXED",
+        "label": "৳"
+      }
+    ]
+  },
+  {
+    "key": "pages.LandingPagesPage.tsx.6",
+    "label": "Selection type",
+    "page": "LandingPagesPage",
+    "options": [
+      {
+        "value": "SINGLE",
+        "label": "Choose one product"
+      },
+      {
+        "value": "MULTI",
+        "label": "Choose multiple products"
+      }
+    ]
+  },
+  {
+    "key": "pages.LandingPagesPage.tsx.7",
+    "label": "Discount type",
+    "page": "LandingPagesPage",
+    "options": [
+      {
+        "value": "PERCENT",
+        "label": "%"
+      },
+      {
+        "value": "FIXED",
+        "label": "৳"
+      }
+    ]
+  },
+  {
+    "key": "pages.LandingPagesPage.tsx.8",
+    "label": "Image aspect ratio",
+    "page": "LandingPagesPage",
+    "options": [
+      {
+        "value": "AUTO",
+        "label": "Original / auto (carousel uses 4:5 frame)"
+      },
+      {
+        "value": "1:1",
+        "label": "Square · 1:1"
+      },
+      {
+        "value": "4:5",
+        "label": "Portrait · 4:5"
+      },
+      {
+        "value": "3:4",
+        "label": "Portrait · 3:4"
+      },
+      {
+        "value": "16:9",
+        "label": "Landscape · 16:9"
+      },
+      {
+        "value": "9:16",
+        "label": "Tall · 9:16"
+      }
+    ]
+  },
+  {
+    "key": "pages.LandingPagesPage.tsx.9",
+    "label": "Product selection",
+    "page": "LandingPagesPage",
+    "options": [
+      {
+        "value": "SINGLE",
+        "label": "Choose one"
+      },
+      {
+        "value": "MULTI",
+        "label": "Choose several"
+      }
+    ]
+  },
+  {
+    "key": "pages.LandingPagesPage.tsx.10",
+    "label": "Image display",
+    "page": "LandingPagesPage",
+    "options": [
+      {
+        "value": "SINGLE",
+        "label": "Single image"
+      },
+      {
+        "value": "CAROUSEL",
+        "label": "Carousel"
+      }
+    ]
+  },
+  {
+    "key": "pages.LandingPagesPage.tsx.11",
+    "label": "Aspect ratio",
+    "page": "LandingPagesPage",
+    "options": [
+      {
+        "value": "AUTO",
+        "label": "Auto (Shorts 9:16, video 16:9)"
+      },
+      {
+        "value": "16:9",
+        "label": "16:9 landscape"
+      },
+      {
+        "value": "9:16",
+        "label": "9:16 portrait / Shorts"
+      },
+      {
+        "value": "4:3",
+        "label": "4:3"
+      },
+      {
+        "value": "1:1",
+        "label": "1:1 square"
+      }
+    ]
+  },
+  {
+    "key": "pages.LandingPagesPage.tsx.12",
+    "label": "Display",
+    "page": "LandingPagesPage",
+    "options": [
+      {
+        "value": "GRID",
+        "label": "Image grid"
+      },
+      {
+        "value": "CAROUSEL",
+        "label": "Carousel"
+      }
+    ]
+  },
+  {
+    "key": "pages.MediaGalleryPage.tsx.1",
+    "label": "Sort",
+    "page": "MediaGalleryPage",
+    "options": [
+      {
+        "value": "recent",
+        "label": "Newest first"
+      },
+      {
+        "value": "name",
+        "label": "Name A–Z"
+      },
+      {
+        "value": "size",
+        "label": "Largest first"
+      }
+    ]
+  },
+  {
+    "key": "pages.MessagingPage.tsx.1",
+    "label": "Channel",
+    "page": "MessagingPage",
+    "options": [
+      {
+        "value": "SMS",
+        "label": "GreenSMS"
+      },
+      {
+        "value": "WHATSAPP",
+        "label": "WhatsApp"
+      }
+    ]
+  },
+  {
+    "key": "pages.MessagingPage.tsx.2",
+    "label": "Channel",
+    "page": "MessagingPage",
+    "options": [
+      {
+        "value": "SMS",
+        "label": "SMS"
+      },
+      {
+        "value": "WHATSAPP",
+        "label": "WhatsApp"
+      },
+      {
+        "value": "BOTH",
+        "label": "Both"
+      }
+    ]
+  },
+  {
+    "key": "pages.OrderDetailsPage.tsx.1",
+    "label": "Order status",
+    "page": "OrderDetailsPage",
+    "options": [
+      {
+        "value": "PENDING",
+        "label": "Pending"
+      },
+      {
+        "value": "CONFIRMED",
+        "label": "Confirmed"
+      },
+      {
+        "value": "PACKAGING",
+        "label": "Packaging"
+      },
+      {
+        "value": "HANDED_OVER",
+        "label": "Handed Over"
+      },
+      {
+        "value": "IN_TRANSIT",
+        "label": "In Transit"
+      },
+      {
+        "value": "DELIVERED",
+        "label": "Delivered"
+      },
+      {
+        "value": "PARTIAL_DELIVERED",
+        "label": "Partial Delivered"
+      },
+      {
+        "value": "HOLD",
+        "label": "Hold"
+      },
+      {
+        "value": "CANCELLED",
+        "label": "Cancelled"
+      },
+      {
+        "value": "RETURNED",
+        "label": "Returned"
+      },
+      {
+        "value": "FAKE_TRASH",
+        "label": "Fake Trash"
+      }
+    ]
+  },
+  {
+    "key": "pages.OrderDetailsPage.tsx.2",
+    "label": "Assigned To",
+    "page": "OrderDetailsPage",
+    "options": [
+      {
+        "value": "",
+        "label": "Unassigned"
+      }
+    ]
+  },
+  {
+    "key": "pages.OrderProtectionPage.tsx.1",
+    "label": "Courier",
+    "page": "OrderProtectionPage",
+    "options": []
+  },
+  {
+    "key": "pages.OrderProtectionPage.tsx.2",
+    "label": "Location level",
+    "page": "OrderProtectionPage",
+    "options": []
+  },
+  {
+    "key": "pages.OrderProtectionPage.tsx.3",
+    "label": "District",
+    "page": "OrderProtectionPage",
+    "options": [
+      {
+        "value": "",
+        "label": "Choose district"
+      }
+    ]
+  },
+  {
+    "key": "pages.OrderProtectionPage.tsx.4",
+    "label": "Thana",
+    "page": "OrderProtectionPage",
+    "options": [
+      {
+        "value": "",
+        "label": "Choose thana"
+      }
+    ]
+  },
+  {
+    "key": "pages.OrderProtectionPage.tsx.5",
+    "label": "Courier location",
+    "page": "OrderProtectionPage",
+    "options": [
+      {
+        "value": "",
+        "label": "Choose location"
+      }
+    ]
+  },
+  {
+    "key": "pages.OrdersPage.tsx.1",
+    "label": "Sort orders",
+    "page": "OrdersPage",
+    "options": [
+      {
+        "value": "createdAt:desc",
+        "label": "Date: newest first"
+      },
+      {
+        "value": "createdAt:asc",
+        "label": "Date: oldest first"
+      },
+      {
+        "value": "orderNumber:asc",
+        "label": "Order number: ascending"
+      },
+      {
+        "value": "orderNumber:desc",
+        "label": "Order number: descending"
+      },
+      {
+        "value": "grandTotal:desc",
+        "label": "Total: high to low"
+      },
+      {
+        "value": "grandTotal:asc",
+        "label": "Total: low to high"
+      },
+      {
+        "value": "status:asc",
+        "label": "Status: A–Z"
+      },
+      {
+        "value": "status:desc",
+        "label": "Status: Z–A"
+      }
+    ]
+  },
+  {
+    "key": "pages.OrdersPage.tsx.2",
+    "label": "Assignee",
+    "page": "OrdersPage",
+    "options": [
+      {
+        "value": "ALL",
+        "label": "All Assignees"
+      },
+      {
+        "value": "UNASSIGNED",
+        "label": "Unassigned"
+      }
+    ]
+  },
+  {
+    "key": "pages.OrdersPage.tsx.3",
+    "label": "Priority",
+    "page": "OrdersPage",
+    "options": [
+      {
+        "value": "ALL",
+        "label": "All Priority"
+      },
+      {
+        "value": "NORMAL",
+        "label": "Normal"
+      },
+      {
+        "value": "URGENT",
+        "label": "⚡ Urgent"
+      }
+    ]
+  },
+  {
+    "key": "pages.OrdersPage.tsx.4",
+    "label": "Courier",
+    "page": "OrdersPage",
+    "options": [
+      {
+        "value": "ALL",
+        "label": "All Couriers"
+      },
+      {
+        "value": "STEADFAST",
+        "label": "Steadfast"
+      },
+      {
+        "value": "PATHAO",
+        "label": "Pathao"
+      },
+      {
+        "value": "REDX",
+        "label": "RedX"
+      }
+    ]
+  },
+  {
+    "key": "pages.OrdersPage.tsx.5",
+    "label": "Order age",
+    "page": "OrdersPage",
+    "options": [
+      {
+        "value": "ALL",
+        "label": "Any Age"
+      },
+      {
+        "value": "today",
+        "label": "Today"
+      },
+      {
+        "value": "under24h",
+        "label": "&lt; 24 Hours"
+      },
+      {
+        "value": "24h",
+        "label": "&gt; 24 Hours"
+      },
+      {
+        "value": "48h",
+        "label": "&gt; 48 Hours"
+      },
+      {
+        "value": "7d",
+        "label": "&gt; 7 Days"
+      }
+    ]
+  },
+  {
+    "key": "pages.OrdersPage.tsx.6",
+    "label": "Settlement",
+    "page": "OrdersPage",
+    "options": [
+      {
+        "value": "ALL",
+        "label": "All Settlements"
+      },
+      {
+        "value": "PENDING",
+        "label": "Settlement Pending"
+      },
+      {
+        "value": "RECONCILED",
+        "label": "Reconciled"
+      },
+      {
+        "value": "DISCREPANCY",
+        "label": "Discrepancy"
+      }
+    ]
+  },
+  {
+    "key": "pages.OrdersPage.tsx.7",
+    "label": "Orders Page · dropdown 7",
+    "page": "OrdersPage",
+    "options": [
+      {
+        "value": "",
+        "label": "Assign to Staff..."
+      },
+      {
+        "value": "UNASSIGN",
+        "label": "Unassign"
+      }
+    ]
+  },
+  {
+    "key": "pages.OrdersPage.tsx.8",
+    "label": "Status",
+    "page": "OrdersPage",
+    "options": [
+      {
+        "value": "PENDING",
+        "label": "Pending"
+      },
+      {
+        "value": "CONFIRMED",
+        "label": "Confirmed"
+      },
+      {
+        "value": "PACKAGING",
+        "label": "Packaging"
+      },
+      {
+        "value": "IN_TRANSIT",
+        "label": "In Courier"
+      },
+      {
+        "value": "DELIVERED",
+        "label": "Delivered"
+      },
+      {
+        "value": "RETURNED",
+        "label": "Returned"
+      },
+      {
+        "value": "CANCELLED",
+        "label": "Cancelled"
+      },
+      {
+        "value": "HOLD",
+        "label": "Hold"
+      }
+    ]
+  },
+  {
+    "key": "pages.OrdersPage.tsx.9",
+    "label": "Assign order",
+    "page": "OrdersPage",
+    "options": [
+      {
+        "value": "",
+        "label": "Unassigned"
+      }
+    ]
+  },
+  {
+    "key": "pages.ProductEditorPage.tsx.1",
+    "label": "Product type",
+    "page": "ProductEditorPage",
+    "options": [
+      {
+        "value": "SIMPLE",
+        "label": "Simple product"
+      },
+      {
+        "value": "VARIABLE",
+        "label": "Variable product"
+      }
+    ]
+  },
+  {
+    "key": "pages.ProductEditorPage.tsx.2",
+    "label": "Add saved attribute",
+    "page": "ProductEditorPage",
+    "options": [
+      {
+        "value": "",
+        "label": "Add saved attribute…"
+      }
+    ]
+  },
+  {
+    "key": "pages.ProductEditorPage.tsx.3",
+    "label": "Attributes",
+    "page": "ProductEditorPage",
+    "options": [
+      {
+        "value": "",
+        "label": "Choose"
+      }
+    ]
+  },
+  {
+    "key": "pages.ProductEditorPage.tsx.4",
+    "label": "Status",
+    "page": "ProductEditorPage",
+    "options": [
+      {
+        "value": "ACTIVE",
+        "label": "Active"
+      },
+      {
+        "value": "OUT_OF_STOCK",
+        "label": "Out of stock"
+      }
+    ]
+  },
+  {
+    "key": "pages.ProductEditorPage.tsx.5",
+    "label": "Storefront status",
+    "page": "ProductEditorPage",
+    "options": [
+      {
+        "value": "DRAFT",
+        "label": "Draft — hidden"
+      },
+      {
+        "value": "ACTIVE",
+        "label": "Active — visible"
+      },
+      {
+        "value": "OUT_OF_STOCK",
+        "label": "Out of stock"
+      }
+    ]
+  },
+  {
+    "key": "pages.ProductsPage.tsx.1",
+    "label": "Status",
+    "page": "ProductsPage",
+    "options": [
+      {
+        "value": "ALL",
+        "label": "All statuses"
+      },
+      {
+        "value": "ACTIVE",
+        "label": "Active"
+      },
+      {
+        "value": "DRAFT",
+        "label": "Draft"
+      },
+      {
+        "value": "OUT_OF_STOCK",
+        "label": "Out of stock"
+      },
+      {
+        "value": "ARCHIVED",
+        "label": "Trash"
+      }
+    ]
+  },
+  {
+    "key": "pages.PurchasesPage.tsx.1",
+    "label": "Status",
+    "page": "PurchasesPage",
+    "options": [
+      {
+        "value": "ALL",
+        "label": "All statuses"
+      },
+      {
+        "value": "RECEIVED",
+        "label": "Received"
+      },
+      {
+        "value": "DRAFT",
+        "label": "Draft"
+      },
+      {
+        "value": "CANCELLED",
+        "label": "Cancelled"
+      }
+    ]
+  },
+  {
+    "key": "pages.SettingsPage.tsx.1",
+    "label": "Environment",
+    "page": "SettingsPage",
+    "options": [
+      {
+        "value": "https://api-hermes.pathao.com",
+        "label": "Live"
+      },
+      {
+        "value": "https://courier-api-sandbox.pathao.com",
+        "label": "Sandbox"
+      }
+    ]
+  },
+  {
+    "key": "pages.SettingsPage.tsx.2",
+    "label": "Pickup store",
+    "page": "SettingsPage",
+    "options": [
+      {
+        "value": "",
+        "label": "Select an approved store"
+      }
+    ]
+  },
+  {
+    "key": "pages.SettingsPage.tsx.3",
+    "label": "City",
+    "page": "SettingsPage",
+    "options": [
+      {
+        "value": "",
+        "label": "Select city"
+      }
+    ]
+  },
+  {
+    "key": "pages.SettingsPage.tsx.4",
+    "label": "Zone",
+    "page": "SettingsPage",
+    "options": [
+      {
+        "value": "",
+        "label": "Select zone"
+      }
+    ]
+  },
+  {
+    "key": "pages.SettingsPage.tsx.5",
+    "label": "Area",
+    "page": "SettingsPage",
+    "options": [
+      {
+        "value": "",
+        "label": "Select area"
+      }
+    ]
+  },
+  {
+    "key": "pages.SettingsPage.tsx.6",
+    "label": "Environment",
+    "page": "SettingsPage",
+    "options": [
+      {
+        "value": "https://sandbox.redx.com.bd/v1.0.0-beta",
+        "label": "Sandbox — simulated parcels"
+      },
+      {
+        "value": "https://openapi.redx.com.bd/v1.0.0-beta",
+        "label": "Production — live parcels"
+      }
+    ]
+  },
+  {
+    "key": "pages.SettingsPage.tsx.7",
+    "label": "User Role",
+    "page": "SettingsPage",
+    "options": [
+      {
+        "value": "CALL_CENTER_AGENT",
+        "label": "Call Center / Order Agent"
+      },
+      {
+        "value": "OPERATIONS_MANAGER",
+        "label": "Operations Manager"
+      },
+      {
+        "value": "ACCOUNTANT",
+        "label": "Accountant"
+      },
+      {
+        "value": "INVENTORY_MANAGER",
+        "label": "Inventory Manager"
+      },
+      {
+        "value": "DISPATCHER",
+        "label": "Dispatcher"
+      },
+      {
+        "value": "SUPER_ADMIN",
+        "label": "Super Administrator"
+      }
+    ]
+  },
+  {
+    "key": "pages.SettingsPage.tsx.8",
+    "label": "Editing Status",
+    "page": "SettingsPage",
+    "options": [
+      {
+        "value": "ACTIVE",
+        "label": "Active"
+      },
+      {
+        "value": "SUSPENDED",
+        "label": "Suspended"
+      },
+      {
+        "value": "INACTIVE",
+        "label": "Inactive"
+      }
+    ]
+  },
+  {
+    "key": "pages.StorefrontSettingsPage.tsx.1",
+    "label": "Storefront Settings Page · dropdown 1",
+    "page": "StorefrontSettingsPage",
+    "options": [
+      {
+        "value": "",
+        "label": "Insert category"
+      }
+    ]
+  },
+  {
+    "key": "pages.StorefrontSettingsPage.tsx.2",
+    "label": "Insert product or page",
+    "page": "StorefrontSettingsPage",
+    "options": [
+      {
+        "value": "",
+        "label": "Insert product or page"
+      }
+    ]
+  },
+  {
+    "key": "pages.StorefrontSettingsPage.tsx.3",
+    "label": "Input type",
+    "page": "StorefrontSettingsPage",
+    "options": [
+      {
+        "value": "text",
+        "label": "Text"
+      },
+      {
+        "value": "textarea",
+        "label": "Long text"
+      },
+      {
+        "value": "number",
+        "label": "Number"
+      },
+      {
+        "value": "email",
+        "label": "Email"
+      },
+      {
+        "value": "tel",
+        "label": "Phone"
+      },
+      {
+        "value": "select",
+        "label": "Dropdown"
+      }
+    ]
+  },
+  {
+    "key": "pages.StorefrontSettingsPage.tsx.4",
+    "label": "Products from",
+    "page": "StorefrontSettingsPage",
+    "options": [
+      {
+        "value": "NEW",
+        "label": "New arrivals"
+      },
+      {
+        "value": "BEST",
+        "label": "Best selling"
+      },
+      {
+        "value": "CATEGORY",
+        "label": "Product category"
+      }
+    ]
+  },
+  {
+    "key": "pages.StorefrontSettingsPage.tsx.5",
+    "label": "Category",
+    "page": "StorefrontSettingsPage",
+    "options": [
+      {
+        "value": "",
+        "label": "Choose category"
+      }
+    ]
+  },
+  {
+    "key": "pages.ThemeCustomizerPage.tsx.1",
+    "label": "Font Family",
+    "page": "ThemeCustomizerPage",
+    "options": []
+  },
+  {
+    "key": "pages.ThemeCustomizerPage.tsx.2",
+    "label": "Header Behavior",
+    "page": "ThemeCustomizerPage",
+    "options": [
+      {
+        "value": "STICKY",
+        "label": "Sticky header"
+      },
+      {
+        "value": "STATIC",
+        "label": "Static header"
+      }
+    ]
+  },
+  {
+    "key": "pages.ThemeCustomizerPage.tsx.3",
+    "label": "Button Shape",
+    "page": "ThemeCustomizerPage",
+    "options": [
+      {
+        "value": "square",
+        "label": "Square"
+      },
+      {
+        "value": "soft",
+        "label": "Soft corners"
+      },
+      {
+        "value": "round",
+        "label": "Pill"
+      }
+    ]
+  },
+  {
+    "key": "pages.ThemeCustomizerPage.tsx.4",
+    "label": "Product-card Density",
+    "page": "ThemeCustomizerPage",
+    "options": [
+      {
+        "value": "COMFORTABLE",
+        "label": "Comfortable"
+      },
+      {
+        "value": "COMPACT",
+        "label": "Compact"
+      }
+    ]
+  },
+  {
+    "key": "pages.ThemeCustomizerPage.tsx.5",
+    "label": "Card Shape",
+    "page": "ThemeCustomizerPage",
+    "options": [
+      {
+        "value": "square",
+        "label": "Square"
+      },
+      {
+        "value": "soft",
+        "label": "Soft corners"
+      },
+      {
+        "value": "round",
+        "label": "Rounded"
+      }
+    ]
+  },
+  {
+    "key": "pages.TrackingPage.tsx.1",
+    "label": "Meta Event Type",
+    "page": "TrackingPage",
+    "options": [
+      {
+        "value": "custom",
+        "label": "trackCustom"
+      },
+      {
+        "value": "standard",
+        "label": "track (Standard)"
+      }
+    ]
+  },
+  {
+    "key": "components.orders.OrderEditModal.tsx.2",
+    "label": "Add product",
+    "page": "OrderEditModal",
+    "options": [
+      {
+        "value": "",
+        "label": "Choose product"
+      }
+    ]
+  },
+  {
+    "key": "components.orders.OrderEditModal.tsx.3",
+    "label": "Product variation to add",
+    "page": "OrderEditModal",
+    "options": [
+      {
+        "value": "",
+        "label": "Choose variation"
+      }
+    ]
+  },
+  {
+    "key": "components.orders.OrderEditModal.tsx.4",
+    "label": "Assigned team member",
+    "page": "OrderEditModal",
+    "options": [
+      {
+        "value": "",
+        "label": "Unassigned"
+      }
+    ]
+  },
+  {
+    "key": "components.orders.OrderEditModal.tsx.5",
+    "label": "Order priority",
+    "page": "OrderEditModal",
+    "options": [
+      {
+        "value": "NORMAL",
+        "label": "Normal"
+      },
+      {
+        "value": "URGENT",
+        "label": "Urgent"
+      }
+    ]
+  }
+]

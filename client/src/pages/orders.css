@@ -50,9 +50,9 @@
 .orders-page tbody tr:has(input[type="checkbox"]:checked) { background: #f0f5f3; }
 .dark .orders-page tbody tr:has(input[type="checkbox"]:checked) { background: #182b2b; }
 .orders-page td select { max-width: 152px; border-radius: 7px; height: 29px; min-height: 29px; font-size: 11px; font-weight: 500; }
-.orders-page td:nth-child(8) select { border-radius: 20px; height: 27px; min-height: 27px; padding-left: 10px; padding-right: 8px; }
-.orders-page td:nth-child(6) select { background: var(--orders-soft); color: var(--orders-muted); border-color: var(--orders-border); }
-.orders-page td:nth-child(9) button { background: var(--orders-surface); border-color: var(--orders-border); color: var(--orders-muted); height: 29px; border-radius: 7px; box-shadow: none; }
+.orders-page select[data-status] { border-radius: 20px; height: 27px; min-height: 27px; padding-left: 10px; padding-right: 8px; }
+
+.orders-page td[data-column="courier"] button { background: var(--orders-surface); border-color: var(--orders-border); color: var(--orders-muted); height: 29px; border-radius: 7px; box-shadow: none; }
 .orders-payment-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 500; line-height: 1.5; padding: 1px 6px; margin-top: 5px; border: 1px solid; border-radius: 20px; }
 .orders-payment-pill i { width: 4px; height: 4px; background: currentColor; border-radius: 50%; }
 .payment-pending { background: #fff9ed; border-color: #efdab2; color: #997027; }.payment-partial { background: #eff6ff; border-color: #cadcf2; color: #4773a4; }.payment-paid { background: #eef8f2; border-color: #c3e2d1; color: #38805c; }.payment-refunded { background: #f4f5f6; border-color: #dfe2e6; color: #6b7280; }
@@ -69,7 +69,7 @@
 .orders-bulk button, .orders-bulk select { border-radius: 6px; font-size: 11px; box-shadow: none; }
 .orders-page .orders-bulk button:not(:last-child) { background: var(--orders-surface); color: var(--orders-ink); border: 1px solid var(--orders-border); }
 .orders-bulk button:hover { filter: brightness(.97); }
-.orders-page select[data-status="PENDING"], .orders-page select[data-status="HOLD"], .orders-page td:nth-child(7) button[class*="bg-amber-500"] { background: #fff9ed; border: 1px solid #efdab2; color: #997027; box-shadow: none; }
+.orders-page select[data-status="PENDING"], .orders-page select[data-status="HOLD"], .orders-page button[data-priority="URGENT"] { background: #fff9ed; border: 1px solid #efdab2; color: #997027; box-shadow: none; }
 .orders-page select[data-status="CONFIRMED"], .orders-page select[data-status="PACKAGING"] { background: #f0f5fb; border-color: #d4e0ee; color: #54769b; }
 .orders-page select[data-status="IN_TRANSIT"] { background: #f4f1fa; border-color: #e0d9ef; color: #80649f; }
 .orders-page select[data-status="DELIVERED"] { background: #eef8f2; border-color: #c3e2d1; color: #38805c; }
@@ -80,7 +80,7 @@
 .dark .orders-page select[data-status="IN_TRANSIT"] { color: #bb9be1; }
 .dark .orders-page select[data-status="DELIVERED"] { color: #83cba6; }
 .dark .orders-page select[data-status="RETURNED"] { color: #de9aa5; }
-.dark .orders-page td:nth-child(7) button[class*="bg-amber-500"] { color: #d9b36d; background: #ffffff08; border-color: #ffffff20; }
+.dark .orders-page button[data-priority="URGENT"] { color: #d9b36d; background: #ffffff08; border-color: #ffffff20; }
 .dark .orders-page tbody tr { border-color: var(--orders-border); }
 .dark .orders-page table thead th { color: var(--orders-muted); }
 .dark .orders-page h1 svg { color: var(--orders-ink); }

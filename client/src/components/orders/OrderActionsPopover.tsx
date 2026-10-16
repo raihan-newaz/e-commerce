@@ -20,7 +20,7 @@ export function OrderActionsPopover({ id, onClose, children }: { id: string; onC
       setPosition({ top, left: Math.max(8, Math.min(rect.right - 196, window.innerWidth - 204)), ready: true });
     };
     positionPanel();
-    panel.current?.querySelector<HTMLElement>('button, a')?.focus();
+    panel.current?.querySelector<HTMLElement>('select, button, a')?.focus();
     const dismiss = (event: MouseEvent) => {
       if (!panel.current?.contains(event.target as Node) && !trigger?.contains(event.target as Node)) close.current();
     };
@@ -44,9 +44,9 @@ export function OrderActionsPopover({ id, onClose, children }: { id: string; onC
         event.stopPropagation(); close.current();
         anchor.current?.parentElement?.querySelector<HTMLButtonElement>('button')?.focus();
       }
-      if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+      if (!(event.target instanceof HTMLSelectElement) && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
         event.preventDefault();
-        const controls = Array.from(panel.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a') || []);
+        const controls = Array.from(panel.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a, select:not(:disabled)') || []);
         const index = controls.indexOf(document.activeElement as HTMLElement);
         const next = event.key === 'Home' ? 0 : event.key === 'End' ? controls.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + controls.length) % controls.length;
         controls[next]?.focus();

@@ -1,3 +1,4 @@
+import adminDropdownRoutes from './modules/adminDropdowns/routes';
 import express from 'express';
 import http from 'http';
 import path from 'path';
@@ -181,6 +182,7 @@ app.get('/api/ready', async (_req, res) => {
 app.use('/api/email', emailRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/admin-dropdowns', adminDropdownRoutes);
 app.use('/api/order-protection', orderProtectionRoutes);
 app.use('/api/incomplete-orders', incompleteOrderRoutes);
 app.use('/api/couriers', courierRoutes);

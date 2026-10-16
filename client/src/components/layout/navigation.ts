@@ -45,6 +45,7 @@ export const settingsGroups: NavigationGroup[] = [
     { label: 'Email notifications', path: '/settings/email', icon: Mail, description: 'SMTP delivery, order templates and delivery history', roles: ['SUPER_ADMIN'] },
   ] },
   { label: 'Team & account', items: [
+    { label: 'Dropdown options', path: '/settings/dropdowns', icon: Settings2, description: 'Add, edit, reorder and hide options; protect values already in use', roles: ['SUPER_ADMIN'] },
     { label: 'Staff users', path: '/settings/users', icon: UsersRound, description: 'Staff accounts, roles and access', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
     { label: 'Security', path: '/settings/security', icon: ShieldCheck, description: 'Change your password and manage account security' },
   ] },

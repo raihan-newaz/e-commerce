@@ -126,13 +126,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <aside
         ref={element => { asideRef.current = element; if (element) element.inert = !isDesktop && !isOpen; }}
         aria-hidden={!isDesktop && !isOpen ? true : undefined}
-        className={`admin-sidebar fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r border-slate-200/80 bg-white text-slate-700 shadow-xl transition-[width,transform] duration-300 lg:z-20 lg:translate-x-0 lg:shadow-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 ${
+        className={`admin-sidebar fixed inset-y-0 left-0 z-50 flex h-[100dvh] flex-col border-r border-slate-200/80 bg-white text-slate-700 shadow-xl transition-[width,transform] duration-300 lg:z-20 lg:translate-x-0 lg:shadow-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 ${
           collapsed ? "w-[76px]" : "w-[260px]"
         } ${isOpen ? "translate-x-0" : "-translate-x-full"} lg:flex`}
       >
         {/* Header with Logo and Collapse Toggle */}
         <div
-          className={`flex h-16 items-center border-b border-slate-100 px-4 dark:border-slate-800/80 ${
+          className={`flex h-16 shrink-0 items-center border-b border-slate-100 px-4 dark:border-slate-800/80 ${
             collapsed ? "justify-center" : "justify-between"
           }`}
         >
@@ -196,8 +196,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
 
         {/* Nav groups */}
-        <nav aria-label="Main navigation" className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+        <nav aria-label="Main navigation" className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <div className="px-3 py-4">
           {navigationGroups.filter(group => group.label !== 'Administration').map((group, groupIndex) => {
             const visibleItems = group.items.filter((item) =>
               canSeeNavigationItem(item, user?.role, user?.builderAccess),
@@ -300,19 +300,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
             );
           })}
           </div>
-          {settingsItem && <div className="shrink-0 border-t border-slate-100 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
+          {settingsItem && <div className="mx-3 mb-4">
             <div className={`flex items-center rounded-xl ${location.pathname.startsWith('/settings') ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>
               <NavLink to="/settings" aria-label="Settings" title={collapsed ? 'Settings' : undefined} onClick={onClose} className={`flex min-w-0 flex-1 items-center rounded-xl px-3 py-2 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 ${collapsed ? 'justify-center' : 'gap-2.5'}`}><SettingsIcon size={16} className="shrink-0 text-slate-400" />{!collapsed && <span>Settings</span>}</NavLink>
               {!collapsed && <button type="button" onClick={() => toggleSubmenu('/settings')} aria-label="Toggle Settings sections" aria-expanded={Boolean(openSubmenus['/settings'])} aria-controls="navigation-settings" className="mr-1 rounded-lg p-2 hover:bg-slate-200/70 dark:hover:bg-slate-700"><ChevronDown size={14} className={`transition-transform ${openSubmenus['/settings'] ? 'rotate-180' : ''}`} /></button>}
             </div>
-            {!collapsed && openSubmenus['/settings'] && <div id="navigation-settings" className="ml-4 mt-1 max-h-[min(240px,35vh)] space-y-0.5 overflow-y-auto border-l border-slate-200 pl-3 dark:border-slate-800">
+            {!collapsed && openSubmenus['/settings'] && <div id="navigation-settings" className="ml-4 mt-1 space-y-0.5 border-l border-slate-200 pl-3 dark:border-slate-800">
               {settingsItem.children?.filter(child => !child.roles || (user && child.roles.includes(user.role))).map(child => <NavLink key={child.path} end to={child.path} onClick={onClose} className={({ isActive }) => `block rounded-lg px-2.5 py-1.5 text-[11px] transition ${isActive ? 'bg-slate-100 font-semibold text-slate-900 dark:bg-slate-800 dark:text-white' : 'text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800'}`}>{child.label}</NavLink>)}
             </div>}
           </div>}
         </nav>
 
         {/* Footer Link to Storefront */}
-        <div className="border-t border-slate-100 p-3 dark:border-slate-800">
+        <div className="shrink-0 border-t border-slate-100 p-3 dark:border-slate-800">
           {!collapsed && (
             <a
               href={storefrontUrl}

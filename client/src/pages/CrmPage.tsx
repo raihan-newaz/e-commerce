@@ -187,19 +187,19 @@ export const CrmPage: React.FC = () => {
             {/* Stats */}
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-200 dark:border-slate-800 text-center">
-                <span className="text-[10px] uppercase font-semibold text-slate-400">Total Spent</span>
+                <span className="text-[10px] uppercase font-semibold text-slate-500 dark:text-slate-400">Total Spent</span>
                 <p className="text-lg font-black text-emerald-600 dark:text-emerald-400 mt-1">
                   {selectedCustomer.stats?.totalSpent?.toLocaleString() || 0} ৳
                 </p>
               </div>
               <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-200 dark:border-slate-800 text-center">
-                <span className="text-[10px] uppercase font-semibold text-slate-400">Orders Ratio</span>
+                <span className="text-[10px] uppercase font-semibold text-slate-500 dark:text-slate-400">Orders Ratio</span>
                 <p className="text-lg font-black text-slate-900 dark:text-slate-100 mt-1">
                   {selectedCustomer.stats?.completedOrders || 0} / {selectedCustomer.stats?.totalOrders || 0}
                 </p>
               </div>
               <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-200 dark:border-slate-800 text-center">
-                <span className="text-[10px] uppercase font-semibold text-slate-400">Returns / Cancel</span>
+                <span className="text-[10px] uppercase font-semibold text-slate-500 dark:text-slate-400">Returns / Cancel</span>
                 <p className="text-lg font-black text-rose-600 dark:text-rose-400 mt-1">
                   {selectedCustomer.stats?.returnedOrders || 0} / {selectedCustomer.stats?.cancelledOrders || 0}
                 </p>
@@ -218,7 +218,7 @@ export const CrmPage: React.FC = () => {
                     <div key={ord.id} className="p-3 flex justify-between items-center text-xs">
                       <div>
                         <span className="font-bold text-slate-900 dark:text-white">{ord.orderNumber}</span>
-                        <p className="text-[11px] text-slate-400">{new Date(ord.createdAt).toLocaleDateString()}</p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">{new Date(ord.createdAt).toLocaleDateString()}</p>
                       </div>
                       <div className="text-right">
                         <span className="font-bold text-slate-900 dark:text-slate-100">{ord.grandTotal} ৳</span>
@@ -239,7 +239,7 @@ export const CrmPage: React.FC = () => {
                     </div>
                   ))
                 ) : (
-                  <div className="p-4 text-center text-xs text-slate-400">No previous orders</div>
+                  <div className="p-4 text-center text-xs text-slate-500 dark:text-slate-400">No previous orders</div>
                 )}
               </div>
             </div>

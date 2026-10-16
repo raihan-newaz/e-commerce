@@ -1,3 +1,5 @@
+import { courierLocations, readyCouriers, type CourierProvider } from '../../lib/courierLocations';
+import { AdminSelect } from '../admin/AdminSelect';
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Order } from '../../types';
@@ -31,6 +33,8 @@ export const CourierDispatchModal: React.FC<CourierDispatchModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const [available,setAvailable] = useState<CourierProvider[]>([]);
+  useEffect(()=>{ let active=true; readyCouriers().then(values=>{if(active){setAvailable(values);if(values.length)setCourier(current=>values.includes(current)?current:values[0]);}}).catch(()=>toast.error('Could not read courier configuration'));return()=>{active=false;};},[]);
   const [courier, setCourier] = useState<'STEADFAST' | 'PATHAO' | 'REDX'>('STEADFAST');
   const [weight, setWeight] = useState(0.5);
   const [specialInstruction, setSpecialInstruction] = useState('');
@@ -65,23 +69,24 @@ export const CourierDispatchModal: React.FC<CourierDispatchModalProps> = ({
   useEffect(() => { setSavedLocationsLoaded(false); if (order?.id) api.get(`/order-protection/orders/${order.id}/locations`).then(({ data }) => setSavedLocations(data.locations || [])).catch(() => {}).finally(() => setSavedLocationsLoaded(true)); }, [order?.id]);
 
   useEffect(() => {
+    if (!available.includes(courier)) return;
     let cancelled = false;
     manuallySelected.current = { district: false, thana: false, area: false };
     setSelectedCity(''); setSelectedZone(''); setSelectedArea(''); setCities([]); setZones([]); setAreas([]);
     setRedxAreaId(''); setRedxAreas([]); setRedxStores([]); setRedxStoreId('');
     if (courier === 'REDX') {
-      api.get('/couriers/locations/REDX?level=AREA').then(({ data }) => { if (!cancelled) setRedxAreas(data.locations || []); })
+      courierLocations('/couriers/locations/REDX?level=AREA').then(({ data }) => { if (!cancelled) setRedxAreas(data.locations || []); })
         .catch(error => { if (!cancelled) toast.error(error.response?.data?.message || 'Could not load RedX areas'); });
       api.get('/couriers/redx/stores').then(({ data }) => { if (!cancelled) setRedxStores(data.data || []); })
         .catch(error => { if (!cancelled) toast.error(error.response?.data?.message || 'Could not load RedX pickup stores'); });
-    } else api.get(`/couriers/locations/${locationProvider}?level=DISTRICT`)
+    } else courierLocations(`/couriers/locations/${locationProvider}?level=DISTRICT`)
       .then(({ data }) => { if (!cancelled) setCities(data.locations || []); })
       .catch((error) => { if (!cancelled) toast.error(error.response?.data?.message || 'Could not load courier districts'); });
     if (courier === 'PATHAO') api.get('/couriers/pathao/stores').then(({ data }) => {
       setStores(data.data || []); setSelectedStore(String(data.selectedStoreId || ''));
     }).catch((error) => toast.error(error.response?.data?.message || 'Could not load Pathao pickup stores'));
     return () => { cancelled = true; };
-  }, [courier, locationProvider]);
+  }, [courier, locationProvider, available]);
 
   useEffect(() => {
     if (!savedLocationsLoaded || courier !== 'REDX' || !order || !redxAreas.length || manuallySelected.current.area || redxAreaId) return;
@@ -101,7 +106,7 @@ export const CourierDispatchModal: React.FC<CourierDispatchModalProps> = ({
     let cancelled = false;
     setSelectedZone(''); setSelectedArea(''); setZones([]); setAreas([]);
     if (!selectedCity) return;
-    api.get(`/couriers/locations/${locationProvider}?level=THANA&parentId=${selectedCity}`).then((res) => { if (!cancelled) setZones(res.data.locations || []); }).catch(() => { if (!cancelled) toast.error('Could not load courier thanas/zones'); });
+    courierLocations(`/couriers/locations/${locationProvider}?level=THANA&parentId=${selectedCity}`).then((res) => { if (!cancelled) setZones(res.data.locations || []); }).catch(() => { if (!cancelled) toast.error('Could not load courier thanas/zones'); });
     return () => { cancelled = true; };
   }, [locationProvider, selectedCity]);
 
@@ -115,7 +120,7 @@ export const CourierDispatchModal: React.FC<CourierDispatchModalProps> = ({
     let cancelled = false;
     setSelectedArea(''); setAreas([]);
     if (courier !== 'PATHAO' || !selectedZone) return;
-    api.get(`/couriers/locations/PATHAO?level=AREA&parentId=${selectedZone}`).then((res) => { if (!cancelled) setAreas(res.data.locations || []); }).catch(() => { if (!cancelled) toast.error('Could not load Pathao areas'); });
+    courierLocations(`/couriers/locations/PATHAO?level=AREA&parentId=${selectedZone}`).then((res) => { if (!cancelled) setAreas(res.data.locations || []); }).catch(() => { if (!cancelled) toast.error('Could not load Pathao areas'); });
     return () => { cancelled = true; };
   }, [courier, selectedZone]);
 
@@ -180,7 +185,7 @@ export const CourierDispatchModal: React.FC<CourierDispatchModalProps> = ({
   const codAmount = order.codAmount > 0 ? order.codAmount : order.grandTotal - order.advancePaid;
 
   const modalContent = (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 dark:bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="admin-form-dialog fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 dark:bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
       <div 
         className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl w-full max-w-xl max-h-[calc(100vh-2rem)] flex flex-col shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
@@ -236,7 +241,7 @@ export const CourierDispatchModal: React.FC<CourierDispatchModalProps> = ({
                 { id: 'STEADFAST', name: 'Steadfast', desc: '1-Click API Entry' },
                 { id: 'PATHAO', name: 'Pathao', desc: 'Auto City/Zone API' },
                 { id: 'REDX', name: 'RedX', desc: 'Instant Parcel API' },
-              ].map((c) => (
+              ].filter(c=>available.includes(c.id as CourierProvider)).map((c) => (
                 <button
                   key={c.id}
                   type="button"
@@ -289,7 +294,7 @@ export const CourierDispatchModal: React.FC<CourierDispatchModalProps> = ({
             </div>
             {courier !== 'REDX' && <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
               District / City
-              <select
+              <AdminSelect dropdownKey="components.orders.CourierDispatchModal.tsx.1"
                 value={selectedCity}
                 onChange={e => {
                   manuallySelected.current.district = true;
@@ -303,11 +308,11 @@ export const CourierDispatchModal: React.FC<CourierDispatchModalProps> = ({
                 {cities.filter(item => item.active).map(item => (
                   <option key={item.id} value={item.externalId}>{item.name}</option>
                 ))}
-              </select>
+              </AdminSelect>
             </label>}
             {courier !== 'REDX' && <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
               Thana / Zone
-              <select
+              <AdminSelect dropdownKey="components.orders.CourierDispatchModal.tsx.2"
                 value={selectedZone}
                 disabled={!selectedCity}
                 onChange={e => {
@@ -321,12 +326,12 @@ export const CourierDispatchModal: React.FC<CourierDispatchModalProps> = ({
                 {zones.filter(item => item.active).map(item => (
                   <option key={item.id} value={item.externalId}>{item.name}</option>
                 ))}
-              </select>
+              </AdminSelect>
             </label>}
             {courier === 'PATHAO' && (
               <label className="col-span-2 text-xs font-medium text-slate-700 dark:text-slate-300">
                 Area
-                <select
+                <AdminSelect dropdownKey="components.orders.CourierDispatchModal.tsx.3"
                   value={selectedArea}
                   disabled={!selectedZone}
                   onChange={e => {
@@ -339,7 +344,7 @@ export const CourierDispatchModal: React.FC<CourierDispatchModalProps> = ({
                   {areas.filter(item => item.active).map(item => (
                     <option key={item.id} value={item.externalId}>{item.name}</option>
                   ))}
-                </select>
+                </AdminSelect>
                 {selectedZone && !areas.length && (
                   <span className="mt-1 block text-[11px] text-amber-600 dark:text-amber-300">
                     No area list available for this zone. District and zone are sufficient to dispatch.
@@ -351,10 +356,10 @@ export const CourierDispatchModal: React.FC<CourierDispatchModalProps> = ({
               <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">RedX delivery area (required)
                 <input value={redxAreaQuery} onChange={e => { setRedxAreaQuery(e.target.value); manuallySelected.current.area = true; setRedxAreaId(''); }} placeholder="Search delivery area or district" className="mt-1 w-full h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs dark:border-slate-700 dark:bg-slate-900" />
               </label>
-              <select value={redxAreaId} onChange={e => { manuallySelected.current.area = true; setRedxAreaId(e.target.value); }} className="w-full h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs dark:border-slate-700 dark:bg-slate-900">
+              <AdminSelect dropdownKey="components.orders.CourierDispatchModal.tsx.4" value={redxAreaId} onChange={e => { manuallySelected.current.area = true; setRedxAreaId(e.target.value); }} className="w-full h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs dark:border-slate-700 dark:bg-slate-900">
                 <option value="">Select the exact RedX area</option>
                 {redxAreas.filter(item => item.active && (!redxAreaQuery || `${item.name} ${item.districtName || ''}`.toLowerCase().includes(redxAreaQuery.toLowerCase()) || item.externalId === redxAreaId)).slice(0, 150).map(item => <option key={item.id} value={item.externalId}>{item.name}{item.districtName ? ` · ${item.districtName}` : ''}</option>)}
-              </select>
+              </AdminSelect>
               {redxAreaId && <p className="text-[11px] text-emerald-700">RedX area ID: {redxAreaId}</p>}
             </div>}
             {courier === 'STEADFAST' && (
@@ -377,10 +382,10 @@ export const CourierDispatchModal: React.FC<CourierDispatchModalProps> = ({
 
           {courier === 'REDX' && <div className="space-y-3 rounded-xl border border-red-200 bg-red-50/40 p-3.5 dark:border-red-900/40 dark:bg-red-950/20">
             <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">Pickup store
-              <select value={redxStoreId} onChange={e => setRedxStoreId(e.target.value)} className="mt-1 w-full h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs dark:border-slate-700 dark:bg-slate-900">
+              <AdminSelect dropdownKey="components.orders.CourierDispatchModal.tsx.5" value={redxStoreId} onChange={e => setRedxStoreId(e.target.value)} className="mt-1 w-full h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs dark:border-slate-700 dark:bg-slate-900">
                 <option value="">Use RedX default pickup store</option>
                 {redxStores.map(store => <option key={store.id} value={store.id}>{store.name} (#{store.id})</option>)}
-              </select>
+              </AdminSelect>
             </label>
             <div className="flex items-center gap-3">
               <button type="button" disabled={!redxAreaId || !redxStoreId} onClick={calculatePrice} className="rounded-lg border border-red-300 px-3 py-2 text-xs font-medium disabled:opacity-40">Calculate RedX fee</button>
@@ -393,14 +398,14 @@ export const CourierDispatchModal: React.FC<CourierDispatchModalProps> = ({
             <div className="grid gap-3 rounded-xl border border-emerald-200/80 dark:border-emerald-900/30 bg-emerald-50/50 dark:bg-emerald-950/20 p-3.5 sm:grid-cols-2">
               <label className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
                 Delivery Type
-                <select
+                <AdminSelect dropdownKey="components.orders.CourierDispatchModal.tsx.6"
                   value={sfDeliveryType}
                   onChange={(event) => setSfDeliveryType(Number(event.target.value) as 0 | 1)}
                   className="mt-1 w-full h-9 rounded-xl border border-slate-200/80 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-500"
                 >
                   <option value={0}>Home delivery</option>
                   <option value={1}>Point delivery</option>
-                </select>
+                </AdminSelect>
               </label>
               <label className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
                 Alternative Phone (optional)
@@ -432,7 +437,7 @@ export const CourierDispatchModal: React.FC<CourierDispatchModalProps> = ({
             <div className="grid grid-cols-2 gap-3.5 p-3.5 bg-slate-50/60 dark:bg-slate-950/40 border border-slate-200/80 dark:border-slate-800 rounded-xl">
               <div className="col-span-2">
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Pickup Store</label>
-                <select
+                <AdminSelect dropdownKey="components.orders.CourierDispatchModal.tsx.7"
                   value={selectedStore}
                   onChange={(e) => setSelectedStore(e.target.value)}
                   className="w-full h-9 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 rounded-xl px-3 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-500"
@@ -443,29 +448,29 @@ export const CourierDispatchModal: React.FC<CourierDispatchModalProps> = ({
                       {store.store_name} (#{store.store_id})
                     </option>
                   ))}
-                </select>
+                </AdminSelect>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Delivery Type</label>
-                <select
+                <AdminSelect dropdownKey="components.orders.CourierDispatchModal.tsx.8"
                   value={deliveryType}
                   onChange={(e) => setDeliveryType(Number(e.target.value))}
                   className="w-full h-9 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 rounded-xl px-3 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-500"
                 >
                   <option value={48}>Normal (48h)</option>
                   <option value={12}>On demand (12h)</option>
-                </select>
+                </AdminSelect>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Item Type</label>
-                <select
+                <AdminSelect dropdownKey="components.orders.CourierDispatchModal.tsx.9"
                   value={itemType}
                   onChange={(e) => setItemType(Number(e.target.value) as 1 | 2)}
                   className="w-full h-9 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 rounded-xl px-3 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-500"
                 >
                   <option value={2}>Parcel</option>
                   <option value={1}>Document</option>
-                </select>
+                </AdminSelect>
               </div>
               <div className="col-span-2 flex items-center gap-3">
                 <button
@@ -533,7 +538,7 @@ export const CourierDispatchModal: React.FC<CourierDispatchModalProps> = ({
           </button>
           <button
             type="button"
-            disabled={loading || (courier === 'REDX' ? !redxAreaId : !selectedCity || !selectedZone)}
+            disabled={loading || !available.includes(courier) || (courier === 'REDX' ? !redxAreaId : !selectedCity || !selectedZone)}
             onClick={handleDispatch}
             className="h-9 flex items-center gap-2 px-5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl shadow-sm shadow-emerald-600/20 transition-all disabled:opacity-50"
           >

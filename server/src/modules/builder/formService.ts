@@ -80,7 +80,7 @@ async function processOrderFromSubmission(values: Record<string, string>, pageSl
     await recordRiskDecision(tx, riskInput, risk, order.id);
     return order;
   });
-  try { await saveOrderCourierSuggestions(created.id, created); }
+  try { void saveOrderCourierSuggestions(created.id, created).catch(() => console.warn('Courier address matching queued task failed')); }
   catch (error) { console.warn('Courier area matching was unavailable for Studio order:', error); }
 }
 

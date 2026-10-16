@@ -1,3 +1,4 @@
+import { AdminSelect } from '../components/admin/AdminSelect';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Boxes, History, PackageCheck, Search, SlidersHorizontal, Warehouse, ExternalLink, FileText, X } from 'lucide-react';
@@ -102,7 +103,7 @@ export const InventoryPage: React.FC = () => {
               </td>
             </tr>)}</tbody></table>{rows.length === 0 && <div className="p-12 text-center text-sm text-slate-500">No inventory items match these filters.</div>}</div>}
     </div>
-    {target && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4 backdrop-blur-sm" onMouseDown={(e) => { if (e.target === e.currentTarget) setTarget(null); }}><form onSubmit={adjust} className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900"><h3 className="text-lg font-black">Adjust stock</h3><p className="mt-1 text-sm text-slate-500">{target.product.name}{target.variant ? ` · ${variationLabel(target.variant)}` : ''}</p><div className="mt-5 space-y-4"><label className="block text-xs font-bold">Movement type<select value={type} onChange={(e) => setType(e.target.value)} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 dark:border-slate-700 dark:bg-slate-950"><option value="MANUAL_ADJUSTMENT">Manual adjustment</option><option value="PURCHASE_IN">Purchase received</option><option value="RETURN_RESTOCK">Customer return</option><option value="DAMAGE_LOSS">Damage / loss</option></select></label><label className="block text-xs font-bold">Quantity change<input type="number" required value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 dark:border-slate-700 dark:bg-slate-950"/><span className="mt-1 block text-[11px] font-normal text-slate-400">Use a positive number to add stock, negative to remove.</span></label><label className="block text-xs font-bold">Reason / reference<textarea required value={note} onChange={(e) => setNote(e.target.value)} className="mt-1.5 h-24 w-full rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950" placeholder="PO number, cycle count, damage reason…"/></label></div><div className="mt-6 flex justify-end gap-2"><button type="button" onClick={() => setTarget(null)} className="h-10 rounded-xl border border-slate-200 px-4 text-sm font-bold dark:border-slate-700">Cancel</button><button disabled={saving} className="h-10 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 px-4 text-sm font-bold disabled:opacity-60 transition">{saving ? 'Saving…' : 'Save adjustment'}</button></div></form></div>}
+    {target && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4 backdrop-blur-sm" onMouseDown={(e) => { if (e.target === e.currentTarget) setTarget(null); }}><form onSubmit={adjust} className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900"><h3 className="text-lg font-black">Adjust stock</h3><p className="mt-1 text-sm text-slate-500">{target.product.name}{target.variant ? ` · ${variationLabel(target.variant)}` : ''}</p><div className="mt-5 space-y-4"><label className="block text-xs font-bold">Movement type<AdminSelect dropdownKey="pages.InventoryPage.tsx.1" value={type} onChange={(e) => setType(e.target.value)} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 dark:border-slate-700 dark:bg-slate-950"><option value="MANUAL_ADJUSTMENT">Manual adjustment</option><option value="PURCHASE_IN">Purchase received</option><option value="RETURN_RESTOCK">Customer return</option><option value="DAMAGE_LOSS">Damage / loss</option></AdminSelect></label><label className="block text-xs font-bold">Quantity change<input type="number" required value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 dark:border-slate-700 dark:bg-slate-950"/><span className="mt-1 block text-[11px] font-normal text-slate-500 dark:text-slate-400">Use a positive number to add stock, negative to remove.</span></label><label className="block text-xs font-bold">Reason / reference<textarea required value={note} onChange={(e) => setNote(e.target.value)} className="mt-1.5 h-24 w-full rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950" placeholder="PO number, cycle count, damage reason…"/></label></div><div className="mt-6 flex justify-end gap-2"><button type="button" onClick={() => setTarget(null)} className="h-10 rounded-xl border border-slate-200 px-4 text-sm font-bold dark:border-slate-700">Cancel</button><button disabled={saving} className="h-10 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 px-4 text-sm font-bold disabled:opacity-60 transition">{saving ? 'Saving…' : 'Save adjustment'}</button></div></form></div>}
 
     {/* Stock Movement History Modal */}
     {historyTarget && (
@@ -131,9 +132,9 @@ export const InventoryPage: React.FC = () => {
 
           <div className="flex-1 overflow-y-auto space-y-2">
             {historyLoading ? (
-              <div className="py-12 text-center text-xs text-slate-400">Loading movements...</div>
+              <div className="py-12 text-center text-xs text-slate-500 dark:text-slate-400">Loading movements...</div>
             ) : historyList.length === 0 ? (
-              <div className="py-12 text-center text-xs text-slate-400">No stock movements recorded yet.</div>
+              <div className="py-12 text-center text-xs text-slate-500 dark:text-slate-400">No stock movements recorded yet.</div>
             ) : (
               <div className="divide-y divide-slate-100 dark:divide-slate-800">
                 {historyList.map((m: any) => (
@@ -153,13 +154,13 @@ export const InventoryPage: React.FC = () => {
                           {m.type.replace(/_/g, ' ')}
                         </span>
                       </div>
-                      <div className="text-[11px] text-slate-400 mt-1">
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
                         Balance after: <span className="font-bold">{m.balanceAfter}</span>
                         {m.note ? ` · ${m.note}` : ''}
                         {m.creator?.name ? ` · by ${m.creator.name}` : ''}
                       </div>
                     </div>
-                    <span className="text-[10px] text-slate-400 whitespace-nowrap">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
                       {new Date(m.createdAt).toLocaleString()}
                     </span>
                   </div>

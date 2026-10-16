@@ -131,7 +131,7 @@ router.post('/:id/convert', requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'C
   });
   if ('blocked' in result && result.blocked) { res.status(409).json({ success: false, message: `Order blocked by protection rules: ${result.blocked.join(', ')}` }); return; }
   if (result.created) {
-    try { await saveOrderCourierSuggestions(result.order.id, result.order); }
+    try { void saveOrderCourierSuggestions(result.order.id, result.order).catch(() => console.warn('Courier address matching queued task failed')); }
     catch (error) { console.warn('Courier area matching was unavailable for converted order:', error); }
     await logAudit({ userId: staff.user?.id, userName: staff.user?.name, action: 'CREATE', entity: 'ORDER', entityId: result.order.id, details: { convertedFromIncomplete: String(req.params.id), overrideReason }, ipAddress: req.ip });
   }

@@ -7,6 +7,17 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Shared admin form treatment, including dialogs rendered through portals. */
+:is(.admin-shell,.admin-form-dialog){--admin-field-bg:#fff;--admin-field-ink:#243044;--admin-field-line:#dce2e9;--admin-field-muted:#8792a2}
+.dark :is(.admin-shell,.admin-form-dialog){--admin-field-bg:#0f172a;--admin-field-ink:#e2e8f0;--admin-field-line:#334155;--admin-field-muted:#94a3b8}
+:is(.admin-shell,.admin-form-dialog) :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=hidden]):not([type=file]),select:not([data-status]),textarea){border:1px solid var(--admin-field-line);border-radius:10px;background-color:var(--admin-field-bg);color:var(--admin-field-ink);font-size:12px;line-height:1.5;min-height:36px;transition:border-color .15s,box-shadow .15s}
+:is(.admin-shell,.admin-form-dialog) :is(input,textarea)::placeholder{color:var(--admin-field-muted)}
+:is(.admin-shell,.admin-form-dialog) :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),select,textarea):focus-visible{outline:2px solid #10b98155;outline-offset:1px;border-color:#10b981;box-shadow:0 0 0 3px #10b9810a}
+:is(.admin-shell,.admin-form-dialog) :is(input,select,textarea):disabled{opacity:.55;cursor:not-allowed}
+:is(.admin-shell,.admin-form-dialog) [aria-invalid=true]{border-color:#e11d48}
+.admin-form-dialog>div{box-shadow:0 18px 70px #0f172a26;border-radius:14px}
+.admin-form-dialog form{line-height:1.6}
+
 /* Masonry-style settings layout keeps shorter panels flowing into available space. */
 .storefront-editor-layout > * {
   break-inside: avoid;

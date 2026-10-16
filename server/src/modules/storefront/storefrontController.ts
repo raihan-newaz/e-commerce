@@ -488,7 +488,7 @@ export const createStorefrontOrder = async (req: Request & { customer?: { id: st
       await recordRiskDecision(tx, riskInput, risk, createdOrder.id);
       return createdOrder;
     }, { maxWait: 15000, timeout: 20000 });
-    try { await saveOrderCourierSuggestions(order.id, order); }
+    try { void saveOrderCourierSuggestions(order.id, order).catch(() => console.warn('Courier address matching queued task failed')); }
     catch (error) { console.warn('Courier area matching was unavailable for the new order:', error); }
 
     let payment: { paymentUrl: string; attemptId: string; returnToken: string } | undefined;

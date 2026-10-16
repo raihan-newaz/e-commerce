@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { courierCatalogGeneration, queueLocationSync } from './locationQueue';
 import prisma from '../../prisma';
 import { normalizeLocation } from './courierLocations';
 
@@ -21,11 +23,16 @@ function uniqueMatch(rows: LocationRow[], aliases: Map<string, string[]>, hints:
   return found.length === 1 ? found[0] : undefined;
 }
 
+let matchCatalog: { generation:number; expires:number; locations: LocationRow[]; aliases: AliasRow[] } | undefined;
+let matchRead: Promise<[LocationRow[],AliasRow[]]> | undefined;
 export async function suggestCourierLocations(input: LocationInput): Promise<Record<CourierProvider, Match>> {
-  const [locations, aliases] = await Promise.all([
+  if (matchCatalog && matchCatalog.generation===courierCatalogGeneration && matchCatalog.expires>Date.now()) return matchCourierLocations(input,matchCatalog.locations,matchCatalog.aliases);
+  if (!matchRead) matchRead = Promise.all([
     prisma.courierLocation.findMany({ where: { provider: { in: ['STEADFAST', 'PATHAO', 'REDX'] }, active: true }, select: { id: true, provider: true, level: true, externalId: true, parentExternalId: true, name: true, districtName: true, active: true } }),
     prisma.courierLocationAlias.findMany({ select: { locationId: true, normalizedAlias: true } }),
-  ]);
+  ]).finally(()=>{matchRead=undefined;});
+  const [locations,aliases] = await matchRead;
+  matchCatalog={generation:courierCatalogGeneration,expires:Date.now()+30_000,locations,aliases};
   return matchCourierLocations(input, locations, aliases);
 }
 
@@ -62,7 +69,7 @@ export function matchCourierLocations(input: LocationInput, locations: LocationR
   return result;
 }
 
-export async function saveOrderCourierSuggestions(orderId: string, input: LocationInput, preserveManual = true) {
+async function performOrderCourierSuggestions(orderId: string, input: LocationInput, preserveManual = true) {
   const suggestions = await suggestCourierLocations(input);
   await prisma.$transaction(async tx => {
     for (const provider of ['STEADFAST', 'PATHAO', 'REDX'] as const) {
@@ -88,4 +95,9 @@ export async function validateCourierSelection(provider: CourierProvider, distri
   if (provider === 'PATHAO' && (!district || !thana)) return false;
   if ((districtExternalId && !district) || (thanaExternalId && (!thana || thana.parentExternalId !== districtExternalId)) || (areaExternalId && (!area || area.parentExternalId !== thanaExternalId))) return false;
   return true;
+}
+
+export function saveOrderCourierSuggestions(orderId: string, input: LocationInput, preserveManual = true) {
+  const fingerprint = createHash('sha256').update(JSON.stringify([input.customerAddress,input.district,input.city,input.zone,input.area,preserveManual])).digest('hex');
+  return queueLocationSync('MATCH:'+orderId+':'+fingerprint, () => performOrderCourierSuggestions(orderId,input,preserveManual));
 }

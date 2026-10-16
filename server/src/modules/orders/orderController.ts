@@ -1,3 +1,4 @@
+import { amendOrder } from './orderEditService';
 import { Request, Response } from 'express';
 import prisma from '../../prisma';
 import { AuthRequest } from '../../middlewares/auth';
@@ -247,6 +248,11 @@ export const getOrderById = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
+    if (!order.sourceIp) {
+      const captured = await prisma.orderRiskEvent.findFirst({ where:{orderId:order.id,ipAddress:{not:null}},orderBy:{createdAt:'asc'},select:{ipAddress:true,source:true} });
+      const capturedIp = normalizeClientIp(captured?.ipAddress);
+      if (capturedIp) { order.sourceIp=capturedIp; if(!order.sourceChannel) order.sourceChannel=captured?.source || null; }
+    }
     const historyWhere = {
       id: { not: order.id }, trashedAt: null,
       OR: [{ customerPhone: order.customerPhone }, ...(order.customerId ? [{ customerId: order.customerId }] : [])],
@@ -275,22 +281,19 @@ export const updateOrder = async (req: AuthRequest, res: Response): Promise<void
     const order = await prisma.order.findUnique({ where: { id } });
     if (!order) { res.status(404).json({ success: false, message: 'Order not found' }); return; }
     if (order.trashedAt) { res.status(409).json({ success: false, message: 'Restore this order from Trash before editing it' }); return; }
-    if (order.courierName || ['HANDED_OVER', 'IN_TRANSIT', 'DELIVERED', 'PARTIAL_DELIVERED', 'CANCELLED', 'RETURNED', 'FAKE_TRASH'].includes(order.status)) {
-      res.status(409).json({ success: false, message: 'Booked, dispatched or closed orders cannot be edited. Use the dedicated status and courier workflows.' });
-      return;
-    }
+
 
     const body = req.body || {};
     const permitted = ['customerName', 'customerPhone', 'customerAddress', 'district', 'city', 'zone', 'area', 'paymentMethod', 'internalNote', 'customerNote', 'warehouseId', 'assignedToId', 'priority'];
     const data: Record<string, unknown> = {};
     for (const field of permitted) {
-      if (body[field] !== undefined) data[field] = body[field] === '' && ['warehouseId', 'assignedToId'].includes(field) ? null : String(body[field]).trim();
+      if (body[field] !== undefined) data[field] = (body[field] === '' || body[field] === null) && ['warehouseId', 'assignedToId'].includes(field) ? null : String(body[field]).trim();
     }
     if (data.priority !== undefined && !['NORMAL', 'URGENT'].includes(String(data.priority))) {
       res.status(400).json({ success: false, message: 'Priority must be NORMAL or URGENT' });
       return;
     }
-    if (data.assignedToId) {
+    if (data.assignedToId && data.assignedToId !== order.assignedToId) {
       const targetUser = await prisma.user.findUnique({ where: { id: String(data.assignedToId), status: 'ACTIVE' }, select: { id: true } });
       if (!targetUser) {
         res.status(400).json({ success: false, message: 'Assigned staff user not found or inactive' });
@@ -305,7 +308,7 @@ export const updateOrder = async (req: AuthRequest, res: Response): Promise<void
       (data.customerPhone !== undefined && !/^01[3-9]\d{8}$/.test(String(data.customerPhone))) ||
       ['district', 'city', 'zone', 'area'].some((field) => String(data[field] || '').length > 100) ||
       ['internalNote', 'customerNote'].some((field) => String(data[field] || '').length > 2000) ||
-      (data.paymentMethod !== undefined && !['COD', 'BKASH', 'NAGAD', 'BANK', 'PREPAID'].includes(String(data.paymentMethod)))) {
+      (data.paymentMethod !== undefined && !['COD', 'BKASH', 'NAGAD', 'BANK', 'PREPAID', ...(order.paymentMethod === 'UDDOKTAPAY' ? ['UDDOKTAPAY'] : [])].includes(String(data.paymentMethod)))) {
       res.status(400).json({ success: false, message: 'Check customer phone, field lengths and payment method' }); return;
     }
     if (data.customerPhone !== undefined && data.customerPhone !== order.customerPhone) {
@@ -321,25 +324,17 @@ export const updateOrder = async (req: AuthRequest, res: Response): Promise<void
         data[field] = value;
       }
     }
-    const deliveryCharge = Number(data.deliveryCharge ?? order.deliveryCharge);
-    const discount = Number(data.discount ?? order.discount);
-    const advancePaid = Number(data.advancePaid ?? order.advancePaid);
-    const grandTotal = Math.max(0, order.subtotal + deliveryCharge - discount);
-    data.grandTotal = grandTotal;
-    data.codAmount = Math.max(0, grandTotal - advancePaid);
-    data.paymentStatus = advancePaid >= grandTotal && grandTotal > 0 ? 'PAID' : advancePaid > 0 ? 'PARTIAL' : 'PENDING';
+    const amended = await amendOrder(id, data, body.items, body.expectedUpdatedAt, req.user?.id);
+    const updated = amended.order;
+    if (['customerAddress', 'district', 'city', 'zone', 'area'].some(field => data[field] !== undefined)) void saveOrderCourierSuggestions(updated.id, updated).catch(() => console.warn('Courier address matching failed after order edit', updated.id));
 
-    const changed = await prisma.order.updateMany({ where: { id, courierName: null, trashedAt: null, status: { in: ['PENDING', 'CONFIRMED', 'PACKAGING', 'HOLD'] } }, data });
-    if (!changed.count) { res.status(409).json({ success: false, message: 'Order changed during editing; reload before saving' }); return; }
-    const updated = await prisma.order.findUniqueOrThrow({ where: { id } });
-    if (['customerAddress', 'district', 'city', 'zone', 'area'].some(field => data[field] !== undefined)) await saveOrderCourierSuggestions(updated.id, updated);
     await logAudit({
       userId: req.user?.id, userName: req.user?.name, action: 'UPDATE', entity: 'ORDER', entityId: id,
-      details: { orderNumber: order.orderNumber, editedFields: Object.keys(data) }, ipAddress: req.ip,
+      details: { orderNumber: order.orderNumber, editedFields: Object.keys(data), beforeTotal:amended.before.grandTotal, afterTotal:updated.grandTotal, items:amended.itemsChanged ? {before:amended.before.items,after:updated.items.map(item=>({productId:item.productId,variantId:item.variantId,quantity:item.quantity,unitPrice:item.unitPrice}))} : undefined, courierReviewRequired:amended.courierReview }, ipAddress: req.ip,
       userAgent: req.headers['user-agent'] as string | undefined,
     });
-    res.json({ success: true, order: updated, message: 'Order updated successfully' });
-  } catch (error: any) { res.status(error.status === 409 ? 409 : 500).json({ success: false, message: error.message }); }
+    res.json({ success: true, order: updated, courierReviewRequired: amended.courierReview, message: 'Order updated successfully' });
+  } catch (error: any) { res.status([400,404,409].includes(error.status) ? error.status : 500).json({ success: false, message: error.message }); }
 };
 
 export const updateOrderAssignment = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -688,7 +683,7 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
         items: true,
       },
     });
-    try { await saveOrderCourierSuggestions(newOrder.id, newOrder); }
+    try { void saveOrderCourierSuggestions(newOrder.id, newOrder).catch(() => console.warn('Courier address matching queued task failed')); }
     catch (error) { console.warn('Courier area matching was unavailable for staff order:', error); }
     await prisma.$transaction(tx => recordRiskDecision(tx, riskInput, risk, newOrder.id));
 

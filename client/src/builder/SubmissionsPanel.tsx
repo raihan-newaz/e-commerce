@@ -1,3 +1,4 @@
+import { AdminSelect } from '../components/admin/AdminSelect';
 import { useCallback, useEffect, useState } from 'react';
 import api from '../lib/api';
 import { errorMessage } from './useStudio';
@@ -80,7 +81,7 @@ export function SubmissionsPanel({ pageId }: { pageId: string }) {
 
           <div className="elementor-control-row">
             <label className="elementor-control-label">Filter Status</label>
-            <select
+            <AdminSelect dropdownKey="builder.SubmissionsPanel.tsx.1"
               className="elementor-control-input"
               value={status}
               onChange={event => setStatus(event.target.value)}
@@ -89,7 +90,7 @@ export function SubmissionsPanel({ pageId }: { pageId: string }) {
               <option value="NEW">NEW</option>
               <option value="REVIEWED">REVIEWED</option>
               <option value="SPAM">SPAM</option>
-            </select>
+            </AdminSelect>
           </div>
 
           <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
@@ -203,7 +204,7 @@ export function SubmissionsPanel({ pageId }: { pageId: string }) {
                 </div>
 
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                  <select
+                  <AdminSelect dropdownKey="builder.SubmissionsPanel.tsx.2"
                     className="elementor-control-input"
                     style={{ flex: 1, padding: '3px 6px', fontSize: '11px' }}
                     value={row.status}
@@ -212,7 +213,7 @@ export function SubmissionsPanel({ pageId }: { pageId: string }) {
                     <option value="NEW">Status: NEW</option>
                     <option value="REVIEWED">Status: REVIEWED</option>
                     <option value="SPAM">Status: SPAM</option>
-                  </select>
+                  </AdminSelect>
                   <button
                     className="elementor-btn"
                     style={{ padding: '3px 8px', fontSize: '11px', color: '#ef4444' }}

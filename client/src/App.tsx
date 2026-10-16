@@ -1,3 +1,4 @@
+import { AdminDropdownProvider } from './components/admin/AdminSelect';
 import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -8,6 +9,7 @@ import { Layout } from './components/layout/Layout';
 import { ScrollToTop } from './components/layout/ScrollToTop';
 import { LoginPage } from './pages/LoginPage';
 
+const DropdownOptionsPage = lazy(() => import('./pages/DropdownOptionsPage'));
 const EmailSettingsPage = lazy(() => import('./pages/EmailSettingsPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then((module) => ({ default: module.DashboardPage })));
 const OrdersPage = lazy(() => import('./pages/OrdersPage').then((module) => ({ default: module.OrdersPage })));
@@ -61,10 +63,16 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return <>{children}</>;
 };
 
+const AdminDropdownScope: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { token, loading, user } = useAuth();
+  return token && !loading ? <AdminDropdownProvider key={user?.id}>{children}</AdminDropdownProvider> : <>{children}</>;
+};
+
 export const App: React.FC = () => {
   return (
     <ThemeProvider>
       <AuthProvider>
+        <AdminDropdownScope>
         <BrowserRouter basename="/admin">
           <ScrollToTop />
           <Toaster
@@ -126,6 +134,7 @@ export const App: React.FC = () => {
               <Route path="theme-customizer" element={<ThemeCustomizerPage />} />
               <Route path="settings" element={<SettingsHubPage />} />
               <Route path="account" element={<AccountPage />} />
+              <Route path="settings/dropdowns" element={<DropdownOptionsPage />} />
               <Route path="settings/email" element={<EmailSettingsPage />} />
               <Route path="settings/order-protection" element={<OrderProtectionPage />} />
               <Route path="settings/:section" element={<SettingsPage />} />
@@ -135,6 +144,7 @@ export const App: React.FC = () => {
           </Routes>
           </Suspense>
         </BrowserRouter>
+        </AdminDropdownScope>
       </AuthProvider>
     </ThemeProvider>
   );

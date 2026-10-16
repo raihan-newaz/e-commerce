@@ -1,3 +1,4 @@
+import { AdminSelect } from '../components/admin/AdminSelect';
 import { useEffect, useState } from "react";
 import {
   BarChart3,
@@ -268,7 +269,7 @@ export const StorefrontSettingsPage = () => {
               className="field mt-0"
               placeholder="/shop"
             />
-            <select
+            <AdminSelect dropdownKey="pages.StorefrontSettingsPage.tsx.1"
               value=""
               onChange={(e) => {
                 const c = categories.find((row) => row.slug === e.target.value);
@@ -289,8 +290,8 @@ export const StorefrontSettingsPage = () => {
                   {c.name}
                 </option>
               ))}
-            </select>
-            <select
+            </AdminSelect>
+            <AdminSelect dropdownKey="pages.StorefrontSettingsPage.tsx.2"
               value=""
               onChange={(e) => {
                 const [kind, id] = e.target.value.split(":");
@@ -305,7 +306,7 @@ export const StorefrontSettingsPage = () => {
               <option value="">Insert product or page</option>
               <optgroup label="Pages">{availableMenuPages.map((page) => <option key={page.url} value={`page:${page.url}`}>{page.label}</option>)}</optgroup>
               <optgroup label="Products">{products.map((product) => <option key={product.id} value={`product:${product.id}`}>{product.name}</option>)}</optgroup>
-            </select>
+            </AdminSelect>
             <Controls
               onUp={() => change(swap(items, index, -1))}
               onDown={() => change(swap(items, index, 1))}
@@ -400,7 +401,7 @@ export const StorefrontSettingsPage = () => {
         </section>
         <section id="store-checkout" className="xl:col-span-2 min-w-0 scroll-mt-40 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="flex items-start justify-between gap-3"><div><h2 className="font-bold">Checkout field editor</h2><p className="mt-1 text-sm text-slate-500">Choose what customers fill in and drag fields to reorder them. Name, mobile and delivery address are required. District can be switched off if you do not need it.</p></div><div className="flex shrink-0 gap-2">{saveButton("checkout", [], ["checkoutFields"])}<button type="button" onClick={() => setConfig('checkoutFields', [...checkoutFields, { key: `custom_${Date.now()}`, label: '', type: 'text', enabled: true, required: false, custom: true }])} className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"><Plus className="h-4 w-4"/>Add field</button></div></div>
-          <div className="mt-4 space-y-3">{checkoutFields.map((field: any, index: number) => <div key={field.key} draggable onDragStart={(event) => { setDraggedCheckoutField(index); event.dataTransfer.effectAllowed = 'move'; }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); if (draggedCheckoutField !== null) moveCheckoutField(draggedCheckoutField, index); }} onDragEnd={() => setDraggedCheckoutField(null)} className={`grid cursor-grab gap-2 rounded-xl border border-slate-200 p-3 active:cursor-grabbing sm:grid-cols-[1.2fr_130px_auto_auto_auto] dark:border-slate-700 ${draggedCheckoutField === index ? 'opacity-50' : ''}`} title="Drag to reorder checkout fields"><label className="text-xs font-semibold">Field label<input value={field.label} onChange={(e) => setConfig('checkoutFields', checkoutFields.map((item: any, i: number) => i === index ? { ...item, label: e.target.value } : item))} className="field mt-1" placeholder="e.g. Preferred delivery time"/></label><label className="text-xs font-semibold">Input type<select value={field.type} disabled={!field.custom} onChange={(e) => setConfig('checkoutFields', checkoutFields.map((item: any, i: number) => i === index ? { ...item, type: e.target.value } : item))} className="field mt-1"><option value="text">Text</option><option value="textarea">Long text</option><option value="number">Number</option><option value="email">Email</option><option value="tel">Phone</option><option value="select">Dropdown</option></select></label>{field.custom && field.type === 'select' && <label className="text-xs font-semibold sm:col-span-2">Dropdown choices (comma separated)<input value={(field.options || []).join(', ')} onChange={(e) => setConfig('checkoutFields', checkoutFields.map((item: any, i: number) => i === index ? { ...item, options: e.target.value.split(',').map((option: string) => option.trim()).filter(Boolean) } : item))} className="field mt-1" placeholder="Morning, Afternoon, Evening"/></label>}<label className="flex items-center gap-2 text-xs font-semibold"><input type="checkbox" checked={field.enabled} disabled={['name','phone','address'].includes(field.key)} onChange={(e) => setConfig('checkoutFields', checkoutFields.map((item: any, i: number) => i === index ? { ...item, enabled: e.target.checked, required: e.target.checked ? item.required : false } : item))}/>Show</label><label className="flex items-center gap-2 text-xs font-semibold"><input type="checkbox" checked={field.required} disabled={!field.enabled || ['name','phone','address'].includes(field.key)} onChange={(e) => setConfig('checkoutFields', checkoutFields.map((item: any, i: number) => i === index ? { ...item, required: e.target.checked } : item))}/>Required</label>{field.custom ? <button type="button" onClick={() => setConfig('checkoutFields', checkoutFields.filter((_: any, i: number) => i !== index))} className="self-center rounded-lg p-2 text-rose-500 hover:bg-rose-50" aria-label="Remove checkout field"><Trash2 className="h-4 w-4"/></button> : <span/>}</div>)}</div>
+          <div className="mt-4 space-y-3">{checkoutFields.map((field: any, index: number) => <div key={field.key} draggable onDragStart={(event) => { setDraggedCheckoutField(index); event.dataTransfer.effectAllowed = 'move'; }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); if (draggedCheckoutField !== null) moveCheckoutField(draggedCheckoutField, index); }} onDragEnd={() => setDraggedCheckoutField(null)} className={`grid cursor-grab gap-2 rounded-xl border border-slate-200 p-3 active:cursor-grabbing sm:grid-cols-[1.2fr_130px_auto_auto_auto] dark:border-slate-700 ${draggedCheckoutField === index ? 'opacity-50' : ''}`} title="Drag to reorder checkout fields"><label className="text-xs font-semibold">Field label<input value={field.label} onChange={(e) => setConfig('checkoutFields', checkoutFields.map((item: any, i: number) => i === index ? { ...item, label: e.target.value } : item))} className="field mt-1" placeholder="e.g. Preferred delivery time"/></label><label className="text-xs font-semibold">Input type<AdminSelect dropdownKey="pages.StorefrontSettingsPage.tsx.3" value={field.type} disabled={!field.custom} onChange={(e) => setConfig('checkoutFields', checkoutFields.map((item: any, i: number) => i === index ? { ...item, type: e.target.value } : item))} className="field mt-1"><option value="text">Text</option><option value="textarea">Long text</option><option value="number">Number</option><option value="email">Email</option><option value="tel">Phone</option><option value="select">Dropdown</option></AdminSelect></label>{field.custom && field.type === 'select' && <label className="text-xs font-semibold sm:col-span-2">Dropdown choices (comma separated)<input value={(field.options || []).join(', ')} onChange={(e) => setConfig('checkoutFields', checkoutFields.map((item: any, i: number) => i === index ? { ...item, options: e.target.value.split(',').map((option: string) => option.trim()).filter(Boolean) } : item))} className="field mt-1" placeholder="Morning, Afternoon, Evening"/></label>}<label className="flex items-center gap-2 text-xs font-semibold"><input type="checkbox" checked={field.enabled} disabled={['name','phone','address'].includes(field.key)} onChange={(e) => setConfig('checkoutFields', checkoutFields.map((item: any, i: number) => i === index ? { ...item, enabled: e.target.checked, required: e.target.checked ? item.required : false } : item))}/>Show</label><label className="flex items-center gap-2 text-xs font-semibold"><input type="checkbox" checked={field.required} disabled={!field.enabled || ['name','phone','address'].includes(field.key)} onChange={(e) => setConfig('checkoutFields', checkoutFields.map((item: any, i: number) => i === index ? { ...item, required: e.target.checked } : item))}/>Required</label>{field.custom ? <button type="button" onClick={() => setConfig('checkoutFields', checkoutFields.filter((_: any, i: number) => i !== index))} className="self-center rounded-lg p-2 text-rose-500 hover:bg-rose-50" aria-label="Remove checkout field"><Trash2 className="h-4 w-4"/></button> : <span/>}</div>)}</div>
         </section>
         <section id="store-carousel" className="xl:col-span-2 min-w-0 scroll-mt-40 rounded-2xl border border-slate-100/90 bg-white p-6 shadow-[0_2px_10px_rgba(0,0,0,0.02)] dark:border-slate-800 dark:bg-slate-900">
           <div className="mb-5 flex items-start justify-between gap-3"><div className="flex gap-3">
@@ -412,7 +413,8 @@ export const StorefrontSettingsPage = () => {
                 their display order.
               </p>
             </div>
-          </div>{saveButton("hero", ["heroEyebrow", "heroTitle", "heroText", "heroImages", "heroButtonLabel", "heroButtonUrl"])}</div>
+          </div>{saveButton("hero", ["heroEyebrow", "heroTitle", "heroText", "heroImages", "heroButtonLabel", "heroButtonUrl"], ["heroDesktopHeight", "heroMobileHeight"])}</div>
+          <div className="mb-5 grid gap-4 sm:grid-cols-2">{([{key:'heroDesktopHeight',label:'Desktop / tablet height',min:160,max:700,fallback:360},{key:'heroMobileHeight',label:'Mobile height',min:120,max:450,fallback:200}] as const).map(item => <label key={item.key} className="text-sm font-semibold">{item.label}<div className="mt-2 flex items-center gap-3"><input aria-label={item.label} type="range" min={item.min} max={item.max} step={10} value={config[item.key] ?? item.fallback} onChange={event => setConfig(item.key,Number(event.target.value))} className="min-w-0 flex-1"/><input aria-label={item.label+' in pixels'} type="number" min={item.min} max={item.max} value={config[item.key] ?? ''} placeholder="Auto" onChange={event => setConfig(item.key,event.target.value === '' ? undefined : Number(event.target.value))} className="w-20 rounded-lg border bg-transparent p-2"/><span className="text-xs text-slate-500">px</span></div><button type="button" onClick={() => setConfig(item.key,undefined)} className="mt-2 text-xs text-emerald-700">Reset to responsive auto</button></label>)}</div>
           <MediaPicker title="Choose storefront carousel images" multiple maxSelection={8} value={form.heroImages.filter(Boolean)} onChange={urls => update('heroImages', urls)} />
           <div className="space-y-3">
             {form.heroImages.map((image: string, index: number) => (
@@ -486,14 +488,14 @@ export const StorefrontSettingsPage = () => {
                 </div>
                 <div className="flex min-w-0 flex-wrap items-end gap-3">
                   <label className="min-w-[150px] flex-[1_1_150px] text-xs font-semibold text-slate-600 dark:text-slate-300">Products from
-                    <select value={section.source} onChange={(e) => setConfig("showcase", showcase.map((x: any, i: number) => i === index ? { ...x, source: e.target.value, category: e.target.value === "CATEGORY" ? x.category : undefined } : x))} className="field mt-1 w-full min-w-0">
+                    <AdminSelect dropdownKey="pages.StorefrontSettingsPage.tsx.4" value={section.source} onChange={(e) => setConfig("showcase", showcase.map((x: any, i: number) => i === index ? { ...x, source: e.target.value, category: e.target.value === "CATEGORY" ? x.category : undefined } : x))} className="field mt-1 w-full min-w-0">
                       <option value="NEW">New arrivals</option><option value="BEST">Best selling</option><option value="CATEGORY">Product category</option>
-                    </select>
+                    </AdminSelect>
                   </label>
                   {section.source === "CATEGORY" && <label className="min-w-[150px] flex-[1_1_150px] text-xs font-semibold text-slate-600 dark:text-slate-300">Category
-                    <select value={section.category || ""} onChange={(e) => setConfig("showcase", showcase.map((x: any, i: number) => i === index ? { ...x, category: e.target.value, title: x.title === "New product section" ? e.target.value : x.title } : x))} className="field mt-1 w-full min-w-0">
+                    <AdminSelect dropdownKey="pages.StorefrontSettingsPage.tsx.5" value={section.category || ""} onChange={(e) => setConfig("showcase", showcase.map((x: any, i: number) => i === index ? { ...x, category: e.target.value, title: x.title === "New product section" ? e.target.value : x.title } : x))} className="field mt-1 w-full min-w-0">
                       <option value="">Choose category</option>{categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
-                    </select>
+                    </AdminSelect>
                   </label>}
                   <label className="w-20 shrink-0 text-xs font-semibold text-slate-600 dark:text-slate-300">Products
                     <input type="number" min="1" max="12" value={section.limit} onChange={(e) => setConfig("showcase", showcase.map((x: any, i: number) => i === index ? { ...x, limit: e.target.value === "" ? "" : Number(e.target.value) } : x))} onBlur={() => setConfig("showcase", showcase.map((x: any, i: number) => i === index ? { ...x, limit: Math.min(12, Math.max(1, Number(x.limit) || 1)) } : x))} className="field mt-1 w-full min-w-0 text-center" />

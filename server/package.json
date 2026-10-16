@@ -27,7 +27,8 @@
     "couriers:sync-locations": "ts-node src/scripts/syncCourierLocations.ts",
     "messaging:seed-sms": "ts-node src/scripts/seedSmsTemplates.ts",
     "media:sync": "ts-node src/scripts/syncMediaAssets.ts",
-    "test:audit": "node --test -r ts-node/register src/tests/audit.test.ts"
+    "test:audit": "node --test -r ts-node/register src/tests/audit.test.ts",
+    "admin:install-dropdowns": "node dist/scripts/installAdminDropdowns.js"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

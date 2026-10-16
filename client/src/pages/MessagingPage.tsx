@@ -1,3 +1,4 @@
+import { AdminSelect } from '../components/admin/AdminSelect';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { MessageTemplate } from '../types';
@@ -271,7 +272,7 @@ export const MessagingPage: React.FC = () => {
           </h3>
 
           <form onSubmit={handleSendTest} className="space-y-3 text-xs">
-            <label className="block font-medium">Channel<select value={testChannel} onChange={e => setTestChannel(e.target.value as 'SMS' | 'WHATSAPP')} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-950"><option value="SMS">GreenSMS</option><option value="WHATSAPP">WhatsApp</option></select></label>
+            <label className="block font-medium">Channel<AdminSelect dropdownKey="pages.MessagingPage.tsx.1" value={testChannel} onChange={e => setTestChannel(e.target.value as 'SMS' | 'WHATSAPP')} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-950"><option value="SMS">GreenSMS</option><option value="WHATSAPP">WhatsApp</option></AdminSelect></label>
             <div>
               <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Phone Number</label>
               <input
@@ -404,7 +405,7 @@ export const MessagingPage: React.FC = () => {
             </div>
             <form onSubmit={handleSaveTemplate} className="space-y-3 text-xs">
               <label className="block font-medium">Name<input value={editingTemplate.name} onChange={e => setEditingTemplate({ ...editingTemplate, name: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-950" /></label>
-              <label className="block font-medium">Channel<select value={editingTemplate.channel} onChange={e => setEditingTemplate({ ...editingTemplate, channel: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-950"><option value="SMS">SMS</option><option value="WHATSAPP">WhatsApp</option><option value="BOTH">Both</option></select></label>
+              <label className="block font-medium">Channel<AdminSelect dropdownKey="pages.MessagingPage.tsx.2" value={editingTemplate.channel} onChange={e => setEditingTemplate({ ...editingTemplate, channel: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-950"><option value="SMS">SMS</option><option value="WHATSAPP">WhatsApp</option><option value="BOTH">Both</option></AdminSelect></label>
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Message Body</label>
                 <textarea

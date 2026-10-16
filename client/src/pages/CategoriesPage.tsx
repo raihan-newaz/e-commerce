@@ -1,3 +1,4 @@
+import { AdminSelect } from '../components/admin/AdminSelect';
 import { FormEvent, useEffect, useState } from "react";
 import {
   FolderTree,
@@ -127,7 +128,7 @@ export const CategoriesPage = () => {
             </label>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-300">
               Slug{" "}
-              <span className="font-normal text-slate-400">(optional)</span>
+              <span className="font-normal text-slate-500 dark:text-slate-400">(optional)</span>
               <input
                 value={form.slug}
                 onChange={(e) => change("slug", e.target.value)}
@@ -137,7 +138,7 @@ export const CategoriesPage = () => {
             </label>
             <label className="block text-sm font-semibold">
               Parent category
-              <select
+              <AdminSelect dropdownKey="pages.CategoriesPage.tsx.1"
                 value={form.parentId}
                 onChange={(e) => change("parentId", e.target.value)}
                 className="field"
@@ -150,11 +151,11 @@ export const CategoriesPage = () => {
                       {category.name}
                     </option>
                   ))}
-              </select>
+              </AdminSelect>
             </label>
             <label className="block text-sm font-semibold">
               Category image{" "}
-              <span className="font-normal text-slate-400">
+              <span className="font-normal text-slate-500 dark:text-slate-400">
                 (Media Gallery)
               </span>
               <MediaPicker title="Choose category image" value={form.image ? [form.image] : []} onChange={urls => change('image', urls[0] || '')} />

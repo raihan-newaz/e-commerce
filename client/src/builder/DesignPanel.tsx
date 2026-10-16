@@ -1,3 +1,4 @@
+import { AdminSelect } from '../components/admin/AdminSelect';
 import { useState } from 'react';
 import { Field } from './Inspector';
 import { type PageDocument, type Command, type BuilderNode, cloneNode, styleGroups, createNode, tokenUsageCount } from './core';
@@ -127,21 +128,21 @@ export function DesignPanel({ document, command, selected, select }: Props) {
 
           <label className="studio-field">
             <span>Choose Class to Edit</span>
-            <select value={className} onChange={event => setClassName(event.target.value)}>
+            <AdminSelect dropdownKey="builder.DesignPanel.tsx.1" value={className} onChange={event => setClassName(event.target.value)}>
               <option value="">Select a class…</option>
               {Object.keys(document.classes).map(name => (
                 <option key={name} value={name}>
                   .{name}
                 </option>
               ))}
-            </select>
+            </AdminSelect>
           </label>
 
           {document.classes[className] && (
             <div style={{ marginTop: '10px', padding: '10px', background: 'var(--e-bg-card)', borderRadius: '4px', border: '1px solid var(--e-border-base)' }}>
               <label className="studio-field">
                 <span>Style property</span>
-                <select value={property} onChange={event => setProperty(event.target.value)}>
+                <AdminSelect dropdownKey="builder.DesignPanel.tsx.2" value={property} onChange={event => setProperty(event.target.value)}>
                   {Object.values(styleGroups)
                     .flat()
                     .map(name => (
@@ -149,7 +150,7 @@ export function DesignPanel({ document, command, selected, select }: Props) {
                         {name}
                       </option>
                     ))}
-                </select>
+                </AdminSelect>
               </label>
               <Field
                 label={property}

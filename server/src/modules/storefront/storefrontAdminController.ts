@@ -8,6 +8,8 @@ import { safeUrl } from '../builder/core/schema';
 const storefrontLink = z.string().trim().min(1).max(240).refine(safeUrl, 'Use a site path, HTTP(S), phone or email link');
 
 const themeConfigSchema = z.object({
+  heroDesktopHeight: z.number().int().min(160).max(700).optional(),
+  heroMobileHeight: z.number().int().min(120).max(450).optional(),
   primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   backgroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),

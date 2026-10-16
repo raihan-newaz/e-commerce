@@ -10,6 +10,13 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model AdminDropdownConfig {
+  key       String   @id @db.VarChar(180)
+  options   Json
+  version   Int      @default(1)
+  updatedAt DateTime @updatedAt
+}
+
 model BuilderPage {
   id                String   @id @default(uuid())
   title             String   @db.VarChar(120)

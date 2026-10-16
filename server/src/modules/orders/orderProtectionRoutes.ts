@@ -1,3 +1,4 @@
+import { pendingLocationJobs, invalidateCourierCatalog } from '../couriers/locationQueue';
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import prisma from '../../prisma';
@@ -55,6 +56,7 @@ router.post('/aliases', requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER']), run(
   if (!location?.active || location.provider !== parsed.data.provider || location.level !== parsed.data.level) { res.status(400).json({ success: false, message: 'Location is unavailable' }); return; }
   const normalizedAlias = normalizeLocation(parsed.data.alias);
   const alias = await prisma.courierLocationAlias.upsert({ where: { provider_level_locationId_normalizedAlias: { provider: parsed.data.provider, level: parsed.data.level, locationId: location.id, normalizedAlias } }, create: { ...parsed.data, normalizedAlias }, update: { alias: parsed.data.alias } });
+  invalidateCourierCatalog();
   await logAudit({ userId: req.user?.id, userName: req.user?.name, action: 'CREATE', entity: 'SETTING', entityId: alias.id, details: { locationId: location.id, alias: alias.alias }, ipAddress: req.ip });
   res.json({ success: true, alias });
 }));
@@ -65,7 +67,11 @@ router.delete('/aliases/:id', requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER'])
 }));
 router.get('/orders/:id/locations', run(async (req, res) => {
   const locations = await prisma.orderCourierLocation.findMany({ where: { orderId: String(req.params.id) } });
-  res.json({ success: true, locations });
+  if (!locations.length && !pendingLocationJobs('MATCH:'+String(req.params.id)+':')) {
+    const order = await prisma.order.findUnique({ where:{id:String(req.params.id)} });
+    if (order && !order.trashedAt) void saveOrderCourierSuggestions(order.id,order).catch(()=>console.warn('Courier address match could not be queued'));
+  }
+  res.json({ success: true, locations, pending:pendingLocationJobs('MATCH:'+String(req.params.id)+':') });
 }));
 router.get('/orders/:id/risk-history', run(async (req, res) => {
   const id = String(req.params.id);
