@@ -232,7 +232,7 @@ export const StorefrontSettingsPage = () => {
     change: (next: any[]) => void,
     saveId: string,
   ) => (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <section id={`store-${saveId}`} className="min-w-0 scroll-mt-40 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="flex items-start justify-between gap-3"><div><h2 className="text-base font-bold">{title}</h2>
       <p className="mt-1 text-sm text-slate-500">
         Add custom links, reorder them, or choose a product category for a
@@ -331,35 +331,19 @@ export const StorefrontSettingsPage = () => {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-            <Store className="h-6 w-6 text-emerald-600 dark:text-emerald-400" /> Storefront editor
+            <Store className="h-6 w-6 text-emerald-600 dark:text-emerald-400" /> Store settings
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Manual controls for carousel banners, menus and product showcases.
+            Store details, checkout, delivery, homepage content and navigation.
           </p>
         </div>
         <span className="text-xs text-slate-500">Save each section independently.</span>
       </div>
-      <div className="storefront-editor-layout columns-1 gap-6 xl:columns-2">
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-start justify-between gap-3"><h2 className="font-bold">Variation option style</h2>{saveButton("variation", [], ["variationStyle", "showColorName", "buyNowText"])}</div>
-          <p className="mt-1 text-sm text-slate-500">Choose how color swatches and size choices look on product pages.</p>
-          <div className="mt-4 flex flex-wrap gap-3">{([{ id: 'SOFT', label: 'Soft rounded' }, { id: 'CIRCLE', label: 'Circle' }, { id: 'SQUARE', label: 'Square' }] as const).map((style) => <button type="button" key={style.id} onClick={() => setConfig('variationStyle', style.id)} className={`rounded-xl border px-4 py-3 text-sm font-bold ${ (config.variationStyle || 'SOFT') === style.id ? 'border-emerald-500 bg-emerald-50 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300' : 'border-slate-200 dark:border-slate-700'}`}><span className={`mb-2 mx-auto block h-8 w-8 border-2 border-slate-700 bg-lime-300 ${style.id === 'SOFT' ? 'rounded-lg' : style.id === 'CIRCLE' ? 'rounded-full' : 'rounded-none'}`}/>{style.label}</button>)}</div>
-          <label className="mt-5 flex items-center gap-3 rounded-xl border border-slate-200 p-3 text-sm font-semibold dark:border-slate-700"><input type="checkbox" checked={config.showColorName !== false} onChange={(event) => setConfig('showColorName', event.target.checked)} />Show color names beside swatches</label>
-          <label className="mt-4 block text-sm font-semibold">Buy Now button text<input maxLength={30} value={config.buyNowText || 'Buy now'} onChange={(event) => setConfig('buyNowText', event.target.value)} className="field mt-1" placeholder="Buy now"/><span className="mt-1 block text-xs font-normal text-slate-500">This label appears on the product page purchase button.</span></label>
-        </section>
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-start justify-between gap-3"><div><h2 className="font-bold">Checkout field editor</h2><p className="mt-1 text-sm text-slate-500">Choose what customers fill in and drag fields to reorder them. Name, mobile and delivery address are required. District can be switched off if you do not need it.</p></div><div className="flex shrink-0 gap-2">{saveButton("checkout", [], ["checkoutFields"])}<button type="button" onClick={() => setConfig('checkoutFields', [...checkoutFields, { key: `custom_${Date.now()}`, label: '', type: 'text', enabled: true, required: false, custom: true }])} className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"><Plus className="h-4 w-4"/>Add field</button></div></div>
-          <div className="mt-4 space-y-3">{checkoutFields.map((field: any, index: number) => <div key={field.key} draggable onDragStart={(event) => { setDraggedCheckoutField(index); event.dataTransfer.effectAllowed = 'move'; }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); if (draggedCheckoutField !== null) moveCheckoutField(draggedCheckoutField, index); }} onDragEnd={() => setDraggedCheckoutField(null)} className={`grid cursor-grab gap-2 rounded-xl border border-slate-200 p-3 active:cursor-grabbing sm:grid-cols-[1.2fr_130px_auto_auto_auto] dark:border-slate-700 ${draggedCheckoutField === index ? 'opacity-50' : ''}`} title="Drag to reorder checkout fields"><label className="text-xs font-semibold">Field label<input value={field.label} onChange={(e) => setConfig('checkoutFields', checkoutFields.map((item: any, i: number) => i === index ? { ...item, label: e.target.value } : item))} className="field mt-1" placeholder="e.g. Preferred delivery time"/></label><label className="text-xs font-semibold">Input type<select value={field.type} disabled={!field.custom} onChange={(e) => setConfig('checkoutFields', checkoutFields.map((item: any, i: number) => i === index ? { ...item, type: e.target.value } : item))} className="field mt-1"><option value="text">Text</option><option value="textarea">Long text</option><option value="number">Number</option><option value="email">Email</option><option value="tel">Phone</option><option value="select">Dropdown</option></select></label>{field.custom && field.type === 'select' && <label className="text-xs font-semibold sm:col-span-2">Dropdown choices (comma separated)<input value={(field.options || []).join(', ')} onChange={(e) => setConfig('checkoutFields', checkoutFields.map((item: any, i: number) => i === index ? { ...item, options: e.target.value.split(',').map((option: string) => option.trim()).filter(Boolean) } : item))} className="field mt-1" placeholder="Morning, Afternoon, Evening"/></label>}<label className="flex items-center gap-2 text-xs font-semibold"><input type="checkbox" checked={field.enabled} disabled={['name','phone','address'].includes(field.key)} onChange={(e) => setConfig('checkoutFields', checkoutFields.map((item: any, i: number) => i === index ? { ...item, enabled: e.target.checked, required: e.target.checked ? item.required : false } : item))}/>Show</label><label className="flex items-center gap-2 text-xs font-semibold"><input type="checkbox" checked={field.required} disabled={!field.enabled || ['name','phone','address'].includes(field.key)} onChange={(e) => setConfig('checkoutFields', checkoutFields.map((item: any, i: number) => i === index ? { ...item, required: e.target.checked } : item))}/>Required</label>{field.custom ? <button type="button" onClick={() => setConfig('checkoutFields', checkoutFields.filter((_: any, i: number) => i !== index))} className="self-center rounded-lg p-2 text-rose-500 hover:bg-rose-50" aria-label="Remove checkout field"><Trash2 className="h-4 w-4"/></button> : <span/>}</div>)}</div>
-        </section>
-        <section id="delivery-charges" className="scroll-mt-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-start justify-between gap-3"><h2 className="font-bold">Delivery charges</h2>{saveButton("delivery", ["insideDhakaCharge", "subAreaCharge", "outsideDhakaCharge"])}</div>
-          <p className="mt-1 text-sm text-slate-500">Set the checkout delivery fee for Dhaka, Dhaka sub areas, and other districts.</p>
-          <div className="mt-5 grid gap-4 md:grid-cols-3">
-            {([["insideDhakaCharge", "Inside Dhaka"], ["subAreaCharge", "Dhaka sub areas"], ["outsideDhakaCharge", "Outside Dhaka"]] as const).map(([key, label]) => <label key={key} className="text-sm font-semibold">{label} (৳)<input type="number" min="0" max="1000" value={form[key] ?? (key === "subAreaCharge" ? 130 : key === "outsideDhakaCharge" ? 150 : 60)} onChange={(event) => update(key, Number(event.target.value))} className="field" /></label>)}
-          </div>
-          <p className="mt-3 text-xs text-slate-500">Dhaka sub area rate applies when the area contains Savar, Ashulia, Tongi, Keraniganj, Amin Bazar, Hemayetpur, Dhamrai, Dohar, or Nawabganj.</p>
-        </section>
-        <section className="grid gap-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:grid-cols-2">
+      <nav aria-label="Store settings sections" className="sticky top-16 z-10 my-5 flex gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white/95 p-2 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
+        {[["store-identity", "Store details"], ["delivery-charges", "Delivery"], ["store-variations", "Product options"], ["store-checkout", "Checkout"], ["store-carousel", "Banners"], ["store-showcase", "Collections"], ["store-headerMenu", "Header menu"], ["store-footerMenu", "Footer menu"], ["store-analytics", "Analytics"], ["store-maintenance", "Maintenance"]].map(([id, label]) => <a key={id} href={`#${id}`} className="shrink-0 rounded-lg px-3 py-2 text-xs text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">{label}</a>)}
+      </nav>
+      <div className="storefront-editor-layout grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
+        <section id="store-identity" className="xl:col-span-2 min-w-0 scroll-mt-40 grid gap-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:grid-cols-2">
           <div className="md:col-span-2 flex items-start justify-between gap-3"><div><h2 className="font-bold">Store identity & messaging</h2><p className="mt-1 text-sm text-slate-500">Manage the public store name, support phone and messages shown across your storefront.</p></div>{saveButton("identity", ["storeName", "phone", "announcement", "footerText"])}</div>
           <label className="text-sm font-semibold">
             Store name
@@ -399,13 +383,26 @@ export const StorefrontSettingsPage = () => {
             />
           </label>
         </section>
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-bold">Maintenance page</h2><p className="mt-1 text-sm text-slate-500">Temporarily show a branded maintenance message to storefront visitors. Admin and order-management access stays available.</p></div>{saveButton("maintenance", [], ["maintenanceMode"])}</div>
-          <label className="mt-4 flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-700"><span><b>Maintenance mode</b><small className="mt-1 block text-slate-500">{config.maintenanceMode ? "On — storefront is paused" : "Off — storefront is open"}</small></span><input type="checkbox" role="switch" checked={Boolean(config.maintenanceMode)} onChange={(event) => setConfig("maintenanceMode", event.target.checked)} className="h-5 w-5 accent-emerald-600" /></label>
-          <p className="mt-3 text-xs text-slate-500">The page title, message, image and HTML blocks can be edited in Pages. Keep maintenance mode off until the page is ready.</p>
-          {maintenancePage && <Link to={`/pages/${maintenancePage.id}/edit`} className="mt-3 inline-flex rounded-lg border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700">Edit maintenance page</Link>}
+        <section id="delivery-charges" className="min-w-0 scroll-mt-40 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex items-start justify-between gap-3"><h2 className="font-bold">Delivery charges</h2>{saveButton("delivery", ["insideDhakaCharge", "subAreaCharge", "outsideDhakaCharge"])}</div>
+          <p className="mt-1 text-sm text-slate-500">Set the checkout delivery fee for Dhaka, Dhaka sub areas, and other districts.</p>
+          <div className="mt-5 grid gap-4 md:grid-cols-3">
+            {([["insideDhakaCharge", "Inside Dhaka"], ["subAreaCharge", "Dhaka sub areas"], ["outsideDhakaCharge", "Outside Dhaka"]] as const).map(([key, label]) => <label key={key} className="text-sm font-semibold">{label} (৳)<input type="number" min="0" max="1000" value={form[key] ?? (key === "subAreaCharge" ? 130 : key === "outsideDhakaCharge" ? 150 : 60)} onChange={(event) => update(key, Number(event.target.value))} className="field" /></label>)}
+          </div>
+          <p className="mt-3 text-xs text-slate-500">Dhaka sub area rate applies when the area contains Savar, Ashulia, Tongi, Keraniganj, Amin Bazar, Hemayetpur, Dhamrai, Dohar, or Nawabganj.</p>
         </section>
-        <section className="rounded-2xl border border-slate-100/90 bg-white p-6 shadow-[0_2px_10px_rgba(0,0,0,0.02)] dark:border-slate-800 dark:bg-slate-900">
+        <section id="store-variations" className="min-w-0 scroll-mt-40 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex items-start justify-between gap-3"><h2 className="font-bold">Variation option style</h2>{saveButton("variation", [], ["variationStyle", "showColorName", "buyNowText"])}</div>
+          <p className="mt-1 text-sm text-slate-500">Choose how color swatches and size choices look on product pages.</p>
+          <div className="mt-4 flex flex-wrap gap-3">{([{ id: 'SOFT', label: 'Soft rounded' }, { id: 'CIRCLE', label: 'Circle' }, { id: 'SQUARE', label: 'Square' }] as const).map((style) => <button type="button" key={style.id} onClick={() => setConfig('variationStyle', style.id)} className={`rounded-xl border px-4 py-3 text-sm font-bold ${ (config.variationStyle || 'SOFT') === style.id ? 'border-emerald-500 bg-emerald-50 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300' : 'border-slate-200 dark:border-slate-700'}`}><span className={`mb-2 mx-auto block h-8 w-8 border-2 border-slate-700 bg-lime-300 ${style.id === 'SOFT' ? 'rounded-lg' : style.id === 'CIRCLE' ? 'rounded-full' : 'rounded-none'}`}/>{style.label}</button>)}</div>
+          <label className="mt-5 flex items-center gap-3 rounded-xl border border-slate-200 p-3 text-sm font-semibold dark:border-slate-700"><input type="checkbox" checked={config.showColorName !== false} onChange={(event) => setConfig('showColorName', event.target.checked)} />Show color names beside swatches</label>
+          <label className="mt-4 block text-sm font-semibold">Buy Now button text<input maxLength={30} value={config.buyNowText || 'Buy now'} onChange={(event) => setConfig('buyNowText', event.target.value)} className="field mt-1" placeholder="Buy now"/><span className="mt-1 block text-xs font-normal text-slate-500">This label appears on the product page purchase button.</span></label>
+        </section>
+        <section id="store-checkout" className="xl:col-span-2 min-w-0 scroll-mt-40 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex items-start justify-between gap-3"><div><h2 className="font-bold">Checkout field editor</h2><p className="mt-1 text-sm text-slate-500">Choose what customers fill in and drag fields to reorder them. Name, mobile and delivery address are required. District can be switched off if you do not need it.</p></div><div className="flex shrink-0 gap-2">{saveButton("checkout", [], ["checkoutFields"])}<button type="button" onClick={() => setConfig('checkoutFields', [...checkoutFields, { key: `custom_${Date.now()}`, label: '', type: 'text', enabled: true, required: false, custom: true }])} className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"><Plus className="h-4 w-4"/>Add field</button></div></div>
+          <div className="mt-4 space-y-3">{checkoutFields.map((field: any, index: number) => <div key={field.key} draggable onDragStart={(event) => { setDraggedCheckoutField(index); event.dataTransfer.effectAllowed = 'move'; }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); if (draggedCheckoutField !== null) moveCheckoutField(draggedCheckoutField, index); }} onDragEnd={() => setDraggedCheckoutField(null)} className={`grid cursor-grab gap-2 rounded-xl border border-slate-200 p-3 active:cursor-grabbing sm:grid-cols-[1.2fr_130px_auto_auto_auto] dark:border-slate-700 ${draggedCheckoutField === index ? 'opacity-50' : ''}`} title="Drag to reorder checkout fields"><label className="text-xs font-semibold">Field label<input value={field.label} onChange={(e) => setConfig('checkoutFields', checkoutFields.map((item: any, i: number) => i === index ? { ...item, label: e.target.value } : item))} className="field mt-1" placeholder="e.g. Preferred delivery time"/></label><label className="text-xs font-semibold">Input type<select value={field.type} disabled={!field.custom} onChange={(e) => setConfig('checkoutFields', checkoutFields.map((item: any, i: number) => i === index ? { ...item, type: e.target.value } : item))} className="field mt-1"><option value="text">Text</option><option value="textarea">Long text</option><option value="number">Number</option><option value="email">Email</option><option value="tel">Phone</option><option value="select">Dropdown</option></select></label>{field.custom && field.type === 'select' && <label className="text-xs font-semibold sm:col-span-2">Dropdown choices (comma separated)<input value={(field.options || []).join(', ')} onChange={(e) => setConfig('checkoutFields', checkoutFields.map((item: any, i: number) => i === index ? { ...item, options: e.target.value.split(',').map((option: string) => option.trim()).filter(Boolean) } : item))} className="field mt-1" placeholder="Morning, Afternoon, Evening"/></label>}<label className="flex items-center gap-2 text-xs font-semibold"><input type="checkbox" checked={field.enabled} disabled={['name','phone','address'].includes(field.key)} onChange={(e) => setConfig('checkoutFields', checkoutFields.map((item: any, i: number) => i === index ? { ...item, enabled: e.target.checked, required: e.target.checked ? item.required : false } : item))}/>Show</label><label className="flex items-center gap-2 text-xs font-semibold"><input type="checkbox" checked={field.required} disabled={!field.enabled || ['name','phone','address'].includes(field.key)} onChange={(e) => setConfig('checkoutFields', checkoutFields.map((item: any, i: number) => i === index ? { ...item, required: e.target.checked } : item))}/>Required</label>{field.custom ? <button type="button" onClick={() => setConfig('checkoutFields', checkoutFields.filter((_: any, i: number) => i !== index))} className="self-center rounded-lg p-2 text-rose-500 hover:bg-rose-50" aria-label="Remove checkout field"><Trash2 className="h-4 w-4"/></button> : <span/>}</div>)}</div>
+        </section>
+        <section id="store-carousel" className="xl:col-span-2 min-w-0 scroll-mt-40 rounded-2xl border border-slate-100/90 bg-white p-6 shadow-[0_2px_10px_rgba(0,0,0,0.02)] dark:border-slate-800 dark:bg-slate-900">
           <div className="mb-5 flex items-start justify-between gap-3"><div className="flex gap-3">
             <Image className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
             <div>
@@ -467,9 +464,7 @@ export const StorefrontSettingsPage = () => {
             </label>
           </div>
         </section>
-        {menuEditor("Header menu", headerMenu, (next) =>
-          setConfig("headerMenu", next), "headerMenu")}
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <section id="store-showcase" className="xl:col-span-2 min-w-0 scroll-mt-40 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="flex items-start justify-between gap-3"><h2 className="font-bold">Product showcase sections</h2>{saveButton("showcase", [], ["showcase"])}</div>
           <p className="mt-1 text-sm text-slate-500">
             Choose new arrivals, best-selling, or a product category. Use arrows
@@ -531,10 +526,21 @@ export const StorefrontSettingsPage = () => {
             Add product showcase
           </button>
         </section>
-        <section className="rounded-2xl border border-slate-100/90 bg-white p-6 shadow-[0_2px_10px_rgba(0,0,0,0.02)] dark:border-slate-800 dark:bg-slate-900">
+        {menuEditor("Header menu", headerMenu, (next) =>
+          setConfig("headerMenu", next), "headerMenu")}
+        {menuEditor("Footer menu", footerItems, (next) =>
+          setConfig("footerMenus", [
+            {
+              heading: config.footerMenus?.[0]?.heading || "Customer care",
+              items: next,
+            },
+            config.footerMenus?.[1] || defaultFooter[1],
+          ]), "footerMenu",
+        )}
+        <section id="store-analytics" className="min-w-0 scroll-mt-40 rounded-2xl border border-slate-100/90 bg-white p-6 shadow-[0_2px_10px_rgba(0,0,0,0.02)] dark:border-slate-800 dark:bg-slate-900">
           <div className="mb-5 flex items-start justify-between gap-3"><div className="flex items-start gap-3">
             <BarChart3 className="mt-0.5 h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-            <div><h2 className="font-bold">Analytics & marketing</h2><p className="mt-1 text-sm text-slate-500">Connect GA4 and Meta Pixel. Store visitors are asked for analytics and marketing consent before either script loads.</p></div>
+            <div><h2 className="font-bold">Analytics & marketing</h2><p className="mt-1 text-sm text-slate-500">Connect GA4 and Meta Pixel. Tracking follows the storefront’s existing privacy preferences.</p></div>
           </div>{saveButton("analytics", [], ["analytics"])}</div>
           <div className="grid gap-4 md:grid-cols-2 items-start">
             <div className="space-y-1.5">
@@ -581,15 +587,12 @@ export const StorefrontSettingsPage = () => {
           </div>
           <p className="mt-3 text-xs leading-5 text-slate-500">Tracks page views, product impressions, product views, search counts, add to cart, checkout starts, purchases, sign-ups and sign-ins. Customer contact details, passwords, addresses and order notes are never sent.</p>
         </section>
-        {menuEditor("Footer menu", footerItems, (next) =>
-          setConfig("footerMenus", [
-            {
-              heading: config.footerMenus?.[0]?.heading || "Customer care",
-              items: next,
-            },
-            config.footerMenus?.[1] || defaultFooter[1],
-          ]), "footerMenu",
-        )}
+        <section id="store-maintenance" className="min-w-0 scroll-mt-40 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-bold">Maintenance page</h2><p className="mt-1 text-sm text-slate-500">Temporarily show a branded maintenance message to storefront visitors. Admin and order-management access stays available.</p></div>{saveButton("maintenance", [], ["maintenanceMode"])}</div>
+          <label className="mt-4 flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-700"><span><b>Maintenance mode</b><small className="mt-1 block text-slate-500">{config.maintenanceMode ? "On — storefront is paused" : "Off — storefront is open"}</small></span><input type="checkbox" role="switch" checked={Boolean(config.maintenanceMode)} onChange={(event) => setConfig("maintenanceMode", event.target.checked)} className="h-5 w-5 accent-emerald-600" /></label>
+          <p className="mt-3 text-xs text-slate-500">The page title, message, image and HTML blocks can be edited in Pages. Keep maintenance mode off until the page is ready.</p>
+          {maintenancePage && <Link to={`/pages/${maintenancePage.id}/edit`} className="mt-3 inline-flex rounded-lg border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700">Edit maintenance page</Link>}
+        </section>
       </div>
     </form>
   );

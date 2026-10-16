@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Order, User } from '../types';
 import api from '../lib/api';
 import { io } from 'socket.io-client';
@@ -21,14 +21,23 @@ import {
   Trash2,
   UserRound,
   ShieldAlert,
+  MoreVertical,
+  Download,
+  SlidersHorizontal,
+  ChevronDown,
+  X,
+  PackageCheck,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { OrderActionsPopover } from '../components/orders/OrderActionsPopover';
+import { downloadOrdersCsv } from '../components/orders/orderCsv';
+import './orders.css';
 import { CourierDispatchModal } from '../components/orders/CourierDispatchModal';
 import { InvoiceModal } from '../components/orders/InvoiceModal';
 import { WhatsAppModal } from '../components/orders/WhatsAppModal';
 import { CreateOrderModal } from '../components/orders/CreateOrderModal';
 import { OrderEditModal } from '../components/orders/OrderEditModal';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 export const OrdersPage: React.FC = () => {
   const navigate = useNavigate();
@@ -50,6 +59,26 @@ export const OrdersPage: React.FC = () => {
   const [selectedSettlement, setSelectedSettlement] = useState(urlParams.get('settlement') || 'ALL');
   const [page, setPage] = useState(Number(urlParams.get('page')) || 1);
   const [totalPages, setTotalPages] = useState(1);
+  const [sortBy, setSortBy] = useState(() => ['createdAt', 'orderNumber', 'grandTotal', 'status'].includes(urlParams.get('sortBy') || '') ? urlParams.get('sortBy')! : 'createdAt');
+  const [sortOrder, setSortOrder] = useState(urlParams.get('sortOrder') === 'asc' ? 'asc' : 'desc');
+  const [filtersOpen, setFiltersOpen] = useState(() => ['courier', 'assignee', 'assignedToId', 'priority', 'orderAge', 'settlement'].some(key => urlParams.has(key)));
+  const [exporting, setExporting] = useState(false);
+  const moreActionsRef = useRef<HTMLDetailsElement>(null);
+
+  useEffect(() => {
+    const closeOutside = (event: PointerEvent) => {
+      if (moreActionsRef.current && !moreActionsRef.current.contains(event.target as Node)) moreActionsRef.current.open = false;
+    };
+    document.addEventListener('pointerdown', closeOutside);
+    return () => document.removeEventListener('pointerdown', closeOutside);
+  }, []);
+  const activeFilters = [
+    { key: 'assignee', value: selectedAssignee, label: `Assignee: ${selectedAssignee === 'UNASSIGNED' ? 'Unassigned' : staffList.find(staff => staff.id === selectedAssignee)?.name || selectedAssignee}`, clear: () => setSelectedAssignee('ALL') },
+    { key: 'priority', value: selectedPriority, label: `Priority: ${selectedPriority.toLowerCase()}`, clear: () => setSelectedPriority('ALL') },
+    { key: 'courier', value: selectedCourier, label: `Courier: ${selectedCourier}`, clear: () => setSelectedCourier('ALL') },
+    { key: 'age', value: selectedOrderAge, label: `Age: ${({ today: 'Today', under24h: '< 24 hours', '24h': '> 24 hours', '48h': '> 48 hours', '7d': '> 7 days' } as Record<string, string>)[selectedOrderAge] || selectedOrderAge}`, clear: () => setSelectedOrderAge('ALL') },
+    { key: 'settlement', value: selectedSettlement, label: `Settlement: ${selectedSettlement.toLowerCase()}`, clear: () => setSelectedSettlement('ALL') },
+  ].filter(filter => filter.value !== 'ALL');
 
   // Modals state
   const [selectedOrderForCourier, setSelectedOrderForCourier] = useState<Order | null>(null);
@@ -61,6 +90,33 @@ export const OrdersPage: React.FC = () => {
 
   // Bulk selections
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+  const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
+
+  // Close 3-dot action menu when clicking outside or pressing Escape
+  useEffect(() => {
+    if (!openActionMenuId) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.order-action-menu-container')) {
+        setOpenActionMenuId(null);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpenActionMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [openActionMenuId]);
+
+  useEffect(() => {
+    setOpenActionMenuId(null);
+  }, [activeTab, page]);
 
   // Load staff list for assignment
   useEffect(() => {
@@ -94,11 +150,15 @@ export const OrdersPage: React.FC = () => {
     if (selectedOrderAge !== 'ALL') nextParams.orderAge = selectedOrderAge;
     if (selectedSettlement !== 'ALL') nextParams.settlement = selectedSettlement;
     if (page > 1) nextParams.page = String(page);
+    if (sortBy !== 'createdAt') nextParams.sortBy = sortBy;
+    if (sortOrder !== 'desc') nextParams.sortOrder = sortOrder;
 
     setUrlParams(nextParams, { replace: true });
   }, [
     activeTab,
     debouncedSearch,
+    sortBy,
+    sortOrder,
     selectedCourier,
     selectedAssignee,
     selectedPriority,
@@ -126,7 +186,7 @@ export const OrdersPage: React.FC = () => {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const params: any = { page, limit: 50 };
+      const params: any = { page, limit: 50, sortBy, sortOrder };
       if (activeTab === 'TRASH') {
         params.trash = 'true';
       } else if (activeTab !== 'ALL') {
@@ -182,27 +242,17 @@ export const OrdersPage: React.FC = () => {
     selectedSettlement,
     page,
     debouncedSearch,
+    sortBy,
+    sortOrder,
   ]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setDebouncedSearch(searchQuery.trim());
-      setPage(1);
+      if (searchQuery.trim() !== debouncedSearch) setPage(1);
     }, 300);
     return () => window.clearTimeout(timer);
   }, [searchQuery]);
-
-  useEffect(() => {
-    setPage(1);
-    setSelectedOrderIds([]);
-  }, [
-    activeTab,
-    selectedCourier,
-    selectedAssignee,
-    selectedPriority,
-    selectedOrderAge,
-    selectedSettlement,
-  ]);
 
   const handleSyncWooCommerce = async () => {
     setSyncingWoo(true);
@@ -398,10 +448,10 @@ export const OrdersPage: React.FC = () => {
   };
 
   const toggleSelectAll = () => {
-    if (selectedOrderIds.length === orders.length) {
-      setSelectedOrderIds([]);
+    if (orders.every(order => selectedOrderIds.includes(order.id))) {
+      setSelectedOrderIds(current => current.filter(id => !orders.some(order => order.id === id)));
     } else {
-      setSelectedOrderIds(orders.map((o) => o.id));
+      setSelectedOrderIds(current => [...new Set([...current, ...orders.map(order => order.id)])]);
     }
   };
 
@@ -409,6 +459,34 @@ export const OrdersPage: React.FC = () => {
     setSelectedOrderIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
+  };
+
+  const updateFilter = (update: () => void) => {
+    update();
+    setPage(1);
+    setSelectedOrderIds([]);
+  };
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      let rows = orders;
+      if (selectedOrderIds.length) {
+        rows = [];
+        for (let i = 0; i < selectedOrderIds.length; i += 4) {
+          const batch = await Promise.all(selectedOrderIds.slice(i, i + 4).map(async id => {
+            const loaded = orders.find(order => order.id === id);
+            if (loaded) return loaded;
+            const response = await api.get(`/orders/${id}`);
+            if (!response.data?.success || !response.data.order) throw new Error('Could not load selected order');
+            return response.data.order as Order;
+          }));
+          rows.push(...batch);
+        }
+      }
+      downloadOrdersCsv(rows, selectedOrderIds.length ? 'selected' : `page-${page}`);
+      toast.success(`${rows.length} orders exported`);
+    } catch { toast.error('Export failed. No partial file was downloaded. Please try again.'); }
+    finally { setExporting(false); }
   };
 
   const tabs = [
@@ -420,12 +498,12 @@ export const OrdersPage: React.FC = () => {
     { id: 'DELIVERED', label: 'Delivered', count: statusCounts.DELIVERED || 0, color: 'text-emerald-500' },
     { id: 'RETURNED', label: 'Returned', count: statusCounts.RETURNED || 0, color: 'text-rose-500' },
     { id: 'CANCELLED', label: 'Cancelled', count: statusCounts.CANCELLED || 0, color: 'text-slate-400' },
-    { id: 'FRAUD_SUSPECT', label: '⚠️ Suspects', count: 1, color: 'text-red-500' },
+    { id: 'FRAUD_SUSPECT', label: 'Suspects', count: undefined, color: 'text-red-500' },
     { id: 'TRASH', label: 'Trash', count: statusCounts.TRASH || 0, color: 'text-rose-500' },
   ];
 
   return (
-      <div className="space-y-6">
+      <div className="orders-page space-y-5">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -438,34 +516,29 @@ export const OrdersPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={handleSyncWooCommerce}
-            disabled={syncingWoo}
-            className="h-9 px-3.5 inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs rounded-xl shadow-sm transition-all disabled:opacity-50"
-          >
-            {syncingWoo ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-            Sync WooCommerce
-          </button>
-
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="h-9 px-3.5 inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs rounded-xl shadow-sm transition-all dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
-          >
-            <Plus className="w-4 h-4" />
-            Create Order
-          </button>
+        <div className="orders-header-actions">
+          <button type="button" className="orders-button" onClick={handleExport} disabled={exporting || loading || (!selectedOrderIds.length && !orders.length)}>{exporting ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}{exporting ? 'Exporting…' : selectedOrderIds.length ? `Export selected (${selectedOrderIds.length})` : `Export page (${orders.length})`}</button>
+          <details ref={moreActionsRef} className="orders-more-actions" onBlur={event => { if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node)) event.currentTarget.open = false; }} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); } }}><summary className="orders-button">More actions <ChevronDown size={14} /></summary><div className="orders-more-content"><button type="button" onClick={handleSyncWooCommerce} disabled={syncingWoo}>{syncingWoo ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}{syncingWoo ? 'Syncing…' : 'Sync WooCommerce'}</button></div></details>
+          <button type="button" className="orders-button orders-primary" onClick={() => setIsCreateModalOpen(true)}><Plus size={16} /> Create Order</button>
         </div>
       </div>
-
+      <section aria-label="All-orders summary" className="orders-stats">
+        {[
+          { label: 'Total orders', value: statusCounts.ALL, icon: ShoppingCart, tone: 'neutral' },
+          { label: 'Pending', value: statusCounts.PENDING, icon: Clock, tone: 'amber' },
+          { label: 'In courier', value: statusCounts.IN_TRANSIT, icon: Truck, tone: 'blue' },
+          { label: 'Delivered', value: statusCounts.DELIVERED, icon: PackageCheck, tone: 'green' },
+        ].map(stat => <article className="orders-stat" key={stat.label}><div className="orders-stat-heading"><span>{stat.label}</span><stat.icon size={16} className={`orders-stat-icon ${stat.tone}`} /></div><strong>{stat.value === undefined ? '—' : stat.value.toLocaleString()}</strong><small>All orders · all time</small></article>)}
+      </section>
+      <section className="orders-panel" aria-label="Orders list">
       {/* Tabs */}
-      <div className="flex flex-wrap items-center gap-1.5 pb-2 border-b border-slate-100 dark:border-slate-800">
+      <div className="orders-tabs flex flex-wrap items-center gap-1.5 pb-2 border-b border-slate-100 dark:border-slate-800">
         {tabs.map((tab) => (
           <button
             key={tab.id}
+            aria-pressed={activeTab === tab.id}
             onClick={() => {
-              setActiveTab(tab.id);
-              setSelectedOrderIds([]);
+              updateFilter(() => setActiveTab(tab.id));
             }}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
               activeTab === tab.id
@@ -474,7 +547,7 @@ export const OrdersPage: React.FC = () => {
             }`}
           >
             <span>{tab.label}</span>
-            <span
+            {tab.count !== undefined && <span
               className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
                 activeTab === tab.id
                   ? 'bg-white/20 text-white dark:bg-slate-900/20 dark:text-slate-900'
@@ -482,18 +555,19 @@ export const OrdersPage: React.FC = () => {
               }`}
             >
               {tab.count}
-            </span>
+            </span>}
           </button>
         ))}
       </div>
 
       {/* Search & Operations Filter Toolbar */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-100/90 dark:border-slate-800 p-3.5 rounded-2xl flex flex-col lg:flex-row items-center justify-between gap-3 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+      <div className="orders-toolbar bg-white dark:bg-slate-900 border border-slate-100/90 dark:border-slate-800 p-3.5 rounded-2xl flex flex-col lg:flex-row items-center justify-between gap-3 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
         <div className="flex items-center gap-2 w-full lg:max-w-sm">
           <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
+              aria-label="Search orders"
               placeholder="Search by order #, phone, customer, tracking..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -502,11 +576,22 @@ export const OrdersPage: React.FC = () => {
           </div>
         </div>
 
+        <div className="orders-toolbar-actions">
+          <button type="button" className={`orders-button ${filtersOpen ? 'is-active' : ''}`} aria-expanded={filtersOpen} aria-controls="orders-filters" onClick={() => setFiltersOpen(open => !open)}><SlidersHorizontal size={15} /> Filters {activeFilters.length > 0 && <span className="orders-count">{activeFilters.length}</span>}</button>
+          <label><span className="sr-only">Sort orders</span><select aria-label="Sort orders" value={`${sortBy}:${sortOrder}`} onChange={event => { const [field, direction] = event.target.value.split(':'); updateFilter(() => { setSortBy(field); setSortOrder(direction); }); }}>
+            <option value="createdAt:desc">Date: newest first</option><option value="createdAt:asc">Date: oldest first</option><option value="orderNumber:asc">Order number: ascending</option><option value="orderNumber:desc">Order number: descending</option><option value="grandTotal:desc">Total: high to low</option><option value="grandTotal:asc">Total: low to high</option><option value="status:asc">Status: A–Z</option><option value="status:desc">Status: Z–A</option>
+          </select></label>
+          <button type="button" className="orders-button orders-icon-button" onClick={fetchOrders} aria-label="Refresh orders"><RotateCcw size={15} /></button>
+        </div>
+      </div>
+      {activeFilters.length > 0 && <div className="orders-filter-chips" aria-label="Active filters">{activeFilters.map(filter => <button type="button" key={filter.key} onClick={() => updateFilter(filter.clear)} aria-label={`Remove ${filter.label}`}>{filter.label}<X size={12} /></button>)}</div>}
+      <div id="orders-filters" hidden={!filtersOpen} className="orders-filter-panel">
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
           {/* Assignee Filter */}
           <select
+            aria-label="Assignee"
             value={selectedAssignee}
-            onChange={(e) => setSelectedAssignee(e.target.value)}
+            onChange={(e) => updateFilter(() => setSelectedAssignee(e.target.value))}
             className="h-9 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300 rounded-xl px-2.5 focus:border-emerald-500 focus:outline-none cursor-pointer"
           >
             <option value="ALL">All Assignees</option>
@@ -520,8 +605,9 @@ export const OrdersPage: React.FC = () => {
 
           {/* Priority Filter */}
           <select
+            aria-label="Priority"
             value={selectedPriority}
-            onChange={(e) => setSelectedPriority(e.target.value)}
+            onChange={(e) => updateFilter(() => setSelectedPriority(e.target.value))}
             className="h-9 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300 rounded-xl px-2.5 focus:border-emerald-500 focus:outline-none cursor-pointer"
           >
             <option value="ALL">All Priority</option>
@@ -531,8 +617,9 @@ export const OrdersPage: React.FC = () => {
 
           {/* Courier Filter */}
           <select
+            aria-label="Courier"
             value={selectedCourier}
-            onChange={(e) => setSelectedCourier(e.target.value)}
+            onChange={(e) => updateFilter(() => setSelectedCourier(e.target.value))}
             className="h-9 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300 rounded-xl px-2.5 focus:border-emerald-500 focus:outline-none cursor-pointer"
           >
             <option value="ALL">All Couriers</option>
@@ -543,8 +630,9 @@ export const OrdersPage: React.FC = () => {
 
           {/* Order Age Filter */}
           <select
+            aria-label="Order age"
             value={selectedOrderAge}
-            onChange={(e) => setSelectedOrderAge(e.target.value)}
+            onChange={(e) => updateFilter(() => setSelectedOrderAge(e.target.value))}
             className="h-9 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300 rounded-xl px-2.5 focus:border-emerald-500 focus:outline-none cursor-pointer"
           >
             <option value="ALL">Any Age</option>
@@ -557,8 +645,9 @@ export const OrdersPage: React.FC = () => {
 
           {/* Settlement Filter */}
           <select
+            aria-label="Settlement"
             value={selectedSettlement}
-            onChange={(e) => setSelectedSettlement(e.target.value)}
+            onChange={(e) => updateFilter(() => setSelectedSettlement(e.target.value))}
             className="h-9 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300 rounded-xl px-2.5 focus:border-emerald-500 focus:outline-none cursor-pointer"
           >
             <option value="ALL">All Settlements</option>
@@ -567,19 +656,12 @@ export const OrdersPage: React.FC = () => {
             <option value="DISCREPANCY">Discrepancy</option>
           </select>
 
-          <button
-            onClick={fetchOrders}
-            title="Refresh"
-            className="h-9 w-9 inline-flex items-center justify-center bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-xl transition-colors"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </button>
         </div>
       </div>
 
       {/* Bulk Action Banner */}
       {selectedOrderIds.length > 0 && (
-        <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-500/30 p-3 rounded-2xl flex flex-wrap items-center justify-between gap-2.5 shadow-sm">
+        <div className="orders-bulk bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-500/30 p-3 rounded-2xl flex flex-wrap items-center justify-between gap-2.5 shadow-sm">
           <div className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-300 font-bold">
             <CheckSquare className="w-4 h-4" />
             <span className="font-medium">{selectedOrderIds.length} orders selected</span>
@@ -668,7 +750,7 @@ export const OrdersPage: React.FC = () => {
       )}
 
       {/* Orders Table */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-card">
+      <div className="orders-table-card bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-card">
         {loading ? (
           <div className="h-64 flex items-center justify-center">
             <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
@@ -679,14 +761,16 @@ export const OrdersPage: React.FC = () => {
             <p>{activeTab === 'TRASH' ? 'Trash is empty.' : 'No orders found matching the filter.'}</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto min-h-[340px]" role="region" aria-label="Orders table" tabIndex={0}>
             <table className="w-full text-left text-xs min-w-[1040px]">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 text-slate-500 dark:text-slate-400 font-semibold uppercase">
                   <th className="p-3.5 w-10 text-center">
                     <input
                       type="checkbox"
-                      checked={selectedOrderIds.length === orders.length && orders.length > 0}
+                      ref={input => { if (input) input.indeterminate = orders.some(order => selectedOrderIds.includes(order.id)) && !orders.every(order => selectedOrderIds.includes(order.id)); }}
+                      aria-label="Select all orders on this page"
+                      checked={orders.length > 0 && orders.every(order => selectedOrderIds.includes(order.id))}
                       onChange={toggleSelectAll}
                       className="rounded border-slate-300 dark:border-slate-700 text-emerald-600 focus:ring-emerald-500"
                     />
@@ -697,9 +781,9 @@ export const OrdersPage: React.FC = () => {
                   <th className="py-3.5 px-4 text-right whitespace-nowrap min-w-[120px]">COD Due</th>
                   <th className="py-3.5 px-3 min-w-[120px]">Assignee</th>
                   <th className="py-3.5 px-3 min-w-[100px] text-center">Priority</th>
-                  <th className="py-3.5 px-3 min-w-[130px]">Status</th>
+                  <th className="py-3.5 px-3 min-w-[130px]">Fulfillment</th>
                   <th className="py-3.5 px-3 min-w-[120px]">Courier</th>
-                  <th className="py-3.5 px-3 text-center min-w-[160px]">Actions</th>
+                  <th className="py-3.5 px-3 text-center min-w-[70px] w-16">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
@@ -715,6 +799,7 @@ export const OrdersPage: React.FC = () => {
                     <td className="p-3.5 text-center" onClick={(event) => event.stopPropagation()}>
                       <input
                         type="checkbox"
+                        aria-label={`Select order ${o.orderNumber}`}
                         checked={selectedOrderIds.includes(o.id)}
                         onChange={() => toggleSelectOrder(o.id)}
                         className="rounded border-slate-300 dark:border-slate-700 text-emerald-600 focus:ring-emerald-500"
@@ -724,7 +809,7 @@ export const OrdersPage: React.FC = () => {
                     {/* Order Number & Time */}
                     <td className="py-3.5 px-3 min-w-[100px] whitespace-nowrap">
                       <div className="font-normal text-slate-800 dark:text-slate-200 text-xs flex items-center gap-1.5 hover:text-emerald-600">
-                        <span className="font-semibold text-slate-900 dark:text-slate-100">#{o.orderNumber}</span>
+                        <Link to={`/orders/${o.id}`} onClick={event => event.stopPropagation()} className="font-semibold text-slate-900 dark:text-slate-100 hover:underline">#{o.orderNumber}</Link>
                         {o.wooOrderId && (
                           <span className="text-[9px] font-semibold px-1 rounded bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30">
                             Woo
@@ -780,8 +865,9 @@ export const OrdersPage: React.FC = () => {
                     {/* COD Amount */}
                     <td className="py-3.5 px-4 text-right whitespace-nowrap min-w-[120px]">
                       <div className="font-semibold text-slate-900 dark:text-slate-100 text-xs tabular-nums">
-                        ৳{(o.codAmount || o.grandTotal).toLocaleString()}
+                        ৳{(o.codAmount ?? o.grandTotal).toLocaleString()}
                       </div>
+                      <span className={`orders-payment-pill payment-${o.paymentStatus?.toLowerCase() || 'pending'}`}><i />{({ PENDING: 'Pending', PARTIAL: 'Partial', PAID: 'Paid', REFUNDED: 'Refunded' })[o.paymentStatus] || o.paymentStatus || 'Pending'}</span>
                       <div className="text-[10px] text-slate-400 tabular-nums mt-0.5 font-normal">
                         Delivery: ৳{o.deliveryCharge}
                       </div>
@@ -791,6 +877,7 @@ export const OrdersPage: React.FC = () => {
                     <td className="py-3.5 px-3 min-w-[120px] whitespace-nowrap" onClick={(event) => event.stopPropagation()}>
                       {activeTab !== 'TRASH' ? (
                         <select
+                          aria-label={`Assign order ${o.orderNumber}`}
                           value={o.assignedTo?.id || ''}
                           onChange={(e) => handleSingleAssign(o.id, e.target.value ? e.target.value : null)}
                           className={`h-8 text-xs font-medium rounded-lg px-2 border focus:outline-none transition-colors cursor-pointer inline-flex items-center w-full max-w-[130px] ${
@@ -833,6 +920,8 @@ export const OrdersPage: React.FC = () => {
                     {/* Status Dropdown */}
                     <td className="py-3.5 px-3 min-w-[130px] whitespace-nowrap" onClick={(event) => event.stopPropagation()}>
                       {activeTab !== 'TRASH' && <select
+                        data-status={o.status}
+                        aria-label={`Fulfillment for order ${o.orderNumber}`}
                         value={o.status}
                         onChange={(e) => handleStatusChange(o.id, e.target.value)}
                         className={`h-9 text-xs font-medium rounded-xl px-3 py-0 border focus:outline-none transition-colors cursor-pointer inline-flex items-center ${
@@ -859,7 +948,9 @@ export const OrdersPage: React.FC = () => {
                         <option value="RETURNED">Returned</option>
                         <option value="CANCELLED">Cancelled</option>
                         <option value="HOLD">Hold</option>
+                        {!['PENDING', 'CONFIRMED', 'PACKAGING', 'IN_TRANSIT', 'DELIVERED', 'RETURNED', 'CANCELLED', 'HOLD'].includes(o.status) && <option value={o.status} disabled>{o.status.replace(/_/g, ' ')}</option>}
                       </select>}
+                      {activeTab === 'TRASH' && <span className="orders-payment-pill payment-refunded">{o.status.replace(/_/g, ' ')}</span>}
                     </td>
 
                     {/* Courier Logistics */}
@@ -885,53 +976,130 @@ export const OrdersPage: React.FC = () => {
                     </td>
 
                     {/* Actions */}
-                    <td className="py-3.5 px-3" onClick={(event) => event.stopPropagation()}>
-                      <div className="flex items-center justify-center gap-1">
-                        {activeTab === 'TRASH' ? <>
-                          <button onClick={() => handleRestoreOrders([o.id])} title="Restore order" className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300"><RotateCcw className="h-3.5 w-3.5"/> Restore</button>
-                          <button onClick={() => handlePermanentDeleteOrders([o.id])} title="Delete permanently" className="rounded-lg bg-rose-50 p-1.5 text-rose-600 hover:bg-rose-100 dark:bg-rose-500/10 dark:text-rose-300"><Trash2 className="h-3.5 w-3.5"/></button>
-                        </> : <>
-                        <a
-                          href={`tel:${o.customerPhone}`}
-                          title="Call"
-                          className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-600 text-slate-600 dark:text-slate-300 hover:text-white rounded-lg transition-all"
-                        >
-                          <Phone className="w-3.5 h-3.5" />
-                        </a>
-
+                    <td className="py-3.5 px-3 text-center" onClick={(event) => event.stopPropagation()}>
+                      <div className="relative inline-block text-left order-action-menu-container">
                         <button
-                          onClick={() => setSelectedOrderForWhatsApp(o)}
-                          title="WhatsApp"
-                          className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-teal-600 text-slate-600 dark:text-slate-300 hover:text-white rounded-lg transition-all"
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenActionMenuId(openActionMenuId === o.id ? null : o.id);
+                          }}
+                          className={`h-8 w-8 inline-flex items-center justify-center rounded-lg transition-colors focus:outline-none ${
+                            openActionMenuId === o.id
+                              ? 'bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-white'
+                              : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }`}
+                          title="Actions"
+                          aria-label={`Actions for order ${o.orderNumber}`}
+                          aria-expanded={openActionMenuId === o.id}
+                          aria-controls={`order-actions-${o.id}`}
                         >
-                          <MessageSquare className="w-3.5 h-3.5" />
+                          <MoreVertical className="w-4 h-4" />
                         </button>
 
-                        <button
-                          onClick={() => setSelectedOrderForCourier(o)}
-                          title="Courier"
-                          className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-600 text-slate-600 dark:text-slate-300 hover:text-white rounded-lg transition-all"
-                        >
-                          <Truck className="w-3.5 h-3.5" />
-                        </button>
+                        {openActionMenuId === o.id && (
+                          <OrderActionsPopover id={`order-actions-${o.id}`} onClose={() => setOpenActionMenuId(null)}>
+                            {activeTab === 'TRASH' ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenActionMenuId(null);
+                                    handleRestoreOrders([o.id]);
+                                  }}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors text-left"
+                                >
+                                  <RotateCcw className="w-3.5 h-3.5" />
+                                  <span>Restore order</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenActionMenuId(null);
+                                    handlePermanentDeleteOrders([o.id]);
+                                  }}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors text-left"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>Delete permanently</span>
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <a
+                                  href={`tel:${o.customerPhone}`}
+                                  onClick={() => setOpenActionMenuId(null)}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors text-left"
+                                >
+                                  <Phone className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                  <span>Call customer</span>
+                                </a>
 
-                        <button
-                          onClick={() => setSelectedOrderForEdit(o)}
-                          title="Edit order"
-                          className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-900 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-white rounded-lg transition-all"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenActionMenuId(null);
+                                    setSelectedOrderForWhatsApp(o);
+                                  }}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors text-left"
+                                >
+                                  <MessageSquare className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+                                  <span>WhatsApp message</span>
+                                </button>
 
-                        <button
-                          onClick={() => setSelectedOrderForInvoice(o)}
-                          title="Print Receipt"
-                          className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg transition-all"
-                        >
-                          <Printer className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={() => handleTrashOrders([o.id])} title="Delete order" className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-rose-600 text-slate-600 dark:text-slate-300 hover:text-white rounded-lg transition-all"><Trash2 className="w-3.5 h-3.5"/></button>
-                        </>}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenActionMenuId(null);
+                                    setSelectedOrderForCourier(o);
+                                  }}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors text-left"
+                                >
+                                  <Truck className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                                  <span>Courier dispatch</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenActionMenuId(null);
+                                    setSelectedOrderForEdit(o);
+                                  }}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors text-left"
+                                >
+                                  <Pencil className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                  <span>Edit order</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenActionMenuId(null);
+                                    setSelectedOrderForInvoice(o);
+                                  }}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors text-left"
+                                >
+                                  <Printer className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
+                                  <span>Print invoice</span>
+                                </button>
+
+                                <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenActionMenuId(null);
+                                    handleTrashOrders([o.id]);
+                                  }}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors text-left"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>Move to trash</span>
+                                </button>
+                              </>
+                            )}
+                          </OrderActionsPopover>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -943,6 +1111,7 @@ export const OrdersPage: React.FC = () => {
         )}
       </div>
 
+      </section>
       {/* Modals */}
       {selectedOrderForCourier && (
         <CourierDispatchModal

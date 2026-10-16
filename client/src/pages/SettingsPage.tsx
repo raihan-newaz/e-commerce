@@ -13,19 +13,12 @@ import {
 import toast from 'react-hot-toast';
 import SecretInput from '../components/SecretInput';
 import { useAuth } from '../context/AuthContext';
+import { pageTitleForPath, pageDescriptionForPath, roleLabel } from '../components/layout/navigation';
 
 export const SettingsPage: React.FC = () => {
   const { user: currentUser } = useAuth();
   const { section: routeSection = 'woocommerce' } = useParams();
   const section = ['woocommerce', 'couriers', 'payments', 'users', 'audit', 'security'].includes(routeSection) ? routeSection : 'woocommerce';
-  const sectionDetails: Record<string, { title: string; description: string }> = {
-    woocommerce: { title: 'WooCommerce Settings', description: 'Store connection and synchronization' },
-    couriers: { title: 'Courier Settings', description: 'Provider connections and API credentials' },
-    payments: { title: 'Payment Settings', description: 'Online checkout and payment gateway configuration' },
-    users: { title: 'Staff Users', description: 'Staff accounts and access roles' },
-    audit: { title: 'Audit Log', description: 'Review actions performed in the admin panel' },
-    security: { title: 'Security Settings', description: 'Password and account security controls' },
-  };
   const [payment, setPayment] = useState({ enabled: false, baseUrl: '', apiKey: '', hasApiKey: false });
   const [savingPayment, setSavingPayment] = useState(false);
 
@@ -375,15 +368,15 @@ export const SettingsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="settings-detail space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
           <Settings className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
-          {sectionDetails[section].title}
+          {pageTitleForPath(`/settings/${section}`)}
         </h1>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-          {sectionDetails[section].description}
+          {pageDescriptionForPath(`/settings/${section}`)}
         </p>
       </div>
 
@@ -460,7 +453,7 @@ export const SettingsPage: React.FC = () => {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Consumer Key (ck_...)</label>
                 <SecretInput
@@ -513,13 +506,14 @@ export const SettingsPage: React.FC = () => {
       {/* Courier API Keys Tab */}
       {section === 'couriers' && (
         <div className="space-y-4 max-w-3xl">
+          <nav aria-label="Courier providers" className="flex flex-wrap gap-2">{['Steadfast', 'Pathao', 'RedX'].map(provider => <a key={provider} href={`#courier-${provider.toLowerCase()}`} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900">{provider}</a>)}</nav>
           {/* Steadfast */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-card space-y-3">
+          <div id="courier-steadfast" className="scroll-mt-36 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-card space-y-3">
             <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
               <Truck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               Steadfast Courier API Keys
             </h3>
-            <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 mb-1">API Key</label>
                 <SecretInput
@@ -551,7 +545,7 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           {/* Pathao */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-card space-y-3">
+          <div id="courier-pathao" className="scroll-mt-36 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-card space-y-3">
             <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
               <Truck className="w-4 h-4 text-rose-600 dark:text-rose-400" />
               Pathao Courier
@@ -563,7 +557,7 @@ export const SettingsPage: React.FC = () => {
                 <option value="https://courier-api-sandbox.pathao.com">Sandbox</option>
               </select>
             </label>
-            <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 mb-1">Client ID</label>
                 <input
@@ -640,7 +634,7 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           {/* RedX */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-card space-y-3">
+          <div id="courier-redx" className="scroll-mt-36 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-card space-y-3">
             <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
               <Truck className="w-4 h-4 text-red-600 dark:text-red-400" />
               RedX OpenAPI
@@ -702,7 +696,7 @@ export const SettingsPage: React.FC = () => {
             </button>}
           </div>
 
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-card">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-x-auto shadow-card">
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 text-slate-500 dark:text-slate-400 font-semibold uppercase">
@@ -716,9 +710,9 @@ export const SettingsPage: React.FC = () => {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                 {users.map((u) => (
                   <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
-                    <td className="py-3 px-4 font-bold text-slate-900 dark:text-slate-200">{u.name}</td>
+                    <td className="py-3 px-4 font-bold text-slate-900 dark:text-slate-200">{u.name}{u.createdAt && <span className="mt-1 block text-[10px] font-normal text-slate-500">Joined {new Date(u.createdAt).toLocaleDateString()}</span>}</td>
                     <td className="py-3 px-3 text-slate-500 dark:text-slate-400">{u.email}</td>
-                    <td className="py-3 px-3 font-semibold text-slate-800 dark:text-slate-200">{u.role}</td>
+                    <td className="py-3 px-3 font-semibold text-slate-800 dark:text-slate-200">{roleLabel(u.role)}</td>
                     <td className="py-3 px-3">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${u.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/20' : 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/20'}`}>
                         {u.status}
@@ -741,7 +735,7 @@ export const SettingsPage: React.FC = () => {
             <p className="text-xs text-slate-500 dark:text-slate-400">Record of order changes, courier dispatch, and transactions.</p>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-card">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-x-auto shadow-card">
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 text-slate-500 dark:text-slate-400 font-semibold uppercase">

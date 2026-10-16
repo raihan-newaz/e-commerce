@@ -22,14 +22,88 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
-  collapsed,
+  collapsed: desktopCollapsed,
   onClose,
   onToggleCollapsed,
 }) => {
   const { user } = useAuth();
   const location = useLocation();
+  const [isDesktop, setIsDesktop] = React.useState(() => window.matchMedia('(min-width: 1024px)').matches);
+  const collapsed = desktopCollapsed && isDesktop;
+  const asideRef = React.useRef<HTMLElement | null>(null);
+  const closeRef = React.useRef(onClose);
+  closeRef.current = onClose;
+  React.useEffect(() => {
+    const media = window.matchMedia('(min-width: 1024px)');
+    const update = () => setIsDesktop(media.matches);
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+  React.useEffect(() => {
+    if (isDesktop || !isOpen) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const controls = () => Array.from(asideRef.current?.querySelectorAll<HTMLElement>('a[href], button:not(:disabled)') || []).filter(element => element.getClientRects().length > 0);
+    controls()[0]?.focus();
+    const keyboard = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); closeRef.current(); }
+      if (event.key === 'Tab') {
+        const elements = controls();
+        const first = elements[0], last = elements[elements.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
+    };
+    document.addEventListener('keydown', keyboard);
+    return () => { document.removeEventListener('keydown', keyboard); previous?.focus(); };
+  }, [isDesktop, isOpen]);
   const [storeConnected, setStoreConnected] = React.useState<boolean | null>(null);
   const storefrontUrl = window.location.origin;
+  const settingsItem = navigationGroups.flatMap(group => group.items).find(item => item.path === '/settings');
+  const SettingsIcon = settingsItem?.icon || Store;
+
+  const [openSubmenus, setOpenSubmenus] = React.useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    navigationGroups.forEach((group) => {
+      group.items.forEach((item) => {
+        if (item.children?.length) {
+          const isChildActive = item.children.filter(child => child.path !== item.path).some(
+            (child) => location.pathname === child.path || location.pathname.startsWith(`${child.path}/`)
+          );
+          if (isChildActive) {
+            initial[item.path] = true;
+          }
+        }
+      });
+    });
+    return initial;
+  });
+
+  React.useEffect(() => {
+    navigationGroups.forEach((group) => {
+      group.items.forEach((item) => {
+        if (item.children?.length) {
+          const isChildActive = item.children.filter(child => child.path !== item.path).some(
+            (child) => location.pathname === child.path || location.pathname.startsWith(`${child.path}/`)
+          );
+          if (isChildActive) {
+            setOpenSubmenus((prev) => (prev[item.path] ? prev : { ...prev, [item.path]: true }));
+          }
+        }
+      });
+    });
+  }, [location.pathname]);
+
+  const toggleSubmenu = (path: string) => {
+    if (collapsed) {
+      onToggleCollapsed();
+      setOpenSubmenus((prev) => ({ ...prev, [path]: true }));
+      return;
+    }
+    setOpenSubmenus((prev) => ({
+      ...prev,
+      [path]: !prev[path],
+    }));
+  };
 
   React.useEffect(() => {
     api.get("/storefront/settings")
@@ -50,6 +124,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Main Sidebar */}
       <aside
+        ref={element => { asideRef.current = element; if (element) element.inert = !isDesktop && !isOpen; }}
+        aria-hidden={!isDesktop && !isOpen ? true : undefined}
         className={`admin-sidebar fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r border-slate-200/80 bg-white text-slate-700 shadow-xl transition-[width,transform] duration-300 lg:z-20 lg:translate-x-0 lg:shadow-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 ${
           collapsed ? "w-[76px]" : "w-[260px]"
         } ${isOpen ? "translate-x-0" : "-translate-x-full"} lg:flex`}
@@ -120,8 +196,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
 
         {/* Nav groups */}
-        <div className="flex-1 overflow-y-auto px-3 py-4">
-          {navigationGroups.map((group, groupIndex) => {
+        <nav aria-label="Main navigation" className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+          {navigationGroups.filter(group => group.label !== 'Administration').map((group, groupIndex) => {
             const visibleItems = group.items.filter((item) =>
               canSeeNavigationItem(item, user?.role, user?.builderAccess),
             );
@@ -137,63 +214,82 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <div className="space-y-0.5">
                   {visibleItems.map((item) => {
                     const Icon = item.icon;
+                    const hasChildren = Boolean(item.children?.length);
+                    const isSubmenuOpen = Boolean(openSubmenus[item.path]);
                     const itemActive =
                       location.pathname === item.path ||
-                      Boolean(item.children?.some((child) => location.pathname === child.path));
+                      (item.path !== '/' && location.pathname.startsWith(`${item.path}/`)) ||
+                      Boolean(
+                        item.children?.some(
+                          (child) =>
+                            location.pathname === child.path ||
+                            location.pathname.startsWith(`${child.path}/`),
+                        ),
+                      );
 
                     return (
                       <div key={item.path}>
-                        <NavLink
-                          to={item.children?.length ? (item.children.find((child) => !child.roles || (user && child.roles.includes(user.role)))?.path || item.path) : item.path}
-                          title={collapsed ? item.label : undefined}
-                          onClick={onClose}
-                          className={() =>
-                            `group flex items-center rounded-xl px-3 py-2 text-xs font-medium transition-all ${
-                              collapsed ? "justify-center" : "gap-2.5"
-                            } ${
-                              itemActive
-                                ? "bg-slate-100 font-semibold text-slate-900 shadow-none dark:bg-slate-800 dark:text-white"
-                                : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white"
-                            }`
-                          }
-                        >
-                          <Icon
-                            className={`h-4 w-4 shrink-0 transition-colors ${
-                              itemActive
-                                ? "text-emerald-600 dark:text-emerald-400"
-                                : "text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300"
-                            }`}
-                            strokeWidth={2}
-                          />
-                          {!collapsed && (
-                            <>
-                              <span className="truncate">{item.label}</span>
-                              {item.children?.length ? (
-                                <ChevronDown className="ml-auto h-3.5 w-3.5 opacity-40" />
-                              ) : null}
-                            </>
-                          )}
-                        </NavLink>
+                        {hasChildren ? (
+                          <div className={`flex items-center rounded-xl ${itemActive ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>
+                            <NavLink to={item.path} onClick={onClose} aria-label={item.label} title={collapsed ? item.label : undefined} className={`group flex min-w-0 flex-1 items-center rounded-xl px-3 py-2 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 ${collapsed ? 'justify-center' : 'gap-2.5'}`}>
+                              <Icon className={`h-4 w-4 shrink-0 ${itemActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
+                              {!collapsed && <span className="truncate">{item.label}</span>}
+                            </NavLink>
+                            {!collapsed && <button type="button" onClick={() => toggleSubmenu(item.path)} aria-label={`Toggle ${item.label} sections`} aria-expanded={isSubmenuOpen} aria-controls={`navigation-${item.path.slice(1)}`} className="mr-1 rounded-lg p-2 hover:bg-slate-200/70 dark:hover:bg-slate-700"><ChevronDown className={`h-3.5 w-3.5 transition-transform ${isSubmenuOpen ? 'rotate-180' : ''}`} /></button>}
+                          </div>
+                        ) : (
+                          <NavLink
+                            to={item.path}
+                            title={collapsed ? item.label : undefined}
+                            onClick={onClose}
+                            className={({ isActive }) =>
+                              `group flex items-center rounded-xl px-3 py-2 text-xs font-medium transition-all ${
+                                collapsed ? "justify-center" : "gap-2.5"
+                              } ${
+                                isActive
+                                  ? "bg-slate-100 font-semibold text-slate-900 shadow-none dark:bg-slate-800 dark:text-white"
+                                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white"
+                              }`
+                            }
+                          >
+                            <Icon
+                              className={`h-4 w-4 shrink-0 transition-colors ${
+                                itemActive
+                                  ? "text-emerald-600 dark:text-emerald-400"
+                                  : "text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300"
+                              }`}
+                              strokeWidth={2}
+                            />
+                            {!collapsed && <span className="truncate">{item.label}</span>}
+                          </NavLink>
+                        )}
 
                         {/* Submenu items */}
-                        {!collapsed && item.children?.length && itemActive && (
-                          <div className="ml-4 mt-1 space-y-0.5 border-l border-slate-200 pl-3 dark:border-slate-800">
-                            {item.children.filter((child) => !child.roles || (user && child.roles.includes(user.role))).map((child) => (
-                              <NavLink
-                                key={child.path}
-                                to={child.path}
-                                onClick={onClose}
-                                className={({ isActive }) =>
-                                  `block rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
-                                    isActive
-                                      ? "bg-emerald-50 font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
-                                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-white"
-                                  }`
-                                }
-                              >
-                                {child.label}
-                              </NavLink>
-                            ))}
+                        {!collapsed && hasChildren && isSubmenuOpen && (
+                          <div id={`navigation-${item.path.slice(1)}`} className="ml-4 mt-1 space-y-0.5 border-l border-slate-200 pl-3 dark:border-slate-800">
+                            {item.children
+                              ?.filter(
+                                (child) =>
+                                  !child.roles ||
+                                  (user && child.roles.includes(user.role)),
+                              )
+                              .map((child) => (
+                                <NavLink
+                                  key={child.path}
+                                  end
+                                  to={child.path}
+                                  onClick={onClose}
+                                  className={({ isActive }) =>
+                                    `block rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+                                      isActive
+                                        ? "bg-emerald-50 font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+                                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-white"
+                                    }`
+                                  }
+                                >
+                                  {child.label}
+                                </NavLink>
+                              ))}
                           </div>
                         )}
                       </div>
@@ -203,7 +299,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             );
           })}
-        </div>
+          </div>
+          {settingsItem && <div className="shrink-0 border-t border-slate-100 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
+            <div className={`flex items-center rounded-xl ${location.pathname.startsWith('/settings') ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>
+              <NavLink to="/settings" aria-label="Settings" title={collapsed ? 'Settings' : undefined} onClick={onClose} className={`flex min-w-0 flex-1 items-center rounded-xl px-3 py-2 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 ${collapsed ? 'justify-center' : 'gap-2.5'}`}><SettingsIcon size={16} className="shrink-0 text-slate-400" />{!collapsed && <span>Settings</span>}</NavLink>
+              {!collapsed && <button type="button" onClick={() => toggleSubmenu('/settings')} aria-label="Toggle Settings sections" aria-expanded={Boolean(openSubmenus['/settings'])} aria-controls="navigation-settings" className="mr-1 rounded-lg p-2 hover:bg-slate-200/70 dark:hover:bg-slate-700"><ChevronDown size={14} className={`transition-transform ${openSubmenus['/settings'] ? 'rotate-180' : ''}`} /></button>}
+            </div>
+            {!collapsed && openSubmenus['/settings'] && <div id="navigation-settings" className="ml-4 mt-1 max-h-[min(240px,35vh)] space-y-0.5 overflow-y-auto border-l border-slate-200 pl-3 dark:border-slate-800">
+              {settingsItem.children?.filter(child => !child.roles || (user && child.roles.includes(user.role))).map(child => <NavLink key={child.path} end to={child.path} onClick={onClose} className={({ isActive }) => `block rounded-lg px-2.5 py-1.5 text-[11px] transition ${isActive ? 'bg-slate-100 font-semibold text-slate-900 dark:bg-slate-800 dark:text-white' : 'text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800'}`}>{child.label}</NavLink>)}
+            </div>}
+          </div>}
+        </nav>
 
         {/* Footer Link to Storefront */}
         <div className="border-t border-slate-100 p-3 dark:border-slate-800">
@@ -219,7 +325,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </span>
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-1 text-xs font-semibold text-slate-800 dark:text-slate-100">
-                  Storefront <ExternalLink className="h-3 w-3 opacity-40" />
+                  View storefront <ExternalLink className="h-3 w-3 opacity-40" />
                 </span>
                 <span className="flex items-center gap-1.5 text-[10px] text-slate-400">
                   <i
@@ -231,7 +337,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         : "bg-amber-300"
                     }`}
                   />
-                  {storeConnected === true ? "Connected" : "Disconnected"}
+                  {storeConnected === null ? "Checking connection…" : storeConnected ? "Connected" : "Unavailable"}
                 </span>
               </span>
             </a>

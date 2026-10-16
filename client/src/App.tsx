@@ -25,6 +25,8 @@ const ExpensesPage = lazy(() => import('./pages/ExpensesPage').then((module) => 
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage').then((module) => ({ default: module.AnalyticsPage })));
 const CrmPage = lazy(() => import('./pages/CrmPage').then((module) => ({ default: module.CrmPage })));
 const MessagingPage = lazy(() => import('./pages/MessagingPage').then((module) => ({ default: module.MessagingPage })));
+const SettingsHubPage = lazy(() => import('./pages/SettingsHubPage'));
+const AccountPage = lazy(() => import('./pages/AccountPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((module) => ({ default: module.SettingsPage })));
 const StorefrontSettingsPage = lazy(() => import('./pages/StorefrontSettingsPage').then((module) => ({ default: module.StorefrontSettingsPage })));
 const TrackingPage = lazy(() => import('./pages/TrackingPage').then((module) => ({ default: module.TrackingPage })));
@@ -122,7 +124,8 @@ export const App: React.FC = () => {
               <Route path="landing-pages/new" element={<Navigate to="/pages?create=landing" replace />} />
               <Route path="landing-pages/:id/edit" element={<LegacyLandingRedirect />} />
               <Route path="theme-customizer" element={<ThemeCustomizerPage />} />
-              <Route path="settings" element={<Navigate to="/settings/woocommerce" replace />} />
+              <Route path="settings" element={<SettingsHubPage />} />
+              <Route path="account" element={<AccountPage />} />
               <Route path="settings/email" element={<EmailSettingsPage />} />
               <Route path="settings/order-protection" element={<OrderProtectionPage />} />
               <Route path="settings/:section" element={<SettingsPage />} />

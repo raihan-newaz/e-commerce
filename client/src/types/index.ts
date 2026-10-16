@@ -7,6 +7,7 @@ export interface User {
   role: 'SUPER_ADMIN' | 'OPERATIONS_MANAGER' | 'ACCOUNTANT' | 'INVENTORY_MANAGER' | 'CALL_CENTER_AGENT' | 'DISPATCHER';
   status: 'ACTIVE' | 'SUSPENDED' | 'INACTIVE';
   avatar?: string;
+  createdAt?: string;
   is2FAEnabled?: boolean;
 }
 

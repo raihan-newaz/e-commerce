@@ -1,5 +1,6 @@
 import {
   Activity,
+  Mail, CreditCard, ShieldCheck, History, UserRound, Plug,
   BarChart3,
   Boxes,
   PackageSearch,
@@ -36,87 +37,96 @@ export interface NavigationGroup {
   items: NavigationItem[];
 }
 
-// Keep access rules alongside the navigation contract. The backend remains the
-// authority for every mutation; this only controls product discoverability.
+export const settingsGroups: NavigationGroup[] = [
+  { label: 'Connections & checkout', items: [
+    { label: 'WooCommerce', path: '/settings/woocommerce', icon: Plug, description: 'Connect a store and manage order synchronization', roles: ['SUPER_ADMIN'] },
+    { label: 'Couriers', path: '/settings/couriers', icon: Truck, description: 'Provider credentials, pickup stores and webhooks', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
+    { label: 'Payments', path: '/settings/payments', icon: CreditCard, description: 'Online checkout and payment gateway configuration', roles: ['SUPER_ADMIN'] },
+    { label: 'Email notifications', path: '/settings/email', icon: Mail, description: 'SMTP delivery, order templates and delivery history', roles: ['SUPER_ADMIN'] },
+  ] },
+  { label: 'Team & account', items: [
+    { label: 'Staff users', path: '/settings/users', icon: UsersRound, description: 'Staff accounts, roles and access', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
+    { label: 'Security', path: '/settings/security', icon: ShieldCheck, description: 'Change your password and manage account security' },
+  ] },
+  { label: 'Safety & activity', items: [
+    { label: 'Order protection', path: '/settings/order-protection', icon: ShieldCheck, description: 'Duplicate-order checks and customer risk rules', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
+    { label: 'Audit log', path: '/settings/audit', icon: History, description: 'Review staff actions and order activity', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
+  ] },
+];
+export const settingsItems = settingsGroups.flatMap(group => group.items);
+
+// These rules control discoverability. Backend authorization remains authoritative.
 export const navigationGroups: NavigationGroup[] = [
-  {
-    label: 'Command center',
-    items: [
-      { label: 'Overview', path: '/', icon: LayoutDashboard, description: 'Business health and action center' },
-      { label: 'Live orders', path: '/orders', icon: ShoppingBag, description: 'Process, assign, and dispatch orders' },
-      { label: 'Incomplete Orders', path: '/incomplete-orders', icon: PackageSearch, description: 'Follow up abandoned checkouts and convert confirmed customers', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'CALL_CENTER_AGENT'] },
-      { label: 'Courier & COD', path: '/courier-hub', icon: Truck, description: 'Delivery operations and reconciliation', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'DISPATCHER', 'ACCOUNTANT'] },
-    ],
-  },
-  {
-    label: 'Operations',
-    items: [
-      { label: 'Products', path: '/products', icon: PackageSearch, description: 'Catalogue, pricing, variations, media, and SEO' },
-      { label: 'Inventory', path: '/inventory', icon: Boxes, description: 'Stock levels, alerts, and adjustments' },
-      { label: 'Categories', path: '/categories', icon: FolderTree, description: 'Product taxonomy and storefront collections' },
-      { label: 'Attributes', path: '/attributes', icon: Tags, description: 'Reusable product options and variation terms' },
-      { label: 'Media Gallery', path: '/media', icon: Images, description: 'Upload and reuse storefront images' },
-      { label: 'Purchases', path: '/purchases', icon: PackageCheck, description: 'Suppliers and purchase orders', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'INVENTORY_MANAGER', 'ACCOUNTANT'] },
-      { label: 'Customers', path: '/crm', icon: UsersRound, description: 'Customer intelligence and risk' },
-    ],
-  },
-  {
-    label: 'Growth & finance',
-    items: [
-      { label: 'Finance', path: '/accounting', icon: Calculator, description: 'Profit, purchases, expenses, and cash accounts', roles: ['SUPER_ADMIN', 'ACCOUNTANT', 'OPERATIONS_MANAGER'] },
-      { label: 'Expenses', path: '/expenses', icon: ReceiptText, description: 'Record, categorize, and review operating costs', roles: ['SUPER_ADMIN', 'ACCOUNTANT', 'OPERATIONS_MANAGER'] },
-      { label: 'Analytics', path: '/analytics', icon: BarChart3, description: 'Sales, profit, customers, costs, and purchase trends', roles: ['SUPER_ADMIN', 'ACCOUNTANT', 'OPERATIONS_MANAGER'] },
-      { label: 'Messages', path: '/messaging', icon: MessageSquareText, description: 'WhatsApp, SMS, and templates', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'CALL_CENTER_AGENT'] },
-      { label: 'Storefront', path: '/storefront', icon: Store, description: 'Shop content, merchandising, and delivery rates', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
-      { label: 'Tracking & CAPI', path: '/tracking', icon: Activity, description: 'Google Analytics, Meta Pixel, server-side CAPI & custom events', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
-      { label: 'Pages', path: '/pages', icon: FileText, description: 'Manage landing, content, and visual pages', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
-      { label: 'Theme Customizer', path: '/theme-customizer', icon: Palette, description: 'Colors, type, layout, and homepage sections', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
-      { label: 'Settings', path: '/settings', icon: Settings2, description: 'Team and integrations', children: [
-        { label: 'WooCommerce', path: '/settings/woocommerce', roles: ['SUPER_ADMIN'] },
-        { label: 'Couriers', path: '/settings/couriers', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
-        { label: 'Email', path: '/settings/email', roles: ['SUPER_ADMIN'] },
-        { label: 'Payments', path: '/settings/payments', roles: ['SUPER_ADMIN'] },
-        { label: 'Staff Users', path: '/settings/users', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
-        { label: 'Audit Log', path: '/settings/audit', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
-        { label: 'Security', path: '/settings/security' },
-        { label: 'Order Protection', path: '/settings/order-protection', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
-      ] },
-    ],
-  },
+  { label: 'Orders & customers', items: [
+    { label: 'Overview', path: '/', icon: LayoutDashboard, description: 'Business health and action center' },
+    { label: 'Orders', path: '/orders', icon: ShoppingBag, description: 'Process, assign, and dispatch orders' },
+    { label: 'Incomplete Orders', path: '/incomplete-orders', icon: PackageSearch, description: 'Follow up abandoned checkouts and convert confirmed customers', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'CALL_CENTER_AGENT'] },
+    { label: 'Customers', path: '/crm', icon: UsersRound, description: 'Customer intelligence and risk' },
+    { label: 'Messages', path: '/messaging', icon: MessageSquareText, description: 'WhatsApp, SMS, and templates', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'CALL_CENTER_AGENT'] },
+    { label: 'Courier & COD', path: '/courier-hub', icon: Truck, description: 'Delivery operations and reconciliation', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'DISPATCHER', 'ACCOUNTANT'] },
+  ] },
+  { label: 'Catalog & stock', items: [
+    { label: 'Products', path: '/products', icon: PackageSearch, description: 'Catalogue, pricing, variations, media, and SEO' },
+    { label: 'Inventory', path: '/inventory', icon: Boxes, description: 'Stock levels, alerts, and adjustments' },
+    { label: 'Categories', path: '/categories', icon: FolderTree, description: 'Product taxonomy and storefront collections' },
+    { label: 'Attributes', path: '/attributes', icon: Tags, description: 'Reusable product options and variation terms' },
+    { label: 'Media Gallery', path: '/media', icon: Images, description: 'Upload and reuse storefront images' },
+    { label: 'Purchases', path: '/purchases', icon: PackageCheck, description: 'Suppliers and purchase orders', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'INVENTORY_MANAGER', 'ACCOUNTANT'] },
+  ] },
+  { label: 'Online store', items: [
+    { label: 'Store settings', path: '/storefront', icon: Store, description: 'Shop content, merchandising, and delivery rates', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
+    { label: 'Pages', path: '/pages', icon: FileText, description: 'Manage landing, content, and visual pages', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
+    { label: 'Theme Customizer', path: '/theme-customizer', icon: Palette, description: 'Colors, type, layout, and homepage sections', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
+    { label: 'Tracking & CAPI', path: '/tracking', icon: Activity, description: 'Google Analytics, Meta Pixel, server-side CAPI & custom events', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
+  ] },
+  { label: 'Finance & reports', items: [
+    { label: 'Accounting', path: '/accounting', icon: Calculator, description: 'Profit, purchases, expenses, and cash accounts', roles: ['SUPER_ADMIN', 'ACCOUNTANT', 'OPERATIONS_MANAGER'] },
+    { label: 'Expenses', path: '/expenses', icon: ReceiptText, description: 'Record, categorize, and review operating costs', roles: ['SUPER_ADMIN', 'ACCOUNTANT', 'OPERATIONS_MANAGER'] },
+    { label: 'Analytics', path: '/analytics', icon: BarChart3, description: 'Sales, profit, customers, costs, and purchase trends', roles: ['SUPER_ADMIN', 'ACCOUNTANT', 'OPERATIONS_MANAGER'] },
+  ] },
+  { label: 'Administration', items: [
+    { label: 'Settings', path: '/settings', icon: Settings2, description: 'Connections, team, security and workspace preferences', children: [
+      { label: 'All settings', path: '/settings' },
+      ...settingsItems.map(({ label, path, roles }) => ({ label, path, roles })),
+    ] },
+  ] },
 ];
 
-export const allNavigationItems = navigationGroups.flatMap((group) => group.items);
-
+export const accountNavigationItem: NavigationItem = { label: 'My account', path: '/account', icon: UserRound, description: 'Your profile, role and account information' };
+export const allNavigationItems = [...navigationGroups.flatMap(group => group.items), accountNavigationItem];
 export const canSeeNavigationItem = (item: NavigationItem, role?: User['role'], builderAccess?: boolean) =>
   item.path === '/builder' && builderAccess !== undefined ? builderAccess : !item.roles || (!!role && item.roles.includes(role));
 
 export const canAccessPath = (pathname: string, role?: User['role'], builderAccess?: boolean) => {
   if (pathname === '/builder' || pathname.startsWith('/landing-pages')) return Boolean(builderAccess) && (role === 'SUPER_ADMIN' || role === 'OPERATIONS_MANAGER');
-  const item = allNavigationItems.find((candidate) => pathname === candidate.path || (candidate.path !== '/' && pathname.startsWith(`${candidate.path}/`)));
+  const item = allNavigationItems.find(candidate => pathname === candidate.path || (candidate.path !== '/' && pathname.startsWith(`${candidate.path}/`)));
   if (!item || !canSeeNavigationItem(item, role, builderAccess)) return false;
-  const child = item.children?.find((candidate) => candidate.path === pathname);
+  const child = item.children?.find(candidate => candidate.path === pathname);
   if (item.children && pathname !== item.path && !child) return false;
   return !child?.roles || (!!role && child.roles.includes(role));
 };
 
-export const pageTitleForPath = (pathname: string) =>
-  pathname === '/landing-pages/new' ? 'Create landing page' :
-  pathname.startsWith('/landing-pages/') ? 'Edit landing page' :
-  pathname === '/pages/new' ? 'Create page' :
-  pathname.startsWith('/pages/') ? 'Edit page' :
-  pathname.startsWith('/settings/') ? ({ woocommerce: 'WooCommerce Settings', couriers: 'Courier Settings', email: 'Email Notifications', payments: 'Payment Settings', users: 'Staff Users', audit: 'Audit Log', security: 'Security Settings', 'order-protection': 'Order Protection' } as Record<string, string>)[pathname.split('/')[2]] || 'Settings' :
-  pathname.startsWith('/orders/') ? 'Order details' :
-  pathname === '/products/new' ? 'Create product' :
-  pathname.startsWith('/products/') ? 'Edit product' :
-  allNavigationItems.find((item) => item.path === pathname)?.label || 'NIX Commerce';
+export const roleLabel = (role?: string) => role ? role.toLowerCase().split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') : 'Staff';
 
-export const pageDescriptionForPath = (pathname: string) =>
-  pathname === '/landing-pages/new' ? 'Choose a template and build a single-page checkout' :
-  pathname.startsWith('/landing-pages/') ? 'Edit the content, offer and checkout' :
-  pathname === '/pages/new' ? 'Build a new storefront page' :
-  pathname.startsWith('/pages/') ? 'Edit page content, URL and search appearance' :
-  pathname.startsWith('/settings/') ? ({ woocommerce: 'Store connection and synchronization', couriers: 'Courier provider connections and API credentials', payments: 'Online checkout and payment gateway configuration', users: 'Staff accounts and access roles', audit: 'Review important actions performed in the admin panel', security: 'Password and account security controls' } as Record<string, string>)[pathname.split('/')[2]] || 'Manage workspace settings' :
-  pathname.startsWith('/orders/') ? 'Customer, payment, items, risk, and fulfilment' :
-  pathname === '/products/new' ? 'Add a storefront-ready catalogue item' :
-  pathname.startsWith('/products/') ? 'Update storefront content and commercial data' :
-  allNavigationItems.find((item) => item.path === pathname)?.description || 'NIX Commerce operations workspace';
+export const pageTitleForPath = (pathname: string): string => {
+  const setting = settingsItems.find(item => item.path === pathname);
+  if (setting) return setting.label;
+  if (pathname === '/landing-pages/new') return 'Create landing page';
+  if (pathname.startsWith('/landing-pages/')) return 'Edit landing page';
+  if (pathname === '/pages/new') return 'Create page';
+  if (pathname.startsWith('/pages/')) return 'Edit page';
+  if (pathname.startsWith('/orders/')) return 'Order details';
+  if (pathname.startsWith('/purchases/')) return 'Purchase details';
+  if (pathname === '/products/new') return 'Create product';
+  if (pathname.startsWith('/products/')) return 'Edit product';
+  return allNavigationItems.find(item => item.path === pathname)?.label || 'NIX Commerce';
+};
+export const pageDescriptionForPath = (pathname: string): string => {
+  const setting = settingsItems.find(item => item.path === pathname);
+  if (setting) return setting.description;
+  if (pathname.startsWith('/orders/')) return 'Customer, payment, items, risk and fulfillment';
+  if (pathname.startsWith('/purchases/')) return 'Supplier, purchased items, payments and stock receipts';
+  if (pathname.startsWith('/products/')) return 'Storefront content, pricing, variations and stock';
+  if (pathname.startsWith('/pages/')) return 'Page content, URL and search appearance';
+  return allNavigationItems.find(item => item.path === pathname)?.description || 'NIX Commerce operations workspace';
+};
