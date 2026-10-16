@@ -39,11 +39,11 @@ export const countdownRuntime = `(() => {
       };
       const save = () => {
         const customerName = value(['customer_name', 'name']);
-        const customerPhone = value(['customer_phone', 'phone']);
+        const customerPhone = value(['customer_phone', 'phone']).replace(/[০-৯]/g, digit => String('০১২৩৪৫৬৭৮৯'.indexOf(digit))).replace(/\\D/g, '').replace(/^880/, '0');
         const address = value(['customer_address', 'address']);
         const productId = value(['product_id']);
         const quantity = Number(value(['quantity']) || 1);
-        if (customerName.length < 2 || !/^01[3-9]\\d{8}$/.test(customerPhone.replace(/\\D/g, '').replace(/^880/, '0')) || address.length < 8 || !/^[a-f\\d-]{36}$/i.test(productId) || !Number.isInteger(quantity) || quantity < 1 || quantity > 10) return;
+        if (!/^01[3-9]\\d{8}$/.test(customerPhone)) return;
         const token = form.elements.namedItem('_draft_token');
         if (!token || !token.value) return;
         try {
@@ -52,11 +52,12 @@ export const countdownRuntime = `(() => {
           if (storedToken && /^[a-f\\d-]{36}$/i.test(storedToken)) token.value = storedToken;
           else sessionStorage.setItem(storageKey, token.value);
         } catch (_) {}
-        const body = { token: token.value, source: 'STUDIO_FORM', pageSlug: location.pathname.split('/')[2], customerName, customerPhone, address, items: [{ productId, quantity }] };
+        const body = { token: token.value, source: 'STUDIO_FORM', pageSlug: location.pathname.split('/')[2], customerName, customerPhone, address, items: /^[a-f\\d-]{36}$/i.test(productId) && Number.isInteger(quantity) && quantity >= 1 && quantity <= 10 ? [{ productId, quantity }] : [] };
         fetch('/api/incomplete-orders/public', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), keepalive: true }).catch(() => {});
       };
-      form.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(save, 900); });
-      form.addEventListener('change', () => { clearTimeout(timer); timer = setTimeout(save, 900); });
+      form.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(save, 500); });
+      form.addEventListener('change', () => { clearTimeout(timer); timer = setTimeout(save, 500); });
+      window.addEventListener('pagehide', () => { if (timer) { clearTimeout(timer); save(); } });
     });
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setupDrafts, { once: true }); else setupDrafts();

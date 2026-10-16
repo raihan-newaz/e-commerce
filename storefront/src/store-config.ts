@@ -17,14 +17,20 @@ export const defaultStorefrontSettings: StorefrontSettings = {
   heroText: 'Modern silhouettes, versatile essentials and considered details—made to live in.',
   phone: store.phone, insideDhakaCharge: store.shipping.dhaka,
   subAreaCharge: store.shipping.subArea, outsideDhakaCharge: store.shipping.outsideDhaka, featuredCategories: [],
-  heroImages: [
-    '/uploads/media/banner-city-overshirt.png',
-    '/uploads/media/banner-neutral-flatlay.png',
-    '/uploads/media/banner-sage-editorial.png',
-    '/uploads/media/banner-rust-accessories.png',
-  ],
+  heroImages: ['/banners/everyday-edit-v2.webp', '/banners/considered-details-v2.webp'],
   heroButtonLabel: 'Shop now', heroButtonUrl: '/shop', aboutTitle: 'Less noise. Better choices.',
   aboutText: 'Our edit focuses on easy-to-style pieces, clear product options and a checkout that takes less than a minute.',
   footerText: 'Thoughtful fashion for real life.',
   themeConfig: { primaryColor: '#171815', accentColor: '#d8ff55', backgroundColor: '#f7f6f2', textColor: '#171815', mutedColor: '#707269', fontFamily: 'Manrope', buttonRadius: 'square', cardRadius: 'square', headerMode: 'STICKY', productDensity: 'COMFORTABLE', showAnnouncement: true, showTrustBar: true, showBestSellers: true, showAbout: true, maintenanceMode: false, variationStyle: 'SOFT', showColorName: true, buyNowText: 'Buy now', checkoutFields: [{ key: 'name', label: 'Full name', type: 'text', enabled: true, required: true }, { key: 'phone', label: 'Mobile number', type: 'tel', enabled: true, required: true }, { key: 'email', label: 'Email address', type: 'email', enabled: true, required: false }, { key: 'address', label: 'Full delivery address', type: 'textarea', enabled: true, required: true }, { key: 'district', label: 'District', type: 'text', enabled: true, required: true }, { key: 'city', label: 'City / area', type: 'text', enabled: true, required: false }, { key: 'note', label: 'Order note', type: 'text', enabled: true, required: false }], analytics: { googleAnalyticsId: '', metaPixelId: '' } },
 };
+
+// Refresh only the four retired built-in banners; keep merchant uploads untouched.
+export function refreshedHeroImages(images: string[]): string[] {
+  const legacy = /^\/uploads\/media\/banner-(city-overshirt|neutral-flatlay|sage-editorial|rust-accessories)\.(png|webp)(?:[?#].*)?$/;
+  return [...new Set(images.map((image) => {
+    const match = image.match(legacy);
+    if (!match) return image;
+    return ['city-overshirt', 'neutral-flatlay'].includes(match[1])
+      ? '/banners/everyday-edit-v2.webp' : '/banners/considered-details-v2.webp';
+  }))];
+}

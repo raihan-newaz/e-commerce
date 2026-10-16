@@ -6,7 +6,7 @@
 .hero-banner-image img{width:100%;height:100%;object-fit:cover}
 .hero-shop-overlay{position:absolute;left:clamp(25px,8vw,120px);bottom:58px;z-index:2}
 @media(max-width:900px){.carousel{width:100%;min-height:0;height:auto}.hero-banner-image img{object-position:center}.hero-shop-overlay{left:20px;bottom:clamp(16px,4vw,36px);padding:9px 15px;font-size:12px}.carousel-dots{left:auto;right:20px;bottom:clamp(14px,3vw,24px)}}
-@media(max-width:560px){.carousel{width:100%!important;min-height:0!important;height:auto!important}.hero-banner-image img{object-fit:cover;object-position:center}.hero-shop-overlay{left:14px;bottom:14px;padding:7px 13px;font-size:11px}.carousel-dots{left:auto;right:14px;bottom:10px;gap:8px;padding:6px;align-items:center}.carousel-dots button{width:20px;height:24px;background:transparent;border:0;padding:10px 0;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;position:relative}.carousel-dots button:after{content:"";display:block;width:100%;height:4px;border-radius:2px;background:#aaa9a2}.carousel-dots button.active:after{background:var(--ink)}}
+@media(max-width:560px){.carousel{width:100%;min-height:0;height:auto}.hero-banner-image img{object-fit:cover;object-position:center}.hero-shop-overlay{left:14px;bottom:14px;padding:7px 13px;font-size:11px}.carousel-dots{left:auto;right:14px;bottom:10px;gap:8px;padding:6px;align-items:center}.carousel-dots button{width:20px;height:24px;background:transparent;border:0;padding:10px 0;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;position:relative}.carousel-dots button:after{content:"";display:block;width:100%;height:4px;border-radius:2px;background:#aaa9a2}.carousel-dots button.active:after{background:var(--ink)}}
 
 /* Consistent product-card rhythm */
 .product-card{position:relative;display:flex;flex-direction:column;height:100%}
@@ -324,3 +324,12 @@ input[type="number"],
 .shop-sort-wrap:focus-within>summary{outline:0;border-color:#9da08f;box-shadow:0 0 0 3px rgba(216,255,85,.3)}
 @media(max-width:900px){.shop-tools{margin-top:24px}.shop-sort-wrap{flex:1 1 auto}}
 @media(max-width:560px){.shop-tools{margin-top:21px}.shop-sort-wrap{width:100%;min-width:0}.shop-sort-wrap>summary{min-height:42px;padding-left:11px;padding-right:11px;font-size:11px}.shop-sort-options{width:min(270px,calc(100vw - 34px))}.shop-sort-options button{min-height:42px}.shop-page .chips{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden}}
+
+/* Short, stable banners: image dimensions must never determine page height. */
+.hero.carousel{display:block;height:clamp(240px,25vw,360px);max-height:46svh;min-height:0;aspect-ratio:auto}
+.hero.carousel .hero-banner-image img{display:block;object-fit:cover;object-position:center}
+.hero.carousel + .trust-row + .collection,.hero.carousel + .collection{padding-top:36px}
+@media(max-width:900px){.hero.carousel{height:clamp(210px,32vw,280px);max-height:none}}
+@media(max-width:560px){.hero.carousel{height:clamp(180px,51vw,240px);max-height:none}.hero.carousel + .trust-row + .collection,.hero.carousel + .collection{padding-top:28px}}
+
+@media(max-width:560px){.hero.carousel .carousel-dots button,.hero.carousel .carousel-dots button.active{background:transparent}.site-header{grid-template-columns:auto minmax(0,1fr) auto}.site-header .brand{max-width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(16px,5.6vw,22px)}.delivery-art-label{max-width:100%;font-size:clamp(48px,18vw,64px)}}

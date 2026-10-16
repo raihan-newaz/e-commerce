@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type MouseEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { clearIncompleteToken, getCachedLandingDesign, getCachedProduct, getCachedStorePage, getIncompleteToken, getLandingDesign, getProduct, getStorePage, placeOrder, quoteLandingCoupon, saveIncompleteCheckout, type LandingDesign } from './api';
+import { clearIncompleteToken, getCachedLandingDesign, getCachedProduct, getCachedStorePage, getIncompleteToken, getLandingDesign, getProduct, getStorePage, placeOrder, quoteLandingCoupon, normalizeIncompletePhone, saveIncompleteCheckout, type LandingDesign } from './api';
 import { useCustomerAuth } from './context/CustomerAuthContext';
 import { generateEventId, getAnalyticsConsent, getMetaCookies, isTrackingAllowed, trackAnalyticsEvent, trackPurchaseOnce } from './analytics';
 import type { Product, StorefrontSettings } from './types';
@@ -345,9 +345,15 @@ export function LandingPage({ settings, slug: slugOverride, initialPage, initial
   const maxProducts = checkout?.selection === 'SINGLE' ? 1 : checkout?.maxProducts ?? checkout?.productIds.length ?? 1;
   const itemKey = JSON.stringify(selectedItems.map(({ productId, variantId, quantity }) => [productId, variantId, quantity]));
   useEffect(() => {
-    if (!draftTouched.current || form.name.trim().length < 2 || !/^01[3-9]\d{8}$/.test(form.phone.trim()) || form.address.trim().length < 8 || !selectedItems.length) return;
-    const timer = window.setTimeout(() => { void saveIncompleteCheckout({ token: draftToken.current, source: 'LANDING', pageSlug: page?.slug, customerName: form.name.trim(), customerPhone: form.phone.trim(), address: form.address.trim(), district: form.district.trim() || undefined, city: form.city.trim() || undefined, email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()) ? form.email.trim() : undefined, items: selectedItems.map(({ productId, variantId, quantity }) => ({ productId, variantId, quantity })), deliveryArea, paymentMethod, couponCode: appliedCoupon?.code }).catch(() => {}); }, 900);
-    return () => window.clearTimeout(timer);
+    if (!draftTouched.current || !/^01[3-9]\d{8}$/.test(normalizeIncompletePhone(form.phone))) return;
+    let pending = true;
+    const save = () => { pending = false; void saveIncompleteCheckout({ token: draftToken.current, source: 'LANDING', pageSlug: page?.slug, customerName: form.name.trim(), customerPhone: normalizeIncompletePhone(form.phone), address: form.address.trim(), district: form.district.trim() || undefined, city: form.city.trim() || undefined, email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()) ? form.email.trim() : undefined, items: selectedItems.map(({ productId, variantId, quantity }) => ({ productId, variantId, quantity })), deliveryArea, paymentMethod, couponCode: appliedCoupon?.code }).catch(() => {}); };
+    const timer = window.setTimeout(save, 500);
+    const flush = () => { if (pending) { window.clearTimeout(timer); save(); } };
+    const onHidden = () => { if (document.visibilityState === 'hidden') flush(); };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onHidden);
+    return () => { window.clearTimeout(timer); window.removeEventListener('pagehide', flush); document.removeEventListener('visibilitychange', onHidden); };
   }, [form, itemKey, deliveryArea, paymentMethod, appliedCoupon?.code, page?.slug]);
   useEffect(() => {
     const items = (checkout?.productIds || []).map((id) => products[id]).filter((product): product is Product => Boolean(product));

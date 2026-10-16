@@ -14,14 +14,14 @@ import { landingDeliveryCharge } from '../storefront/deliveryPolicy';
 const router = Router();
 const run = (handler: (req: Request, res: Response) => Promise<void>) => (req: Request, res: Response) => { Promise.resolve(handler(req, res)).catch(error => res.status(error.status || 500).json({ success: false, message: error.message })); };
 const itemSchema = z.object({ productId: z.string().uuid(), variantId: z.string().uuid().nullable().optional(), quantity: z.number().int().min(1).max(10) });
-const draftSchema = z.object({ token: z.string().uuid(), source: z.enum(['STOREFRONT', 'LANDING', 'STUDIO_FORM']), pageSlug: z.string().max(120).optional(), customerName: z.string().trim().min(2).max(100), customerPhone: z.string().trim().min(10).max(18), address: z.string().trim().min(8).max(300), district: z.string().trim().max(80).optional(), city: z.string().trim().max(80).optional(), email: z.string().email().max(160).optional(), items: z.array(itemSchema).min(1).max(20), deliveryArea: z.enum(['DHAKA_CITY', 'SUB_AREA', 'OUTSIDE_DHAKA']).optional(), paymentMethod: z.enum(['COD', 'UDDOKTAPAY']).default('COD'), couponCode: z.string().trim().max(40).optional() });
+const draftSchema = z.object({ token: z.string().uuid(), source: z.enum(['STOREFRONT', 'LANDING', 'STUDIO_FORM']), pageSlug: z.string().max(120).optional(), customerName: z.string().trim().max(100).default(''), customerPhone: z.string().trim().min(10).max(18), address: z.string().trim().max(300).default(''), district: z.string().trim().max(80).optional(), city: z.string().trim().max(80).optional(), email: z.string().email().max(160).optional(), items: z.array(itemSchema).max(20).default([]), deliveryArea: z.enum(['DHAKA_CITY', 'SUB_AREA', 'OUTSIDE_DHAKA']).optional(), paymentMethod: z.enum(['COD', 'UDDOKTAPAY']).default('COD'), couponCode: z.string().trim().max(40).optional() });
 export const draftTokenHash = (token: string) => crypto.createHash('sha256').update(token).digest('hex');
 
 router.post('/public', rateLimit({ windowMs: 15 * 60_000, max: 60, standardHeaders: true, legacyHeaders: false }), run(async (req, res) => {
   const origin = req.get('origin');
   if (!origin || origin !== `${req.protocol}://${req.get('host')}` && !config.clientUrls.includes(origin)) { res.status(403).json({ success: false, message: 'Invalid checkout origin' }); return; }
   const parsed = draftSchema.safeParse(req.body);
-  if (!parsed.success || !/^01[3-9]\d{8}$/.test(normalizeOrderPhone(parsed.data?.customerPhone || ''))) { res.status(400).json({ success: false, message: 'Complete contact details and a product are required' }); return; }
+  if (!parsed.success || !/^01[3-9]\d{8}$/.test(normalizeOrderPhone(parsed.data?.customerPhone || ''))) { res.status(400).json({ success: false, message: 'A valid Bangladesh mobile number is required' }); return; }
   const input = parsed.data;
   const ip = normalizeClientIp(req.ip);
   if (ip) {
@@ -41,7 +41,7 @@ router.get('/', requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'CALL_CENTER_A
   const page = Math.max(1, Number(req.query.page) || 1);
   const status = String(req.query.status || 'OPEN');
   if (!['OPEN', 'CONTACTED', 'NO_ANSWER', 'DECLINED', 'CONVERTED', 'DISCARDED'].includes(status)) { res.status(400).json({ success: false, message: 'Invalid status' }); return; }
-  const where = { status, ...(status === 'OPEN' ? { lastActivityAt: { lte: new Date(Date.now() - 15 * 60_000) } } : {}) };
+  const where = { status };
   const [drafts, total] = await Promise.all([prisma.incompleteCheckout.findMany({ where, orderBy: { lastActivityAt: 'desc' }, skip: (page - 1) * 25, take: 25 }), prisma.incompleteCheckout.count({ where })]);
   const ids = [...new Set(drafts.flatMap(draft => (draft.items as Array<{ productId: string }>).map(item => item.productId)))];
   const products = await prisma.product.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } });
@@ -76,6 +76,7 @@ router.post('/:id/convert', requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'C
     if (draft.orderId) return { order: await tx.order.findUniqueOrThrow({ where: { id: draft.orderId } }), created: false };
     if (['DECLINED', 'DISCARDED'].includes(draft.status)) throw Object.assign(new Error('Lead is closed'), { status: 409 });
     const items = draft.items as Array<{ productId: string; variantId?: string | null; quantity: number }>;
+    if (draft.customerName.trim().length < 2 || draft.address.trim().length < 8 || !items.length) throw Object.assign(new Error('Complete the customer name, delivery address and product selection before creating an order.'), { status: 400 });
     const riskInput = { phone: draft.customerPhone, address: draft.address, items, ip: draft.ipAddress, source: 'INCOMPLETE' as const, override: staff.user?.role === 'SUPER_ADMIN' && overrideReason.length >= 3 };
     const risk = await evaluateOrderRisk(tx, riskInput);
     if (risk.decision === 'BLOCK') { await recordRiskDecision(tx, riskInput, risk); return { blocked: risk.reasons, created: false as const }; }

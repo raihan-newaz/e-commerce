@@ -142,7 +142,7 @@ export const getIncompleteToken = (source: string) => {
   } catch { return crypto.randomUUID(); }
 };
 export const clearIncompleteToken = (source: string) => { try { sessionStorage.removeItem(`nix-incomplete:${source}`); } catch {} };
-export const saveIncompleteCheckout = (payload: unknown) => request<{ success: boolean; id: string }>('/api/incomplete-orders/public', { method: 'POST', body: JSON.stringify(payload) });
+export const saveIncompleteCheckout = (payload: unknown) => request<{ success: boolean; id: string }>('/api/incomplete-orders/public', { method: 'POST', body: JSON.stringify(payload), keepalive: true });
 export async function placeOrder(payload: any, _key?: string) {
   const {idempotencyKey: _old, _eventId, _fbc, _fbp, _trackingConsent, ...stable} = payload;
   const data = new TextEncoder().encode(JSON.stringify(stable));
@@ -177,3 +177,7 @@ export const addCustomerWishlist = (productId: string) => request<{ success: boo
 export const removeCustomerWishlist = (productId: string) => request<{ success: boolean; message: string }>(`/api/storefront/account/wishlist/${productId}`, { method: 'DELETE' });
 
 export const getLandingThankYouDesign = (slug: string) => request<LandingDesign>(`/api/builder/public-landings/${encodeURIComponent(slug)}?view=thank-you`);
+
+export const normalizeIncompletePhone = (value: string) => value
+  .replace(/[০-৯]/g, digit => String('০১২৩৪৫৬৭৮৯'.indexOf(digit)))
+  .replace(/\D/g, '').replace(/^880/, '0');

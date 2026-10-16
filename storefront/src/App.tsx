@@ -1,10 +1,10 @@
 import { CSSProperties, FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronRight, ClipboardCheck, Heart, Menu, Minus, PackageCheck, Plus, Search, ShieldCheck, ShoppingBag, Trash2, Truck, UserRound, X } from 'lucide-react';
-import { addCustomerWishlist, clearIncompleteToken, getCachedLandingDesign, getCachedProduct, getCachedProducts, getCachedStorefrontSettings, getCachedStorePage, getIncompleteToken, getLandingDesign, getPaymentResult, getProduct, getStorePage, getStorefrontSettings, listProducts, placeOrder, saveIncompleteCheckout, trackOrder, type LandingDesign } from './api';
+import { addCustomerWishlist, clearIncompleteToken, getCachedLandingDesign, getCachedProduct, getCachedProducts, getCachedStorefrontSettings, getCachedStorePage, getIncompleteToken, getLandingDesign, getPaymentResult, getProduct, getStorePage, getStorefrontSettings, listProducts, placeOrder, normalizeIncompletePhone, saveIncompleteCheckout, trackOrder, type LandingDesign } from './api';
 import { useCart } from './context/CartContext';
 import { useCustomerAuth } from './context/CustomerAuthContext';
-import { defaultStorefrontSettings, publicSupportPhone } from './store-config';
+import { defaultStorefrontSettings, publicSupportPhone, refreshedHeroImages } from './store-config';
 import type { CheckoutField, DeliveryArea, OrderResult, Product, StorePage, StorefrontSettings, Variant } from './types';
 import { CustomerAccountPage, CustomerAuthPage } from './CustomerAccountPages';
 import { LandingPage } from './LandingPage';
@@ -229,10 +229,9 @@ function HomePage({ settings }: { settings: StorefrontSettings }) {
   const { buyNow } = useCart();
   const [loading, setLoading] = useState(() => !getCachedProducts());
   const [error, setError] = useState('');
-  const [heroAspectRatio, setHeroAspectRatio] = useState<string>('1536 / 1024');
   const listTracked = useRef(false);
   useEffect(() => { listProducts().then((data) => { setProducts(data.products); if (!listTracked.current) { listTracked.current = true; trackAnalyticsEvent('view_item_list', { item_list_name: 'Homepage collection', items: data.products.slice(0, 8).map((item) => productAnalyticsItem(item)) }); } }).catch((e) => setError(e.message)).finally(() => setLoading(false)); listProducts('?sort=best-selling').then((data) => setBestSellers(data.products)).catch(() => undefined); }, []);
-  const heroSlides = settings.heroImages.map((image, index) => ({
+  const heroSlides = refreshedHeroImages(settings.heroImages).map((image, index) => ({
     id: `custom-${index}`,
     image,
     alt: settings.storeName,
@@ -241,20 +240,10 @@ function HomePage({ settings }: { settings: StorefrontSettings }) {
   const newArrivals = [...products.filter((product) => product.productType === 'SIMPLE').slice(0, 6), ...products.filter((product) => product.productType === 'VARIABLE').slice(0, 2)];
   const showcases = settings.themeConfig.showcase?.length ? settings.themeConfig.showcase : [{ id: 'new', eyebrow: 'JUST IN', title: 'New arrivals', source: 'NEW' as const, limit: 8, enabled: true }, { id: 'best', eyebrow: 'CUSTOMER FAVOURITES', title: 'Most selling', source: 'BEST' as const, limit: 4, enabled: settings.themeConfig.showBestSellers }];
   useEffect(() => { if (heroSlides.length < 2) return; const timer = window.setInterval(() => setActiveSlide((current) => (current + 1) % heroSlides.length), 5000); return () => window.clearInterval(timer); }, [heroSlides.length]);
-  useEffect(() => {
-    const firstImg = heroSlides[0]?.image;
-    if (!firstImg) return;
-    const img = new Image();
-    img.src = firstImg;
-    img.onload = () => {
-      if (img.naturalWidth && img.naturalHeight) {
-        setHeroAspectRatio(`${img.naturalWidth} / ${img.naturalHeight}`);
-      }
-    };
-  }, [heroSlides]);
+  useEffect(() => { setActiveSlide((current) => current < heroSlides.length ? current : 0); }, [heroSlides.length]);
   const quickBuy = (product: Product, variant?: Variant) => { if (product.productType === 'VARIABLE' && !variant) { setQuickProduct(product); return; } const unitPrice = variant?.salePrice ?? product.salePrice; buyNow({ productId: product.id, variantId: variant?.id, name: product.name, variantName: variant ? Object.values(variant.attributes).join(' / ') || variant.name : undefined, image: variant?.image || product.image, unitPrice, quantity: 1, stockQuantity: variant?.stockQuantity ?? product.stockQuantity }); navigate('/checkout'); };
   return <>
-    <section className="hero carousel" style={{ aspectRatio: heroAspectRatio }}>{heroSlides.length ? heroSlides.map((slide, index) => <div className={`hero-slide ${index === activeSlide ? 'active' : ''}`} key={slide.id}><div className="hero-banner-image"><ProductImage src={slide.image} alt={slide.alt} loading={index === 0 ? 'eager' : 'lazy'} fetchPriority={index === 0 ? 'high' : 'low'} decoding="async" onLoad={(e: React.SyntheticEvent<HTMLImageElement>) => { if (e.currentTarget.naturalWidth && e.currentTarget.naturalHeight) setHeroAspectRatio(`${e.currentTarget.naturalWidth} / ${e.currentTarget.naturalHeight}`); }} /></div><Link className="button dark hero-shop-overlay" to={slide.to}>{settings.heroButtonLabel} <ArrowRight size={18} /></Link></div>) : <div className="hero-slide active"><div className="hero-banner-image skeleton" /></div>}{heroSlides.length > 1 && <div className="carousel-dots">{heroSlides.map((slide, index) => <button key={slide.id} aria-label={`Show banner ${index + 1}`} className={activeSlide === index ? 'active' : ''} onClick={() => setActiveSlide(index)} />)}</div>}</section>
+    <section className="hero carousel" aria-label="Featured collections">{heroSlides.length ? heroSlides.map((slide, index) => <div className={`hero-slide ${index === activeSlide ? 'active' : ''}`} key={slide.id}><div className="hero-banner-image"><ProductImage src={slide.image} alt={slide.alt} loading={index === 0 ? 'eager' : 'lazy'} fetchPriority={index === 0 ? 'high' : 'low'} decoding="async" /></div><Link className="button dark hero-shop-overlay" to={slide.to}>{settings.heroButtonLabel} <ArrowRight size={18} /></Link></div>) : <div className="hero-slide active"><div className="hero-banner-image skeleton" /></div>}{heroSlides.length > 1 && <div className="carousel-dots">{heroSlides.map((slide, index) => <button key={slide.id} aria-label={`Show banner ${index + 1}`} className={activeSlide === index ? 'active' : ''} onClick={() => setActiveSlide(index)} />)}</div>}</section>
     {settings.themeConfig.showTrustBar && <section className="trust-row"><span><Truck /> Nationwide delivery</span><span><ShieldCheck /> Cash on delivery</span><span><PackageCheck /> Easy exchange support</span></section>}
     {showcases.filter((section) => section.enabled).map((section) => { const sectionProducts = section.source === 'BEST' ? (bestSellers.length ? bestSellers : products) : section.source === 'CATEGORY' ? products.filter((product) => product.category.toLowerCase() === (section.category || '').toLowerCase()) : newArrivals; return <section className={`collection section ${section.source === 'BEST' ? 'best-sellers' : ''}`} id={section.id} key={section.id}><div className="section-head"><div><span className="eyebrow">{section.eyebrow}</span><h2>{section.title}</h2></div><Link to={section.source === 'CATEGORY' ? `/shop?category=${encodeURIComponent(section.category || '')}` : '/shop'}>View all <ArrowRight size={16} /></Link></div>{loading ? <ProductGridSkeleton /> : error ? <Empty title="We could not load the collection" text={error} /> : sectionProducts.length ? <div className="product-grid">{sectionProducts.slice(0, section.limit).map((product) => <ProductCard key={product.id} product={product} onBuyNow={quickBuy} buyNowText={settings.themeConfig.buyNowText || 'Buy now'} />)}</div> : <Empty title="No products in this category" text="Add products to the selected category to show them here." />}</section>; })}
     {settings.themeConfig.showAbout && <section className="why section" id="why"><div className="why-image"><span className="delivery-art-label">DELIVERY<br />& CARE</span><div className="delivery-art-card"><Truck size={23}/><span>Nationwide delivery</span><b>From {money(Math.min(settings.insideDhakaCharge, settings.subAreaCharge, settings.outsideDhakaCharge))}</b></div></div><div><span className="eyebrow">DELIVERY & EASY EXCHANGE</span><h2>{settings.aboutTitle}</h2><p>{settings.aboutText}</p><div className="principles"><span><b>01</b> Inside Dhaka delivery <strong>{money(settings.insideDhakaCharge)}</strong></span><span><b>02</b> Dhaka sub area delivery <strong>{money(settings.subAreaCharge)}</strong></span><span><b>03</b> Outside Dhaka delivery <strong>{money(settings.outsideDhakaCharge)}</strong></span>{publicSupportPhone(settings.phone) && <span><b>04</b> Need an exchange? Call <a href={`tel:${settings.phone}`}>{settings.phone}</a></span>}</div><Link className="delivery-help-link" to="/delivery">See delivery information <ArrowRight size={15}/></Link></div></section>}
@@ -348,7 +337,7 @@ function ProductDetail({ id, variationStyle, showColorName, buyNowText, storeNam
         setActiveImage((current) => current || p.image || '');
         const pageTitle = `${p.metaTitle || p.name} | ${storeName}`;
         const pageDesc = p.metaDescription || p.description || `Shop ${p.name} at ${storeName}. Best price in Bangladesh.`;
-        const fullImageUrl = p.image ? (p.image.startsWith('http') ? p.image : `${window.location.origin}${p.image}`) : `${window.location.origin}/uploads/media/banner-city-overshirt.webp`;
+        const fullImageUrl = p.image ? (p.image.startsWith('http') ? p.image : `${window.location.origin}${p.image}`) : `${window.location.origin}/banners/everyday-edit-v2.webp`;
         const canonicalUrl = `${window.location.origin}/product/${encodeURIComponent(p.slug || p.id)}`;
 
         document.title = pageTitle;
@@ -379,7 +368,7 @@ function ProductDetail({ id, variationStyle, showColorName, buyNowText, storeNam
           schemaScript.type = 'application/ld+json';
           document.head.appendChild(schemaScript);
         }
-        const inStock = p.productType === 'VARIABLE' ? p.variants.some((v) => v.inStock) : (p.stock > 0);
+        const inStock = p.productType === 'VARIABLE' ? p.variants.some((v) => v.inStock) : p.inStock;
         schemaScript.textContent = JSON.stringify({
           '@context': 'https://schema.org/',
           '@type': 'Product',
@@ -653,9 +642,15 @@ function CheckoutPage({ settings }: { settings: StorefrontSettings }) {
   useEffect(() => { if (items.length && !checkoutTracked.current) { checkoutTracked.current = true; trackAnalyticsEvent('begin_checkout', { currency: 'BDT', value: subtotal, items: items.map((item) => ({ id: item.productId, name: item.name, price: item.unitPrice, quantity: item.quantity })) }); } }, [items, subtotal]);
   useEffect(() => { if (customer && !form.name && !form.phone) setForm((current) => ({ ...current, name: customer.name || '', phone: customer.phone || '', email: customer.email || '', address: customer.address || '', district: customer.district || 'Dhaka', city: customer.city || customer.area || '' })); }, [customer]);
   useEffect(() => {
-    if (!draftTouched.current || form.name.trim().length < 2 || !/^01[3-9]\d{8}$/.test(form.phone.trim()) || form.address.trim().length < 8 || !items.length) return;
-    const timer = window.setTimeout(() => { const email = form.email?.trim(); void saveIncompleteCheckout({ token: draftToken.current, source: 'STOREFRONT', customerName: form.name.trim(), customerPhone: form.phone.trim(), address: form.address.trim(), district: form.district?.trim(), city: form.city?.trim(), email: email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : undefined, items: items.map(item => ({ productId: item.productId, variantId: item.variantId || null, quantity: item.quantity })), deliveryArea, paymentMethod }).catch(() => {}); }, 900);
-    return () => window.clearTimeout(timer);
+    if (!draftTouched.current || !/^01[3-9]\d{8}$/.test(normalizeIncompletePhone(form.phone))) return;
+    let pending = true;
+    const save = () => { pending = false; const email = form.email?.trim(); void saveIncompleteCheckout({ token: draftToken.current, source: 'STOREFRONT', customerName: form.name.trim(), customerPhone: normalizeIncompletePhone(form.phone), address: form.address.trim(), district: form.district?.trim(), city: form.city?.trim(), email: email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : undefined, items: items.map(item => ({ productId: item.productId, variantId: item.variantId || null, quantity: item.quantity })), deliveryArea, paymentMethod }).catch(() => {}); };
+    const timer = window.setTimeout(save, 500);
+    const flush = () => { if (pending) { window.clearTimeout(timer); save(); } };
+    const onHidden = () => { if (document.visibilityState === 'hidden') flush(); };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onHidden);
+    return () => { window.clearTimeout(timer); window.removeEventListener('pagehide', flush); document.removeEventListener('visibilitychange', onHidden); };
   }, [form, items, deliveryArea, paymentMethod]);
   const delivery = deliveryFeeForArea(deliveryArea, settings);
   if (!items.length) return <section className="section"><Empty title="Nothing to checkout" text="Add a product before starting checkout." action="Go shopping" /></section>;

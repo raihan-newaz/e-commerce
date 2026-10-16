@@ -29,10 +29,8 @@ const products = [
 ] as const;
 
 const banners = [
-  ['banner-city-overshirt.png', 'NIX editorial city overshirt banner'],
-  ['banner-neutral-flatlay.png', 'NIX neutral essentials flat lay banner'],
-  ['banner-sage-editorial.png', 'NIX sage editorial fashion banner'],
-  ['banner-rust-accessories.png', 'NIX rust accessories editorial banner'],
+  ['everyday-edit-v2.webp', 'NIX everyday essentials banner'],
+  ['considered-details-v2.webp', 'NIX accessories and details banner'],
 ] as const;
 
 async function main() {
@@ -52,9 +50,9 @@ async function main() {
   }
 
   for (const [fileName, altText] of banners) {
-    const url = imageUrl(fileName);
-    const file = fs.statSync(path.join(mediaDir, fileName));
-    await prisma.mediaAsset.upsert({ where: { url }, update: { fileName, altText, mimeType: 'image/png', size: file.size }, create: { fileName, url, altText, mimeType: 'image/png', size: file.size } });
+    const url = `/banners/${fileName}`;
+    const file = fs.statSync(path.resolve(__dirname, '../../../storefront/public/banners', fileName));
+    await prisma.mediaAsset.upsert({ where: { url }, update: { fileName, altText, mimeType: 'image/webp', size: file.size }, create: { fileName, url, altText, mimeType: 'image/webp', size: file.size } });
   }
 
   const current = await prisma.storefrontSettings.upsert({ where: { id: 'default' }, update: {}, create: { id: 'default' } });
@@ -63,7 +61,7 @@ async function main() {
   };
   await prisma.storefrontSettings.update({ where: { id: 'default' }, data: {
     storeName: 'NIX',
-    heroImages: JSON.stringify(banners.map(([fileName]) => imageUrl(fileName))),
+    heroImages: JSON.stringify(banners.map(([fileName]) => `/banners/${fileName}`)),
     featuredCategories: JSON.stringify(categories.slice(0, 5).map(([, slug]) => slug)),
     themeConfig: JSON.stringify(themeConfig),
   } });
