@@ -39,6 +39,7 @@ import mediaRoutes from './modules/media/mediaRoutes';
 import builderRoutes, { publicBuilderPage, publicLandingDesign } from './modules/builder/routes';
 import { submitBuilderForm } from './modules/builder/formService';
 import { countdownRuntime } from './modules/builder/countdownRuntime';
+import ivrRoutes from './modules/orders/ivrRoutes';
 
 const app = express();
 const server = http.createServer(app);
@@ -50,6 +51,44 @@ export const io = new SocketIOServer(server, {
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     credentials: true,
   },
+});
+
+// Proxy WebRTC SIP WebSocket to Asterisk PBX (103.169.160.153:8088/ws)
+server.on('upgrade', (req, socket, head) => {
+  if (req.url && (req.url === '/ws-sip' || req.url.startsWith('/ws-sip'))) {
+    const proxyReq = http.request({
+      hostname: '103.169.160.153',
+      port: 8088,
+      path: '/ws',
+      method: req.method,
+      headers: {
+        ...req.headers,
+        host: '103.169.160.153:8088',
+      },
+    });
+
+    proxyReq.on('upgrade', (proxyRes, proxySocket, proxyHead) => {
+      socket.write(
+        `HTTP/1.1 101 Switching Protocols\r\n` +
+        Object.entries(proxyRes.headers)
+          .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}\r\n`)
+          .join('') +
+        '\r\n'
+      );
+      if (proxyHead && proxyHead.length) {
+        socket.write(proxyHead);
+      }
+      proxySocket.pipe(socket);
+      socket.pipe(proxySocket);
+    });
+
+    proxyReq.on('error', (err) => {
+      console.error('SIP WebSocket proxy error:', err.message);
+      socket.destroy();
+    });
+
+    proxyReq.end();
+  }
 });
 
 io.use(async (socket, next) => {
@@ -95,7 +134,7 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   contentSecurityPolicy: config.isDev ? false : { directives: {
     scriptSrc: ["'self'", 'https://www.googletagmanager.com', 'https://connect.facebook.net'],
-    connectSrc: ["'self'", 'https://*.google-analytics.com', 'https://*.analytics.google.com', 'https://www.facebook.com'],
+    connectSrc: ["'self'", 'https://*.google-analytics.com', 'https://*.analytics.google.com', 'https://www.facebook.com', 'wss:', 'ws:'],
     imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
     frameSrc: ["'self'", 'https://www.youtube.com', 'https://www.youtube-nocookie.com'],
     upgradeInsecureRequests: config.publicOrigin.startsWith('https:') ? [] : null,
@@ -161,6 +200,9 @@ app.use('/api', (_req, res, next) => {
   res.setHeader('X-LiteSpeed-Cache-Control', 'no-cache');
   next();
 });
+// The live LiteSpeed setup may serve the storefront shell directly for root
+// paths, so expose the dynamic sitemap through the already proxied /api prefix.
+app.get('/api/sitemap.xml', getSitemapXml);
 
 // Health Check
 app.get('/api/health', (req, res) => {
@@ -192,6 +234,7 @@ app.use('/api/purchases', purchaseRoutes);
 app.use('/api/accounting', accountingRoutes);
 app.use('/api/crm', crmRoutes);
 app.use('/api/messaging', messageRoutes);
+app.use('/api/ivr', ivrRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/storefront', storefrontRoutes);

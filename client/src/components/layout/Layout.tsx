@@ -22,11 +22,11 @@ export const Layout: React.FC = () => {
       />
       <div
         className={`flex min-w-0 flex-1 flex-col transition-[padding] duration-300 ${
-          sidebarCollapsed ? "lg:pl-[76px]" : "lg:pl-[260px]"
+          sidebarCollapsed ? "lg:pl-[64px]" : "lg:pl-[212px]"
         }`}
       >
         <Navbar onToggleSidebar={() => setSidebarOpen(true)} />
-        <main id="main-content" className="mx-auto w-full max-w-[1800px] flex-1 px-4 py-2.5 sm:px-6 sm:py-3 xl:px-8 xl:py-3">
+        <main id="main-content" className="mx-auto w-full max-w-[1800px] flex-1 px-3 py-2 sm:px-4 sm:py-2.5 xl:px-6 xl:py-2.5">
           <div className="admin-page">
             {canAccessPath(location.pathname, user?.role, user?.builderAccess) ? <><PageContext /><Outlet /></> : <Navigate to="/" replace />}
           </div>

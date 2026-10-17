@@ -1,6 +1,6 @@
 import {
   Activity,
-  Mail, CreditCard, ShieldCheck, History, UserRound, Plug,
+  Mail, CreditCard, ShieldCheck, History, UserRound, Plug, PhoneCall,
   BarChart3,
   Boxes,
   PackageSearch,
@@ -43,6 +43,7 @@ export const settingsGroups: NavigationGroup[] = [
     { label: 'Couriers', path: '/settings/couriers', icon: Truck, description: 'Provider credentials, pickup stores and webhooks', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
     { label: 'Payments', path: '/settings/payments', icon: CreditCard, description: 'Online checkout and payment gateway configuration', roles: ['SUPER_ADMIN'] },
     { label: 'Email notifications', path: '/settings/email', icon: Mail, description: 'SMTP delivery, order templates and delivery history', roles: ['SUPER_ADMIN'] },
+    { label: 'Auto IVR Calling', path: '/settings/ivr', icon: PhoneCall, description: 'Automated order confirmation calls, Asterisk PBX & retry rules', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER'] },
   ] },
   { label: 'Team & account', items: [
     { label: 'Dropdown options', path: '/settings/dropdowns', icon: Settings2, description: 'Add, edit, reorder and hide options; protect values already in use', roles: ['SUPER_ADMIN'] },

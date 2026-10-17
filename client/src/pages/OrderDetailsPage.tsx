@@ -2,7 +2,7 @@ import './orderDetails.css';
 import { useAuth } from '../context/AuthContext';
 import { AdminSelect } from '../components/admin/AdminSelect';
 import React, { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, ArrowLeft, Box, CalendarClock, CheckCircle2, Copy, MapPin, MessageCircle, Phone, Printer, Truck, UserRound } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Box, CalendarClock, CheckCircle2, Copy, Loader2, MapPin, MessageCircle, Phone, PhoneForwarded, Printer, Truck, UserRound } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../lib/api';
@@ -13,6 +13,8 @@ import { CustomerHistoryCard, type CustomerHistory } from '../components/orders/
 import { CourierDispatchModal } from '../components/orders/CourierDispatchModal';
 import CourierLocationCard from '../components/orders/CourierLocationCard';
 import OrderRiskCard from '../components/orders/OrderRiskCard';
+import { useWebPhone } from '../context/WebPhoneContext';
+import { OrderNotesCard } from '../components/orders/OrderNotesCard';
 
 const statuses = ['PENDING', 'CONFIRMED', 'PACKAGING', 'HANDED_OVER', 'IN_TRANSIT', 'DELIVERED', 'PARTIAL_DELIVERED', 'HOLD', 'CANCELLED', 'RETURNED', 'FAKE_TRASH'];
 const money = (value: number) => `৳${Number(value || 0).toLocaleString()}`;
@@ -45,6 +47,33 @@ export const OrderDetailsPage: React.FC = () => {
   const [redxRecoveryId, setRedxRecoveryId] = useState('');
   const [redxBusy, setRedxBusy] = useState(false);
   const [staffList, setStaffList] = useState<any[]>([]);
+  const [ivrManualEnabled, setIvrManualEnabled] = useState(false);
+  const [ivrDialing, setIvrDialing] = useState(false);
+  const { startCall } = useWebPhone();
+
+  useEffect(() => {
+    api.get('/ivr/config').then((res) => {
+      if (res.data?.success && res.data.config?.allowManualCall) {
+        setIvrManualEnabled(true);
+      }
+    }).catch(() => {});
+  }, []);
+
+  const handleTriggerIvrCall = async () => {
+    if (!order) return;
+    setIvrDialing(true);
+    try {
+      const res = await api.post('/ivr/manual-dial', { orderId: order.id });
+      if (res.data?.success) {
+        toast.success(res.data.message || `IVR confirmation call queued for Order #${order.orderNumber}`);
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to trigger IVR call');
+    } finally {
+      setIvrDialing(false);
+    }
+  };
+
   const load = async () => { const serial=++loadSerial.current; try { const {data}=await api.get('/orders/'+id); if(serial===loadSerial.current){setOrder(data.order);setCustomerHistory(data.customerHistory || null);} } catch(error:any){if(serial===loadSerial.current)toast.error(error.response?.data?.message || 'Order not found');} finally {if(serial===loadSerial.current)setLoading(false);} };
   useEffect(()=>{setLoading(true);setOrder(null);void load();return()=>{loadSerial.current++;};},[id]);
   useEffect(() => {
@@ -179,15 +208,83 @@ export const OrderDetailsPage: React.FC = () => {
   let checkoutDetails: Record<string, string> = {};
   try { checkoutDetails = JSON.parse(order.checkoutDetails || '{}'); } catch { checkoutDetails = {}; }
   return <div className="order-details-page mx-auto max-w-7xl space-y-5 pb-12">
-    <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center"><div className="flex items-center gap-3"><Link to="/orders" className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"><ArrowLeft className="h-4 w-4"/></Link><div><div className="flex items-center gap-2"><h2 className="text-2xl font-semibold">Order {order.orderNumber}</h2>{order.isFraudSuspect && <span className="rounded-full bg-rose-100 px-2 py-1 text-[10px] font-medium text-rose-700">RISK</span>}{order.isDuplicate && <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-medium text-amber-700">DUPLICATE</span>}</div><p className="mt-1 text-xs text-slate-500">Placed {new Date(order.createdAt).toLocaleString()} · Last updated {new Date(order.updatedAt).toLocaleString()}</p></div></div><div className="flex flex-wrap gap-2">{canManage && !order.trashedAt && <button onClick={() => setEditOpen(true)} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium dark:border-slate-700 dark:bg-slate-900">Edit order</button>}<button onClick={() => setInvoiceOpen(true)} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium dark:border-slate-700 dark:bg-slate-900"><Printer className="h-4 w-4"/>Invoice</button><AdminSelect dropdownKey="pages.OrderDetailsPage.tsx.1" aria-label="Order status" data-status={order.status} disabled={updating} value={order.status} onChange={(e) => updateStatus(e.target.value)} className="h-10 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 px-4 text-sm font-medium shadow transition outline-none">{statuses.map(status => <option key={status} value={status}>{pretty(status)}</option>)}</AdminSelect></div></div>
+    <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+      <div className="flex items-center gap-3">
+        <Link to="/orders" className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+          <ArrowLeft className="h-4 w-4"/>
+        </Link>
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-semibold">Order {order.orderNumber}</h2>
+            {order.isFraudSuspect && <span className="rounded-full bg-rose-100 px-2 py-1 text-[10px] font-medium text-rose-700">RISK</span>}
+            {order.isDuplicate && <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-medium text-amber-700">DUPLICATE</span>}
+          </div>
+          <p className="mt-1 text-xs text-slate-500">Placed {new Date(order.createdAt).toLocaleString()} · Last updated {new Date(order.updatedAt).toLocaleString()}</p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Direct Call Header Button */}
+        <button
+          type="button"
+          onClick={() => startCall({ orderId: order.id, orderNumber: order.orderNumber, customerName: order.customerName, phone: order.customerPhone })}
+          className="inline-flex h-10 items-center gap-2 rounded-xl bg-emerald-600 px-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 cursor-pointer active:scale-95"
+          title={`Direct Call ${order.customerName} (${order.customerPhone})`}
+        >
+          <Phone className="h-4 w-4" />
+          <span>Direct Call</span>
+          <span className="hidden sm:inline font-mono text-xs opacity-90">({order.customerPhone})</span>
+        </button>
+
+        {/* WhatsApp Header Button */}
+        <a
+          target="_blank"
+          rel="noreferrer"
+          href={`https://wa.me/88${order.customerPhone.replace(/\D/g, '')}`}
+          className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#25D366] px-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#20ba59]"
+          title="Chat on WhatsApp"
+        >
+          <MessageCircle className="h-4 w-4" />
+          <span className="hidden sm:inline">WhatsApp</span>
+        </a>
+
+        {/* Automated Robot IVR Trigger */}
+        {ivrManualEnabled && (
+          <button
+            type="button"
+            disabled={ivrDialing}
+            onClick={handleTriggerIvrCall}
+            className="inline-flex h-10 items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-800/60 dark:bg-indigo-950/40 dark:text-indigo-300 disabled:opacity-50"
+            title="Trigger automated robot IVR call"
+          >
+            {ivrDialing ? <Loader2 className="h-4 w-4 animate-spin text-indigo-600 dark:text-indigo-400" /> : <PhoneForwarded className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />}
+            <span className="hidden md:inline">{ivrDialing ? 'Calling…' : 'Automated IVR'}</span>
+          </button>
+        )}
+
+        {canManage && !order.trashedAt && (
+          <button onClick={() => setEditOpen(true)} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium dark:border-slate-700 dark:bg-slate-900">
+            Edit order
+          </button>
+        )}
+        <button onClick={() => setInvoiceOpen(true)} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium dark:border-slate-700 dark:bg-slate-900">
+          <Printer className="h-4 w-4"/>Invoice
+        </button>
+        <AdminSelect dropdownKey="pages.OrderDetailsPage.tsx.1" aria-label="Order status" data-status={order.status} disabled={updating} value={order.status} onChange={(e) => updateStatus(e.target.value)} className="h-10 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 px-4 text-sm font-medium shadow transition outline-none">
+          {statuses.map(status => <option key={status} value={status}>{pretty(status)}</option>)}
+        </AdminSelect>
+      </div>
+    </div>
     <section className="order-summary-grid" aria-label="Order summary">{[{label:'Order total',value:money(order.grandTotal),detail:order.items.length+' product lines'},{label:'Amount due',value:money(order.codAmount),detail:pretty(order.paymentStatus)},{label:'Payment method',value:pretty(order.paymentMethod),detail:'Advance '+money(order.advancePaid)},{label:'Order status',value:pretty(order.status),detail:pretty(order.priority)+' priority'}].map(item=><div key={item.label} className="order-summary-card"><span>{item.label}</span><strong>{item.value}</strong><small>{item.detail}</small></div>)}</section>
     {order.internalNote?.includes('[Courier review required]') && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">This order was amended after booking. Confirm the delivery address, products and COD amount with the courier.</p>}
     {(order.isFraudSuspect || order.isDuplicate) && <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0"/><div><b>Review before fulfilment</b><p className="text-sm opacity-80">{order.isFraudSuspect ? 'Customer history triggered a risk flag. ' : ''}{order.isDuplicate ? 'A recent order has the same customer phone number.' : ''}</p></div></div>}
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]"><div className="space-y-6">
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]"><div className="space-y-6">
+      {/* Prominent Notes & Checkout Details Card with Dates/Times */}
+      <OrderNotesCard order={order} onRefresh={load} />
       <section className="overflow-hidden rounded-2xl border border-slate-100/90 bg-white shadow-[0_2px_10px_rgba(0,0,0,0.02)] dark:border-slate-800 dark:bg-slate-900"><div className="flex items-center gap-2 border-b border-slate-200/80 px-5 py-4 dark:border-slate-800"><Box className="h-5 w-5 text-emerald-600 dark:text-emerald-400"/><h3 className="font-semibold">Order items</h3></div><div className="divide-y divide-slate-100 dark:divide-slate-800">{order.items.map(item => <div key={item.id} className="flex items-center gap-4 p-5">{(item.variant?.image || item.product?.image) ? <img src={item.variant?.image || item.product?.image} alt="" className="h-16 w-16 rounded-xl object-cover"/> : <span className="grid h-16 w-16 place-items-center rounded-xl bg-slate-100 dark:bg-slate-800"><Box className="h-5 w-5 text-slate-400"/></span>}<div className="min-w-0 flex-1"><b className="block truncate">{item.productName}</b><p className="mt-1 text-xs text-slate-500">{item.variantName || [item.color, item.size].filter(Boolean).join(' / ') || 'Standard'} · SKU {item.productSku || '—'}</p><p className="mt-2 text-xs font-bold text-slate-900 dark:text-slate-100">{money(item.unitPrice)} × {item.quantity}</p></div><b>{money(item.totalPrice)}</b></div>)}</div><div className="ml-auto max-w-sm space-y-2 border-t border-slate-200/80 p-5 text-sm dark:border-slate-800"><div className="flex justify-between text-slate-500"><span>Subtotal</span><span>{money(order.subtotal)}</span></div><div className="flex justify-between text-slate-500"><span>Delivery</span><span>{money(order.deliveryCharge)}</span></div>{order.discount > 0 && <div className="flex justify-between text-emerald-600"><span>Discount</span><span>-{money(order.discount)}</span></div>}<div className="flex justify-between border-t border-slate-200/80 pt-3 text-lg font-semibold dark:border-slate-700"><span>Grand total</span><span>{money(order.grandTotal)}</span></div><div className="flex justify-between text-xs text-slate-500"><span>Advance paid</span><span>{money(order.advancePaid)}</span></div><div className="flex justify-between rounded-xl bg-emerald-50 p-3 font-semibold text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300"><span>COD to collect</span><span>{money(order.codAmount)}</span></div></div></section>
       <section className="grid gap-4 md:grid-cols-2"><div className="rounded-2xl border border-slate-100/90 bg-white p-5 shadow-[0_2px_10px_rgba(0,0,0,0.02)] dark:border-slate-800 dark:bg-slate-900"><h3 className="font-semibold">Payment</h3><dl className="mt-4 space-y-3 text-sm"><div className="flex justify-between"><dt className="text-slate-500">Method</dt><dd>{pretty(order.paymentMethod)}</dd></div><div className="flex justify-between"><dt className="text-slate-500">Status</dt><dd>{pretty(order.paymentStatus)}</dd></div></dl></div><div className="rounded-2xl border border-slate-100/90 bg-white p-5 shadow-[0_2px_10px_rgba(0,0,0,0.02)] dark:border-slate-800 dark:bg-slate-900"><h3 className="font-semibold">Courier information</h3><dl className="mt-4 space-y-3 text-sm"><div className="flex justify-between gap-2"><dt className="text-slate-500">Provider</dt><dd>{pretty(order.courierName)}</dd></div><div className="flex justify-between gap-2"><dt className="text-slate-500">Tracking</dt><dd className="break-all font-mono text-xs">{order.courierTrackingCode || 'Not dispatched'}</dd></div><div className="flex justify-between gap-2"><dt className="text-slate-500">Consignment</dt><dd className="break-all font-mono text-xs">{order.courierConsignmentId || '—'}</dd></div><div className="flex justify-between gap-2"><dt className="text-slate-500">Courier status</dt><dd>{pretty(order.courierStatus)}</dd></div><div className="flex justify-between gap-2"><dt className="text-slate-500">Courier charge</dt><dd>{money(order.courierCharge)}</dd></div><div className="flex justify-between gap-2"><dt className="text-slate-500">COD received</dt><dd>{money(order.courierCodReceived)}</dd></div><div className="flex justify-between gap-2"><dt className="text-slate-500">Settlement</dt><dd>{pretty(order.courierSettlementStatus)}</dd></div>{order.courierStoreId && <div className="flex justify-between gap-2"><dt className="text-slate-500">Pickup store</dt><dd>#{order.courierStoreId}</dd></div>}</dl></div></section>
-      {(order.internalNote || order.customerNote || Object.keys(checkoutDetails).length > 0) && <section className="rounded-2xl border border-slate-100/90 bg-white p-5 shadow-[0_2px_10px_rgba(0,0,0,0.02)] dark:border-slate-800 dark:bg-slate-900"><h3 className="font-semibold">Notes & checkout details</h3><div className="mt-4 grid gap-3 md:grid-cols-2">{order.customerNote && <div className="rounded-xl bg-slate-50 p-4 dark:bg-slate-950"><b className="text-xs uppercase text-slate-400">Customer note</b><p className="mt-2 text-sm">{order.customerNote}</p></div>}{order.internalNote && <div className="rounded-xl bg-amber-50 p-4 dark:bg-amber-500/10"><b className="text-xs uppercase text-amber-600">Internal note</b><p className="mt-2 text-sm">{order.internalNote}</p></div>}{Object.entries(checkoutDetails).map(([label, value]) => <div key={label} className="rounded-xl bg-slate-50 p-4 dark:bg-slate-950"><b className="text-xs uppercase text-slate-400">{label}</b><p className="mt-2 text-sm">{String(value)}</p></div>)}</div></section>}
-    </div><aside className="space-y-5"><section className="rounded-2xl border border-slate-100/90 bg-white p-5 shadow-[0_2px_10px_rgba(0,0,0,0.02)] dark:border-slate-800 dark:bg-slate-900"><div className="flex items-center gap-2"><UserRound className="h-5 w-5 text-emerald-600 dark:text-emerald-400"/><h3 className="font-semibold">Customer</h3></div><p className="mt-4 font-bold">{order.customerName}</p><button onClick={() => copy(order.customerPhone)} className="mt-1 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-emerald-600">{order.customerPhone}<Copy className="h-3 w-3"/></button><div className="mt-4 grid grid-cols-2 gap-2"><a href={`tel:${order.customerPhone}`} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-slate-950 text-sm font-bold text-white dark:bg-white dark:text-slate-950"><Phone className="h-4 w-4"/>Call</a><a target="_blank" rel="noreferrer" href={`https://wa.me/88${order.customerPhone.replace(/\D/g, '')}`} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-emerald-600 text-sm font-bold text-white"><MessageCircle className="h-4 w-4"/>WhatsApp</a></div><dl className="mt-4 space-y-2 border-t border-slate-100 pt-3 text-xs dark:border-slate-800"><div className="flex justify-between gap-3"><dt className="text-slate-500">Order source</dt><dd>{pretty(order.sourceChannel|| (order.wooOrderId?'WooCommerce':'Unknown'))}</dd></div><div className="flex justify-between gap-3"><dt className="text-slate-500">{order.sourceChannel==='STAFF'?'Staff request IP':'Customer / checkout IP'}</dt><dd data-testid="order-source-ip" className="break-all font-mono">{order.sourceIp || 'Not captured'}</dd></div></dl>{!order.sourceIp && <p className="mt-2 text-[11px] text-slate-400">No customer IP was saved with this order.</p>}</section><section className="rounded-2xl border border-slate-100/90 bg-white p-5 shadow-[0_2px_10px_rgba(0,0,0,0.02)] dark:border-slate-800 dark:bg-slate-900"><div className="flex items-center gap-2"><MapPin className="h-5 w-5 text-emerald-600 dark:text-emerald-400"/><h3 className="font-semibold">Delivery address</h3></div><p className="mt-4 text-sm leading-6">{order.customerAddress}</p><p className="mt-2 text-xs text-slate-500">{[order.area, order.zone, order.city, order.district].filter(Boolean).join(', ')}</p></section>      <section className="rounded-2xl border border-slate-100/90 bg-white p-5 shadow-[0_2px_10px_rgba(0,0,0,0.02)] dark:border-slate-800 dark:bg-slate-900">
+
+    </div><aside className="space-y-5"><section className="rounded-2xl border border-slate-100/90 bg-white p-5 shadow-[0_2px_10px_rgba(0,0,0,0.02)] dark:border-slate-800 dark:bg-slate-900"><div className="flex items-center gap-2"><UserRound className="h-5 w-5 text-emerald-600 dark:text-emerald-400"/><h3 className="font-semibold">Customer</h3></div><p className="mt-4 font-bold">{order.customerName}</p><button onClick={() => copy(order.customerPhone)} className="mt-1 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-emerald-600">{order.customerPhone}<Copy className="h-3 w-3"/></button><div className="mt-4 grid grid-cols-2 gap-2"><button type="button" onClick={() => startCall({ orderId: order.id, orderNumber: order.orderNumber, customerName: order.customerName, phone: order.customerPhone })} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 transition shadow-sm"><Phone className="h-4 w-4"/>Direct Call</button><a target="_blank" rel="noreferrer" href={`https://wa.me/88${order.customerPhone.replace(/\D/g, '')}`} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-slate-900 text-sm font-bold text-white hover:bg-slate-800 transition dark:bg-slate-800"><MessageCircle className="h-4 w-4"/>WhatsApp</a></div>{ivrManualEnabled && (<button type="button" disabled={ivrDialing} onClick={handleTriggerIvrCall} className="mt-2.5 flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/80 px-3 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 hover:border-indigo-300 dark:border-indigo-800/60 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/40 disabled:opacity-50" title="Trigger automated IVR phone call to customer">{ivrDialing ? <Loader2 className="h-4 w-4 animate-spin text-indigo-600 dark:text-indigo-400" /> : <PhoneForwarded className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />}<span>{ivrDialing ? 'Calling Customer…' : 'Trigger Automated IVR'}</span></button>)}<dl className="mt-4 space-y-2 border-t border-slate-100 pt-3 text-xs dark:border-slate-800"><div className="flex justify-between gap-3"><dt className="text-slate-500">Order source</dt><dd>{pretty(order.sourceChannel|| (order.wooOrderId?'WooCommerce':'Unknown'))}</dd></div><div className="flex justify-between gap-3"><dt className="text-slate-500">{order.sourceChannel==='STAFF'?'Staff request IP':'Customer / checkout IP'}</dt><dd data-testid="order-source-ip" className="break-all font-mono">{order.sourceIp || 'Not captured'}</dd></div></dl>{!order.sourceIp && <p className="mt-2 text-[11px] text-slate-400">No customer IP was saved with this order.</p>}</section><section className="rounded-2xl border border-slate-100/90 bg-white p-5 shadow-[0_2px_10px_rgba(0,0,0,0.02)] dark:border-slate-800 dark:bg-slate-900"><div className="flex items-center gap-2"><MapPin className="h-5 w-5 text-emerald-600 dark:text-emerald-400"/><h3 className="font-semibold">Delivery address</h3></div><p className="mt-4 text-sm leading-6">{order.customerAddress}</p><p className="mt-2 text-xs text-slate-500">{[order.area, order.zone, order.city, order.district].filter(Boolean).join(', ')}</p></section>      <section className="rounded-2xl border border-slate-100/90 bg-white p-5 shadow-[0_2px_10px_rgba(0,0,0,0.02)] dark:border-slate-800 dark:bg-slate-900">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <CalendarClock className="h-5 w-5 text-emerald-600 dark:text-emerald-400"/>
@@ -255,6 +352,6 @@ export const OrderDetailsPage: React.FC = () => {
     {!order.courierName && order.status !== 'HOLD' && !['DELIVERED', 'RETURNED', 'CANCELLED'].includes(order.status) && <button onClick={() => setDispatchOpen(true)} className="w-fit rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 px-4 py-2 text-sm font-medium shadow transition">Select courier & dispatch</button>}
     {editOpen && <OrderEditModal order={order} onClose={() => setEditOpen(false)} onSuccess={load}/>}
     {dispatchOpen && <CourierDispatchModal order={order} onClose={() => setDispatchOpen(false)} onSuccess={(updated) => { setOrder({ ...order, ...updated }); load(); }}/>} 
-    {invoiceOpen && <InvoiceModal order={order} onClose={() => setInvoiceOpen(false)}/>} 
+    {invoiceOpen && <InvoiceModal order={order} onClose={() => setInvoiceOpen(false)}/>}
   </div>;
 };

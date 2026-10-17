@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Allow: /api/sitemap.xml
+Disallow: /admin/
+Disallow: /api/
+Disallow: /payment/result
+Disallow: /order/
+
+Sitemap: https://nix.bd/sitemap.xml

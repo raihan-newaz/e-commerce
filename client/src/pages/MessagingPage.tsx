@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { MessageTemplate } from '../types';
 import api from '../lib/api';
+import { Link } from 'react-router-dom';
 import {
   MessageSquare,
   Send,
@@ -10,6 +11,7 @@ import {
   Edit2,
   Loader2,
   FileCode,
+  PhoneCall,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import SecretInput from '../components/SecretInput';
@@ -182,9 +184,18 @@ export const MessagingPage: React.FC = () => {
             GreenSMS, WhatsApp and editable order notifications
           </p>
         </div>
-        <button type="button" onClick={() => document.getElementById('message-templates')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm hover:border-emerald-400 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-          <Edit2 className="h-3.5 w-3.5" /> Edit templates
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/settings/ivr"
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-800 shadow-sm hover:bg-emerald-100 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300"
+          >
+            <PhoneCall className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+            Auto IVR Call Settings
+          </Link>
+          <button type="button" onClick={() => document.getElementById('message-templates')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm hover:border-emerald-400 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+            <Edit2 className="h-3.5 w-3.5" /> Edit templates
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

@@ -103,6 +103,9 @@ configuration rather than pasting Nginx directives into OpenLiteSpeed.
 ```sh
 curl --fail https://nix.bd/api/health
 curl --fail https://nix.bd/api/ready
+curl --fail https://nix.bd/robots.txt
+curl --fail https://nix.bd/sitemap.xml
+curl --fail https://nix.bd/api/sitemap.xml
 curl -I https://nix.bd/admin/orders
 curl -I https://nix.bd/assets/missing.js
 curl -I https://nix.bd/api/not-real

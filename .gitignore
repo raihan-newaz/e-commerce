@@ -21,3 +21,6 @@ server/uploads/
 Thumbs.db
 .vscode/
 .idea/
+
+# Shell scripts
+*.sh

@@ -8,6 +8,7 @@ import {
   Truck,
   MessageSquare,
   Phone,
+  PhoneForwarded,
   Printer,
   Plus,
   Clock,
@@ -37,6 +38,7 @@ import { CourierDispatchModal } from '../components/orders/CourierDispatchModal'
 import { InvoiceModal } from '../components/orders/InvoiceModal';
 import { WhatsAppModal } from '../components/orders/WhatsAppModal';
 import { CreateOrderModal } from '../components/orders/CreateOrderModal';
+import { useWebPhone } from '../context/WebPhoneContext';
 import { OrderEditModal } from '../components/orders/OrderEditModal';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
@@ -92,6 +94,32 @@ export const OrdersPage: React.FC = () => {
   // Bulk selections
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
+
+  // IVR manual call support
+  const [ivrManualEnabled, setIvrManualEnabled] = useState(false);
+  const { startCall } = useWebPhone();
+
+  useEffect(() => {
+    api.get('/ivr/config').then((res) => {
+      if (res.data?.success && res.data.config?.allowManualCall) {
+        setIvrManualEnabled(true);
+      }
+    }).catch(() => {});
+  }, []);
+
+  const handleTriggerIvrCall = async (orderId: string, orderNumber: string) => {
+    setDialingIvrOrderId(orderId);
+    try {
+      const res = await api.post('/ivr/manual-dial', { orderId });
+      if (res.data?.success) {
+        toast.success(res.data.message || `IVR confirmation call queued for Order #${orderNumber}`);
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to trigger IVR call');
+    } finally {
+      setDialingIvrOrderId(null);
+    }
+  };
 
   // Close 3-dot action menu when clicking outside or pressing Escape
   useEffect(() => {
@@ -837,7 +865,24 @@ export const OrdersPage: React.FC = () => {
                           </span>
                         )}
                       </div>
-                      <div className="text-slate-600 dark:text-slate-300 font-normal text-[11px] mt-0.5">{o.customerPhone}</div>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-slate-600 dark:text-slate-300 font-normal text-[11px]">{o.customerPhone}</span>
+                        {ivrManualEnabled && (
+                          <button
+                            type="button"
+                            title="Direct Call Customer (Web Phone)"
+                            onClick={() => startCall({
+                              orderId: o.id,
+                              orderNumber: o.orderNumber || o.id.slice(0, 8),
+                              customerName: o.customerName,
+                              phone: o.customerPhone
+                            })}
+                            className="p-1 rounded-md text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
+                          >
+                            <Phone className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                       <div className="text-[10px] text-slate-400 truncate max-w-[170px] mt-0.5">
                         {o.customerAddress}
                       </div>
@@ -1019,14 +1064,41 @@ export const OrdersPage: React.FC = () => {
                               </>
                             ) : (
                               <>
-                                <a
-                                  href={`tel:${o.customerPhone}`}
-                                  onClick={() => setOpenActionMenuId(null)}
-                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors text-left"
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenActionMenuId(null);
+                                    startCall({
+                                      orderId: o.id,
+                                      orderNumber: o.orderNumber || o.id.slice(0, 8),
+                                      customerName: o.customerName,
+                                      phone: o.customerPhone
+                                    });
+                                  }}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors text-left"
                                 >
-                                  <Phone className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                                  <span>Call customer</span>
-                                </a>
+                                  <Phone className="w-3.5 h-3.5" />
+                                  <span>Direct Call (Web Phone)</span>
+                                </button>
+
+                                {ivrManualEnabled && (
+                                  <button
+                                    type="button"
+                                    disabled={dialingIvrOrderId === o.id}
+                                    onClick={() => {
+                                      setOpenActionMenuId(null);
+                                      handleTriggerIvrCall(o.id, o.orderNumber || o.id.slice(0, 8));
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-colors text-left"
+                                  >
+                                    {dialingIvrOrderId === o.id ? (
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                      <PhoneForwarded className="w-3.5 h-3.5" />
+                                    )}
+                                    <span>Trigger IVR Call</span>
+                                  </button>
+                                )}
 
                                 <button
                                   type="button"

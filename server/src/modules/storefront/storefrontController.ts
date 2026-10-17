@@ -18,6 +18,7 @@ import { getCache, setCache } from '../../redis';
 import { evaluateOrderRisk, normalizeClientIp, recordRiskDecision } from '../orders/orderProtection';
 import { draftTokenHash } from '../orders/incompleteOrderRoutes';
 import { saveOrderCourierSuggestions } from '../couriers/orderLocationService';
+import { dispatchIvrCall, getIvrConfig } from '../orders/ivrService';
 export { productSlug } from '../inventory/productValidation';
 
 const checkoutSchema = z.object({
@@ -564,6 +565,34 @@ export const createStorefrontOrder = async (req: Request & { customer?: { id: st
       }
     })();
     void sendOrderNotification({ eventTrigger: 'ORDER_PLACED', order }).catch(error => console.error('Storefront SMS notification failed:', error));
+
+    // Automated Outbound Voice Call (IVR Order Confirmation)
+    if (order.status === 'PENDING' && order.paymentMethod === 'COD') {
+      void (async () => {
+        try {
+          const ivrConfig = await getIvrConfig();
+          const delayMinutes = ivrConfig.orderCallDelayMinutes || 0;
+          if (delayMinutes > 0) {
+            setTimeout(() => {
+              void dispatchIvrCall({
+                id: order.id,
+                customerPhone: order.customerPhone,
+                grandTotal: order.grandTotal
+              }).catch(err => console.error('[IVR-DELAYED-CALL-ERROR]', err));
+            }, delayMinutes * 60 * 1000);
+          } else {
+            await dispatchIvrCall({
+              id: order.id,
+              customerPhone: order.customerPhone,
+              grandTotal: order.grandTotal
+            });
+          }
+        } catch (err) {
+          console.error('[IVR-AUTO-CALL] Failed to queue call:', err);
+        }
+      })();
+    }
+
     const responsePayload = {
       success: true,
       message: 'Your order has been placed',

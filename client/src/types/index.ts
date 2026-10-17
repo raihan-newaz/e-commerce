@@ -79,7 +79,7 @@ export interface Order {
   customer?: Customer;
   assignedTo?: { id: string; name: string; phone?: string };
   warehouse?: { id: string; name: string };
-  messageLogs?: Array<{ id: string; status?: string; channel?: string; createdAt: string }>;
+  messageLogs?: Array<{ id: string; status?: string; channel?: string; body?: string; eventTrigger?: string; recipient?: string; createdAt: string }>;
 }
 
 export interface Customer {

@@ -127,30 +127,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ref={element => { asideRef.current = element; if (element) element.inert = !isDesktop && !isOpen; }}
         aria-hidden={!isDesktop && !isOpen ? true : undefined}
         className={`admin-sidebar fixed inset-y-0 left-0 z-50 flex h-[100dvh] flex-col border-r border-slate-200/80 bg-white text-slate-700 shadow-xl transition-[width,transform] duration-300 lg:z-20 lg:translate-x-0 lg:shadow-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 ${
-          collapsed ? "w-[76px]" : "w-[260px]"
+          collapsed ? "w-[64px]" : "w-[212px]"
         } ${isOpen ? "translate-x-0" : "-translate-x-full"} lg:flex`}
       >
         {/* Header with Logo and Collapse Toggle */}
         <div
-          className={`flex h-16 shrink-0 items-center border-b border-slate-100 px-4 dark:border-slate-800/80 ${
+          className={`flex h-14 shrink-0 items-center border-b border-slate-100 px-3 dark:border-slate-800/80 ${
             collapsed ? "justify-center" : "justify-between"
           }`}
         >
           <NavLink
             to="/"
-            className="flex min-w-0 items-center gap-2.5"
+            className="flex min-w-0 items-center gap-2"
             onClick={onClose}
             aria-label="NIX Commerce home"
           >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-white shadow-sm shadow-emerald-500/20">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-xs font-bold text-white shadow-sm shadow-emerald-500/20">
               N
             </div>
             {!collapsed && (
               <div className="min-w-0">
-                <p className="truncate text-sm font-bold tracking-tight text-slate-900 dark:text-white">
+                <p className="truncate text-xs font-bold tracking-tight text-slate-900 dark:text-white">
                   NIX Commerce
                 </p>
-                <p className="truncate text-[10px] font-medium text-slate-400 dark:text-slate-500">
+                <p className="truncate text-[9.5px] font-medium text-slate-400 dark:text-slate-500">
                   Operations workspace
                 </p>
               </div>
@@ -162,7 +162,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               type="button"
               onClick={onToggleCollapsed}
-              className="hidden rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 lg:flex dark:hover:bg-slate-800 dark:hover:text-white"
+              className="hidden rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 lg:flex dark:hover:bg-slate-800 dark:hover:text-white"
               title="Collapse sidebar"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -174,7 +174,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               onClick={onClose}
               aria-label="Close navigation"
-              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-900 lg:hidden dark:hover:bg-slate-800 dark:hover:text-white"
+              className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-900 lg:hidden dark:hover:bg-slate-800 dark:hover:text-white"
             >
               <X className="h-4 w-4" />
             </button>
@@ -197,7 +197,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Nav groups */}
         <nav aria-label="Main navigation" className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          <div className="px-3 py-4">
+          <div className="px-2 py-3">
           {navigationGroups.filter(group => group.label !== 'Administration').map((group, groupIndex) => {
             const visibleItems = group.items.filter((item) =>
               canSeeNavigationItem(item, user?.role, user?.builderAccess),
@@ -205,9 +205,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             if (!visibleItems.length) return null;
 
             return (
-              <div key={group.label} className={groupIndex ? "mt-5" : ""}>
+              <div key={group.label} className={groupIndex ? "mt-4" : ""}>
                 {!collapsed && (
-                  <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
+                  <p className="mb-1 px-2 text-[9.5px] font-bold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
                     {group.label}
                   </p>
                 )}
@@ -230,21 +230,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     return (
                       <div key={item.path}>
                         {hasChildren ? (
-                          <div className={`flex items-center rounded-xl ${itemActive ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>
-                            <NavLink to={item.path} onClick={onClose} aria-label={item.label} title={collapsed ? item.label : undefined} className={`group flex min-w-0 flex-1 items-center rounded-xl px-3 py-2 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 ${collapsed ? 'justify-center' : 'gap-2.5'}`}>
-                              <Icon className={`h-4 w-4 shrink-0 ${itemActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
+                          <button
+                            type="button"
+                            onClick={() => toggleSubmenu(item.path)}
+                            aria-label={`Toggle ${item.label} sections`}
+                            aria-expanded={isSubmenuOpen}
+                            aria-controls={`navigation-${item.path.slice(1)}`}
+                            title={collapsed ? item.label : undefined}
+                            className={`group flex w-full items-center rounded-xl px-2.5 py-1.5 text-xs font-medium transition-all ${
+                              collapsed ? "justify-center" : "justify-between"
+                            } ${
+                              itemActive
+                                ? "bg-slate-100 font-semibold text-slate-900 shadow-none dark:bg-slate-800 dark:text-white"
+                                : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white"
+                            }`}
+                          >
+                            <div className={`flex min-w-0 items-center ${collapsed ? "justify-center" : "gap-2"}`}>
+                              <Icon className={`h-4 w-4 shrink-0 transition-colors ${itemActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300'}`} />
                               {!collapsed && <span className="truncate">{item.label}</span>}
-                            </NavLink>
-                            {!collapsed && <button type="button" onClick={() => toggleSubmenu(item.path)} aria-label={`Toggle ${item.label} sections`} aria-expanded={isSubmenuOpen} aria-controls={`navigation-${item.path.slice(1)}`} className="mr-1 rounded-lg p-2 hover:bg-slate-200/70 dark:hover:bg-slate-700"><ChevronDown className={`h-3.5 w-3.5 transition-transform ${isSubmenuOpen ? 'rotate-180' : ''}`} /></button>}
-                          </div>
+                            </div>
+                            {!collapsed && (
+                              <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform duration-200 ${isSubmenuOpen ? 'rotate-180 text-slate-600 dark:text-slate-200' : ''}`} />
+                            )}
+                          </button>
                         ) : (
                           <NavLink
                             to={item.path}
                             title={collapsed ? item.label : undefined}
                             onClick={onClose}
                             className={({ isActive }) =>
-                              `group flex items-center rounded-xl px-3 py-2 text-xs font-medium transition-all ${
-                                collapsed ? "justify-center" : "gap-2.5"
+                              `group flex items-center rounded-xl px-2.5 py-1.5 text-xs font-medium transition-all ${
+                                collapsed ? "justify-center" : "gap-2"
                               } ${
                                 isActive
                                   ? "bg-slate-100 font-semibold text-slate-900 shadow-none dark:bg-slate-800 dark:text-white"
@@ -266,7 +282,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                         {/* Submenu items */}
                         {!collapsed && hasChildren && isSubmenuOpen && (
-                          <div id={`navigation-${item.path.slice(1)}`} className="ml-4 mt-1 space-y-0.5 border-l border-slate-200 pl-3 dark:border-slate-800">
+                          <div id={`navigation-${item.path.slice(1)}`} className="ml-3 mt-0.5 space-y-0.5 border-l border-slate-200/80 pl-2.5 dark:border-slate-800">
                             {item.children
                               ?.filter(
                                 (child) =>
@@ -280,7 +296,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                   to={child.path}
                                   onClick={onClose}
                                   className={({ isActive }) =>
-                                    `block rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+                                    `block truncate rounded-lg px-2 py-1 text-[11px] font-medium transition-colors ${
                                       isActive
                                         ? "bg-emerald-50 font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
                                         : "text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-white"
@@ -300,15 +316,71 @@ export const Sidebar: React.FC<SidebarProps> = ({
             );
           })}
           </div>
-          {settingsItem && <div className="mx-3 mb-4">
-            <div className={`flex items-center rounded-xl ${location.pathname.startsWith('/settings') ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>
-              <NavLink to="/settings" aria-label="Settings" title={collapsed ? 'Settings' : undefined} onClick={onClose} className={`flex min-w-0 flex-1 items-center rounded-xl px-3 py-2 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 ${collapsed ? 'justify-center' : 'gap-2.5'}`}><SettingsIcon size={16} className="shrink-0 text-slate-400" />{!collapsed && <span>Settings</span>}</NavLink>
-              {!collapsed && <button type="button" onClick={() => toggleSubmenu('/settings')} aria-label="Toggle Settings sections" aria-expanded={Boolean(openSubmenus['/settings'])} aria-controls="navigation-settings" className="mr-1 rounded-lg p-2 hover:bg-slate-200/70 dark:hover:bg-slate-700"><ChevronDown size={14} className={`transition-transform ${openSubmenus['/settings'] ? 'rotate-180' : ''}`} /></button>}
+
+          {settingsItem && (
+            <div className="mx-2 mb-3">
+              <button
+                type="button"
+                onClick={() => toggleSubmenu('/settings')}
+                aria-label="Toggle Settings menu"
+                aria-expanded={Boolean(openSubmenus['/settings'])}
+                aria-controls="navigation-settings"
+                title={collapsed ? 'Settings' : undefined}
+                className={`group flex w-full items-center rounded-xl px-2.5 py-1.5 text-xs font-medium transition-all ${
+                  collapsed ? "justify-center" : "justify-between"
+                } ${
+                  location.pathname.startsWith('/settings')
+                    ? "bg-slate-100 font-semibold text-slate-900 shadow-none dark:bg-slate-800 dark:text-white"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white"
+                }`}
+              >
+                <div className={`flex min-w-0 items-center ${collapsed ? "justify-center" : "gap-2"}`}>
+                  <SettingsIcon
+                    size={16}
+                    className={`shrink-0 transition-colors ${
+                      location.pathname.startsWith('/settings')
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300"
+                    }`}
+                  />
+                  {!collapsed && <span className="truncate">Settings</span>}
+                </div>
+                {!collapsed && (
+                  <ChevronDown
+                    size={13}
+                    className={`shrink-0 text-slate-400 transition-transform duration-200 ${
+                      openSubmenus['/settings'] ? "rotate-180 text-slate-600 dark:text-slate-200" : ""
+                    }`}
+                  />
+                )}
+              </button>
+
+              {/* Submenu items */}
+              {!collapsed && openSubmenus['/settings'] && (
+                <div id="navigation-settings" className="ml-3 mt-1 space-y-0.5 border-l border-slate-200/80 pl-2.5 dark:border-slate-800">
+                  {settingsItem.children
+                    ?.filter(child => !child.roles || (user && child.roles.includes(user.role)))
+                    .map((child) => (
+                      <NavLink
+                        key={child.path}
+                        end={child.path === '/settings'}
+                        to={child.path}
+                        onClick={onClose}
+                        className={({ isActive }) =>
+                          `block truncate rounded-lg px-2 py-1 text-[11px] font-medium transition-colors ${
+                            isActive
+                              ? "bg-emerald-50 font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+                              : "text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-white"
+                          }`
+                        }
+                      >
+                        {child.label}
+                      </NavLink>
+                    ))}
+                </div>
+              )}
             </div>
-            {!collapsed && openSubmenus['/settings'] && <div id="navigation-settings" className="ml-4 mt-1 space-y-0.5 border-l border-slate-200 pl-3 dark:border-slate-800">
-              {settingsItem.children?.filter(child => !child.roles || (user && child.roles.includes(user.role))).map(child => <NavLink key={child.path} end to={child.path} onClick={onClose} className={({ isActive }) => `block rounded-lg px-2.5 py-1.5 text-[11px] transition ${isActive ? 'bg-slate-100 font-semibold text-slate-900 dark:bg-slate-800 dark:text-white' : 'text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800'}`}>{child.label}</NavLink>)}
-            </div>}
-          </div>}
+          )}
         </nav>
 
         {/* Footer Link to Storefront */}

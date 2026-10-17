@@ -104,6 +104,7 @@ export function getRobotsTxt(_req: Request, res: Response): void {
   const robots = [
     'User-agent: *',
     'Allow: /',
+    'Allow: /api/sitemap.xml',
     'Disallow: /admin/',
     'Disallow: /api/',
     'Disallow: /payment/result',

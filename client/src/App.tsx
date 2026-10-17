@@ -3,6 +3,7 @@ import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { WebPhoneProvider } from './context/WebPhoneContext';
 import { Toaster } from 'react-hot-toast';
 
 import { Layout } from './components/layout/Layout';
@@ -11,6 +12,7 @@ import { LoginPage } from './pages/LoginPage';
 
 const DropdownOptionsPage = lazy(() => import('./pages/DropdownOptionsPage'));
 const EmailSettingsPage = lazy(() => import('./pages/EmailSettingsPage'));
+const IvrSettingsPage = lazy(() => import('./pages/IvrSettingsPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then((module) => ({ default: module.DashboardPage })));
 const OrdersPage = lazy(() => import('./pages/OrdersPage').then((module) => ({ default: module.OrdersPage })));
 const OrderDetailsPage = lazy(() => import('./pages/OrderDetailsPage').then((module) => ({ default: module.OrderDetailsPage })));
@@ -74,7 +76,8 @@ export const App: React.FC = () => {
       <AuthProvider>
         <AdminDropdownScope>
         <BrowserRouter basename="/admin">
-          <ScrollToTop />
+          <WebPhoneProvider>
+            <ScrollToTop />
           <Toaster
             position="top-right"
             toastOptions={{
@@ -136,13 +139,15 @@ export const App: React.FC = () => {
               <Route path="account" element={<AccountPage />} />
               <Route path="settings/dropdowns" element={<DropdownOptionsPage />} />
               <Route path="settings/email" element={<EmailSettingsPage />} />
+              <Route path="settings/ivr" element={<IvrSettingsPage />} />
               <Route path="settings/order-protection" element={<OrderProtectionPage />} />
               <Route path="settings/:section" element={<SettingsPage />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-          </Suspense>
+            </Suspense>
+          </WebPhoneProvider>
         </BrowserRouter>
         </AdminDropdownScope>
       </AuthProvider>

@@ -16,7 +16,12 @@ import {
 } from './orderController';
 import { authenticateToken, requireRole } from '../../middlewares/auth';
 
+import { handlePbxIvrWebhook } from './ivrWebhook';
+
 const router = Router();
+
+// PBX IVR Automated Confirmation Webhook (HMAC Secured)
+router.post('/pbx-ivr-result', handlePbxIvrWebhook);
 
 router.get('/', authenticateToken, listOrders);
 router.get('/:id', authenticateToken, getOrderById);
