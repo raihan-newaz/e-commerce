@@ -1,0 +1,12 @@
+<module>
+  <rawname>nixops</rawname>
+  <name>NIX PBX Console</name>
+  <version>1.0.0</version>
+  <publisher>NIX</publisher>
+  <license>MIT</license>
+  <category>Reports</category>
+  <description>Live operator view, call and queue reports, secure recording playback and backup health.</description>
+  <menuitems><nixops needsenginedb="yes">NIX PBX Console</nixops></menuitems>
+  <depends><version>17.0</version><module>cdr</module></depends>
+  <supported><version>17.0</version></supported>
+</module>

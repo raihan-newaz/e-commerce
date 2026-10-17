@@ -1,0 +1,16 @@
+[Unit]
+Description=Private PBX configuration and CDR database snapshot
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/sbin/nixops-backup.py
+User=root
+UMask=0077
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/backups/nixops /var/lib/nixops
+TimeoutStartSec=300
