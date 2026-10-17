@@ -10,7 +10,7 @@ class Nixops extends \FreePBX_Helpers implements \BMO {
     public function ajaxRequest($command, &$settings) {
         $settings['authenticate'] = true;
         $settings['allowremote'] = false;
-        return in_array($command, ['live', 'reports', 'queues', 'backup', 'recording', 'export'], true);
+        return in_array($command, ['live', 'reports', 'queues', 'backup', 'health', 'recording', 'export'], true);
     }
     private function authorize() {
         // FreePBX's AJAX dispatcher skips auth on localhost. Enforce it here too.
@@ -85,6 +85,9 @@ class Nixops extends \FreePBX_Helpers implements \BMO {
         $status = (string)($_REQUEST['status'] ?? '');
         if (!in_array($status, ['', 'ANSWERED', 'NO ANSWER', 'BUSY', 'FAILED', 'CONGESTION'], true)) throw new \InvalidArgumentException('Invalid call status');
         if ($status !== '') { $where .= ' AND disposition = :status'; $params['status'] = $status; }
+        $recorded = (string)($_REQUEST['recorded'] ?? '');
+        if (!in_array($recorded, ['', '1'], true)) throw new \InvalidArgumentException('Invalid recording filter');
+        if ($recorded === '1') $where .= " AND recordingfile<>''";
         return [$where, $params];
     }
     private function query($sql, $params) {
@@ -107,7 +110,9 @@ class Nixops extends \FreePBX_Helpers implements \BMO {
         unset($row);
         $summary = $this->query("SELECT COUNT(*) AS total,COALESCE(SUM(disposition='ANSWERED'),0) AS answered,COALESCE(SUM(disposition<>'ANSWERED'),0) AS unanswered,COALESCE(SUM(billsec),0) AS talkSeconds,COALESCE(SUM(recordingfile<>''),0) AS recordings FROM $table WHERE $where", $params)[0];
         $daily = $this->query("SELECT DATE(calldate) AS day,COUNT(*) AS total,COALESCE(SUM(disposition='ANSWERED'),0) AS answered FROM $table WHERE $where GROUP BY DATE(calldate) ORDER BY day", $params);
-        return ['rows' => $rows, 'summary' => array_map('intval', $summary), 'daily' => $daily, 'page' => $page, 'pageSize' => $limit, 'timezone' => $this->timezone(), 'truncated' => $export && (int)$summary['total'] > $limit];
+        $hourly = $this->query("SELECT HOUR(calldate) AS hour,COUNT(*) AS total,SUM(disposition='ANSWERED') AS answered FROM $table WHERE $where GROUP BY HOUR(calldate) ORDER BY hour", $params);
+        $destinations = $this->query("SELECT dst,COUNT(*) AS total,SUM(disposition='ANSWERED') AS answered,SUM(billsec) AS talkSeconds FROM $table WHERE $where GROUP BY dst ORDER BY total DESC,dst LIMIT 10", $params);
+        return ['rows' => $rows, 'summary' => array_map('intval', $summary), 'daily' => $daily, 'hourly' => $hourly, 'destinations' => $destinations, 'page' => $page, 'pageSize' => $limit, 'timezone' => $this->timezone(), 'truncated' => $export && (int)$summary['total'] > $limit];
     }
     public function queues() {
         [$from, $to] = $this->range();
@@ -137,6 +142,20 @@ class Nixops extends \FreePBX_Helpers implements \BMO {
         if (!is_readable($file)) return ['available' => false];
         $data = json_decode(file_get_contents($file), true);
         return is_array($data) ? $data : ['available' => false];
+    }
+    public function health() {
+        $volumes = [];
+        foreach (['Recordings' => '/var/spool/asterisk/monitor', 'System' => '/'] as $label => $path) {
+            $total = @disk_total_space($path); $free = @disk_free_space($path);
+            $volumes[] = ['name' => $label, 'available' => $total !== false && $free !== false && $total > 0,
+                'total' => $total ?: 0, 'free' => $free ?: 0];
+        }
+        $backup = $this->backup();
+        $last = isset($backup['lastSuccess']) ? strtotime($backup['lastSuccess']) : false;
+        $age = $last ? max(0, time() - $last) : null;
+        return ['volumes' => $volumes, 'load' => sys_getloadavg() ?: [], 'backupAgeSeconds' => $age,
+            'backupHealthy' => ($backup['status'] ?? '') === 'ok' && $age !== null && $age < 36 * 3600,
+            'at' => date(DATE_ATOM)];
     }
     private function recording() {
         $id = (string)($_REQUEST['id'] ?? '');
@@ -193,7 +212,7 @@ class Nixops extends \FreePBX_Helpers implements \BMO {
         try {
             $this->authorize();
             $command = $_REQUEST['command'] ?? '';
-            if (!in_array($command, ['live', 'reports', 'queues', 'backup'], true)) throw new \InvalidArgumentException('Unknown operation');
+            if (!in_array($command, ['live', 'reports', 'queues', 'backup', 'health'], true)) throw new \InvalidArgumentException('Unknown operation');
             return ['success' => true, 'data' => $this->$command()];
         } catch (\Throwable $e) {
             if (http_response_code() < 400) http_response_code(400);

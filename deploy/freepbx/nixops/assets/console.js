@@ -4,6 +4,7 @@
   if (!root) return;
   const $ = id => document.getElementById(id);
   let tab = 'overview', page = 1, total = 0, liveBusy = false, expired = false, audioUrl = '';
+  let reportRequest = 0;
   const text = (id, value) => { $(id).textContent = String(value); };
   const duration = seconds => { const n = Math.max(0, Number(seconds) || 0); return n >= 3600 ? `${Math.floor(n / 3600)}h ${Math.floor(n % 3600 / 60)}m` : `${Math.floor(n / 60)}m ${n % 60}s`; };
   function fail(error) { $('nx-error').hidden = false; $('nx-error').textContent = error.message || 'Could not load PBX data'; }
@@ -68,7 +69,7 @@
   function filters() {
     const from = $('nx-from').value, to = $('nx-to').value;
     if (!from || !to || to < from || (Date.parse(to) - Date.parse(from)) / 86400000 > 30) throw new Error('Choose a valid date range of at most 31 days.');
-    return { from, to, search: $('nx-search').value.trim(), status: $('nx-status').value, page: String(page) };
+    return { from, to, search: $('nx-search').value.trim(), status: $('nx-status').value, recorded: $('nx-recorded').value, page: String(page) };
   }
   function dailyChart(data) {
     $('nx-daily').replaceChildren();
@@ -105,14 +106,28 @@
   function closePlayer() { $('nx-player').pause(); $('nx-player').removeAttribute('src'); $('nx-player-card').hidden = true; if (audioUrl) URL.revokeObjectURL(audioUrl); audioUrl = ''; }
   function download(href, filename) { const link = document.createElement('a'); link.href = href; link.download = filename; link.click(); }
   async function reports() {
+    const requestNumber = ++reportRequest;
     $('nx-apply').disabled = true;
     try {
-      const data = await request('reports', filters()); total = data.summary.total;
+      const data = await request('reports', filters());
+      if (requestNumber !== reportRequest) return;
+      total = data.summary.total;
       text('nx-total', total); text('nx-answered', data.summary.answered); text('nx-missed', data.summary.unanswered); text('nx-talk', duration(data.summary.talkSeconds));
       text('nx-rate', (total ? (data.summary.answered / total * 100).toFixed(1) : '0') + '% answered');
       text('nx-count', `${total} records`); text('nx-timezone', `Times use ${data.timezone}.`); text('nx-page', `Page ${page} of ${Math.max(1, Math.ceil(total / 50))}`);
       $('nx-prev').disabled = page <= 1; $('nx-next').disabled = page * 50 >= total;
       dailyChart(data.daily);
+      $('nx-hourly').replaceChildren();
+      const maxHour = Math.max(1, ...data.hourly.map(h => Number(h.total)));
+      for (let hour = 0; hour < 24; hour++) {
+        const point = data.hourly.find(h => Number(h.hour) === hour);
+        const block = document.createElement('div'); block.className = 'nx-hour';
+        const label = `${String(hour).padStart(2, '0')}:00 — ${point?.total || 0} records, ${point?.answered || 0} answered`;
+        block.title = label; block.setAttribute('aria-label', label); block.tabIndex = 0;
+        block.style.setProperty('--activity', String(Number(point?.total || 0) / maxHour));
+        block.textContent = String(hour).padStart(2, '0'); $('nx-hourly').append(block);
+      }
+      rows('nx-destinations', data.destinations.map(d => [d.dst || 'Unknown', d.total, d.answered, duration(d.talkSeconds)]), 4);
       rows('nx-records', data.rows.map(row => {
         const actions = document.createElement('div'); actions.className = 'nx-recording-actions';
         if (row.recorded) {
@@ -123,8 +138,8 @@
         } else actions.textContent = 'Not recorded';
         return [row.calldate, row.src, row.dst, badge(row.disposition, row.disposition === 'ANSWERED'), duration(row.duration), duration(row.billsec), actions];
       }), 7);
-    } catch (error) { fail(error); }
-    finally { $('nx-apply').disabled = false; }
+    } catch (error) { if (requestNumber === reportRequest) fail(error); }
+    finally { if (requestNumber === reportRequest) $('nx-apply').disabled = false; }
   }
   async function queues() {
     try {
@@ -144,7 +159,27 @@
       if (data.status !== 'ok') { const note = document.createElement('p'); note.textContent = 'Check nixops-backup.service logs on the server.'; box.append(note); }
     } catch (error) { fail(error); }
   }
-  async function refresh() { clearError(); if (tab === 'overview') await live(); else if (tab === 'calls') await reports(); else if (tab === 'queues') await queues(); else await backup(); }
+  async function health() {
+    try {
+      const data = await request('health'), box = $('nx-health'); box.replaceChildren();
+      const notices = [];
+      function card(label, value, detail) {
+        const article = document.createElement('article'), title = document.createElement('span'), number = document.createElement('strong'), note = document.createElement('small');
+        title.textContent = label; number.textContent = value; note.textContent = detail; article.append(title, number, note); box.append(article);
+      }
+      for (const disk of data.volumes) {
+        const used = disk.available ? (1 - disk.free / disk.total) * 100 : null;
+        card(disk.name + ' storage', used === null ? 'Unknown' : used.toFixed(1) + '%', disk.available ? (disk.free / 1073741824).toFixed(1) + ' GB free' : 'Storage information unavailable');
+        if (used === null || used >= 85) notices.push(disk.name + ': ' + (used === null ? 'unable to read disk capacity.' : 'storage is nearly full. Review retention and capacity.'));
+      }
+      card('Server load', data.load.length ? data.load[0].toFixed(2) : 'Unknown', '1 / 5 / 15 min: ' + data.load.map(n => n.toFixed(2)).join(' / '));
+      card('Backup freshness', data.backupHealthy ? 'Healthy' : 'Review', data.backupAgeSeconds === null ? 'No successful snapshot' : duration(data.backupAgeSeconds) + ' since last success');
+      if (!data.backupHealthy) notices.push('Backup is missing, failed or older than 36 hours. Check the backup service.');
+      text('nx-health-alerts', notices.length ? notices.join(' ') : 'Storage and backup checks passed.');
+      $('nx-health-alerts').className = notices.length ? 'nx-alert' : 'nx-note';
+    } catch (error) { fail(error); }
+  }
+  async function refresh() { clearError(); if (tab === 'overview') await live(); else if (tab === 'calls') await reports(); else if (tab === 'queues') await queues(); else if (tab === 'health') await health(); else await backup(); }
   root.querySelectorAll('[data-tab]').forEach(button => button.addEventListener('click', () => {
     tab = button.dataset.tab;
     root.querySelectorAll('[data-tab]').forEach(b => { b.classList.toggle('active', b === button); b.setAttribute('aria-pressed', String(b === button)); });
@@ -152,6 +187,23 @@
     refresh();
   }));
   $('nx-refresh').addEventListener('click', refresh);
+  root.querySelectorAll('[data-days]').forEach(button => button.addEventListener('click', () => {
+    const date = new Date(root.dataset.today + 'T12:00:00Z');
+    date.setUTCDate(date.getUTCDate() - Number(button.dataset.days) + 1);
+    $('nx-from').value = date.toISOString().slice(0, 10); $('nx-to').value = root.dataset.today;
+    page = 1; clearError(); reports();
+  }));
+  $('nx-reset').addEventListener('click', () => {
+    $('nx-from').value = $('nx-to').value = root.dataset.today;
+    $('nx-search').value = $('nx-status').value = $('nx-recorded').value = '';
+    page = 1; clearError(); reports();
+  });
+  $('nx-wallboard').addEventListener('click', () => {
+    const enabled = root.classList.toggle('nx-wallboard');
+    $('nx-wallboard').textContent = enabled ? 'Exit wallboard' : 'Wallboard';
+    $('nx-wallboard').setAttribute('aria-pressed', String(enabled));
+  });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape' && root.classList.contains('nx-wallboard')) $('nx-wallboard').click(); });
   $('nx-apply').addEventListener('click', () => { page = 1; clearError(); reports(); });
   $('nx-search').addEventListener('keydown', event => { if (event.key === 'Enter') { page = 1; clearError(); reports(); } });
   $('nx-prev').addEventListener('click', () => { if (page > 1) { page--; reports(); } });

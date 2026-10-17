@@ -19,13 +19,18 @@ $_SERVER['HTTP_X_NIXOPS_TOKEN'] = 'wrong';
 check(!$module->ajaxHandler()['success'], 'CSRF token required');
 $checks[] = 'csrf_denied';
 $_SERVER['HTTP_X_NIXOPS_TOKEN'] = $_SESSION['nixops_token'];
-foreach (['live', 'reports', 'queues', 'backup'] as $command) {
+foreach (['live', 'reports', 'queues', 'backup', 'health'] as $command) {
     http_response_code(200);
     $_REQUEST = ['command' => $command];
     $result = $module->ajaxHandler();
     check($result['success'], $command . ' data');
     if ($command === 'live') check(strlen($result['data']['queueStatus']) > 5, 'AMI status populated');
     if ($command === 'reports') check(isset($result['data']['summary']['total']), 'CDR summary populated');
+    if ($command === 'reports') {
+        check(array_sum(array_column($result['data']['hourly'], 'total')) === $result['data']['summary']['total'], 'hourly totals match filtered report');
+        check(count($result['data']['destinations']) <= 10, 'destinations bounded');
+    }
+    if ($command === 'health') check(count($result['data']['volumes']) === 2 && is_bool($result['data']['backupHealthy']), 'health shape valid');
     if ($command === 'backup') check(($result['data']['status'] ?? '') === 'ok', 'verified snapshot exists');
     $checks[] = $command . '_ok';
 }
@@ -34,6 +39,13 @@ foreach ([['from' => '2026-02-31'], ['from' => '2020-01-01', 'to' => '2026-01-01
     check(!$module->ajaxHandler()['success'], 'invalid filter rejected');
 }
 $checks[] = 'invalid_filters_denied';
+$_REQUEST = ['command' => 'reports', 'recorded' => 'invalid'];
+check(!$module->ajaxHandler()['success'], 'invalid recording filter denied');
+$_REQUEST = ['command' => 'reports', 'recorded' => '1'];
+$recorded = $module->ajaxHandler();
+check($recorded['success'], 'recording filter works');
+check($recorded['data']['summary']['total'] === $recorded['data']['summary']['recordings'], 'recording filter excludes unrecorded calls');
+$checks[] = 'recording_filter_ok';
 $_SESSION['AMP_user'] = new class { public function checkSection($section) { return false; } };
 $_REQUEST = ['command' => 'reports'];
 check(!$module->ajaxHandler()['success'], 'module permission required');
