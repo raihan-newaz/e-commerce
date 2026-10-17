@@ -97,6 +97,7 @@ export const OrdersPage: React.FC = () => {
 
   // IVR manual call support
   const [ivrManualEnabled, setIvrManualEnabled] = useState(false);
+  const [dialingIvrOrderId, setDialingIvrOrderId] = useState<string | null>(null);
   const { startCall } = useWebPhone();
 
   useEffect(() => {

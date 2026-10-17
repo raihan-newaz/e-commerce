@@ -24,3 +24,7 @@ Thumbs.db
 
 # Shell scripts
 *.sh
+
+# Backup archives
+*.tar.gz
+bdix_freepbx_wireguard_backup_*

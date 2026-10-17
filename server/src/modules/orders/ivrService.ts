@@ -57,11 +57,13 @@ export async function getIvrConfig(): Promise<IvrConfigData> {
     }
   }
 
+  const apiUrl = record?.apiUrl || process.env.PBX_IVR_URL || '';
+
   return {
-    apiUrl: record?.apiUrl || process.env.PBX_IVR_URL || 'http://103.169.160.153:7088',
+    apiUrl,
     apiKey,
     callerId: record?.senderId || '09639139179',
-    isEnabled: record ? record.isEnabled : (process.env.PBX_IVR_ENABLED !== 'false'),
+    isEnabled: Boolean(apiUrl && apiKey) && (record ? record.isEnabled : process.env.PBX_IVR_ENABLED === 'true'),
     maxRetries: extra.maxRetries ?? 2,
     retryDelayMinutes: extra.retryDelayMinutes ?? 15,
     callStartTime: extra.callStartTime || '09:00',
@@ -95,6 +97,10 @@ export function isWithinCallingHours(startTime: string, endTime: string): boolea
 export async function dispatchIvrCall(order: { id: string; customerPhone: string; grandTotal?: number }, isRetry = false, isManual = false) {
   const config = await getIvrConfig();
   const isTest = order.id.startsWith('TEST-');
+
+  if (!config.apiUrl || !config.apiKey) {
+    return { success: false, error: 'IVR endpoint and signing secret must be configured' };
+  }
 
   if (!config.isEnabled && !isTest && !isManual) {
     return { skipped: true, reason: 'PBX IVR calling is disabled in settings' };

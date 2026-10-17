@@ -14,7 +14,7 @@ const router = Router();
 router.post('/webhook', handlePbxIvrWebhook);
 
 // Get IVR Configuration
-router.get('/config', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER']), async (req: Request, res: Response): Promise<void> => {
+router.get('/config', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'CALL_CENTER_AGENT']), async (req: Request, res: Response): Promise<void> => {
   try {
     const config = await getIvrConfig();
     res.json({
@@ -108,6 +108,10 @@ router.put('/config', authenticateToken, requireRole(['SUPER_ADMIN']), async (re
     });
 
     const nextApiKey = keepExistingSecret(apiKey, existing?.apiKey);
+    if (isEnabled && !nextApiKey) {
+      res.status(400).json({ success: false, message: 'Set an IVR signing secret before enabling calls.' });
+      return;
+    }
 
     const extraJson = JSON.stringify({
       maxRetries,
@@ -273,21 +277,27 @@ router.get('/logs', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_M
 });
 
 // Get WebPhone Config for in-browser WebRTC calling
-router.get('/webphone-config', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+router.get('/webphone-config', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'CALL_CENTER_AGENT']), async (req: Request, res: Response): Promise<void> => {
   try {
     const config = await getIvrConfig();
-    const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https';
-    const host = req.headers.host || 'nix.bd';
-    const wsProto = isHttps ? 'wss:' : 'ws:';
+    const wsServer = process.env.PBX_WEBRTC_WS_SERVER?.trim();
+    const sipDomain = process.env.PBX_WEBRTC_SIP_DOMAIN?.trim();
+    const extension = process.env.PBX_WEBRTC_EXTENSION?.trim();
+    const password = process.env.PBX_WEBRTC_PASSWORD;
+    if (!wsServer || !sipDomain || !extension || !password) {
+      res.status(503).json({ success: false, message: 'WebPhone credentials are not configured on the server.' });
+      return;
+    }
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
     res.json({
       success: true,
       config: {
-        wsServer: `${wsProto}//${host}/ws-sip`,
-        sipDomain: '103.169.160.153',
-        extension: 'webrtc_agent',
-        password: 'REDACTED',
+        wsServer,
+        sipDomain,
+        extension,
+        password,
         displayName: (req as any).user?.name || 'NIX Agent',
-        callerId: config.callerId || '09639139179',
+        callerId: process.env.PBX_WEBRTC_CALLER_ID?.trim() || config.callerId,
       }
     });
   } catch (err: any) {
@@ -296,10 +306,14 @@ router.get('/webphone-config', authenticateToken, async (req: Request, res: Resp
 });
 
 // Hangup Active Call
-router.post('/active-call/hangup', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+router.post('/active-call/hangup', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'CALL_CENTER_AGENT']), async (req: Request, res: Response): Promise<void> => {
   try {
     const { phone, orderId } = req.body;
     const config = await getIvrConfig();
+    if (!config.apiUrl || !config.apiKey) {
+      res.status(503).json({ success: false, message: 'IVR endpoint and signing secret are not configured.' });
+      return;
+    }
     const timestamp = Math.floor(Date.now() / 1000);
     const payload = JSON.stringify({ phone, orderId, timestamp });
     const signature = crypto.createHmac('sha256', config.apiKey).update(payload).digest('hex');
