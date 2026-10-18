@@ -1,7 +1,9 @@
 <?php
 namespace FreePBX\modules;
+require_once __DIR__ . '/Operations.php';
 
 class Nixops extends \FreePBX_Helpers implements \BMO {
+    use NixopsOperations;
     private $pbx;
     public function __construct($freepbx = null) { $this->pbx = $freepbx; }
     public function install() {}
@@ -10,7 +12,7 @@ class Nixops extends \FreePBX_Helpers implements \BMO {
     public function ajaxRequest($command, &$settings) {
         $settings['authenticate'] = true;
         $settings['allowremote'] = false;
-        return in_array($command, ['live', 'reports', 'queues', 'backup', 'health', 'recording', 'export'], true);
+        return in_array($command, ['live', 'reports', 'queues', 'backup', 'health', 'recording', 'export', 'capabilities', 'settings', 'saveSettings', 'roles', 'saveRole', 'audit', 'followups', 'saveFollowup', 'customer', 'retention', 'quarantine', 'restoreRecording'], true);
     }
     private function authorize() {
         // FreePBX's AJAX dispatcher skips auth on localhost. Enforce it here too.
@@ -144,6 +146,7 @@ class Nixops extends \FreePBX_Helpers implements \BMO {
         return is_array($data) ? $data : ['available' => false];
     }
     public function health() {
+        $config = $this->config()['values'];
         $volumes = [];
         foreach (['Recordings' => '/var/spool/asterisk/monitor', 'System' => '/'] as $label => $path) {
             $total = @disk_total_space($path); $free = @disk_free_space($path);
@@ -154,10 +157,12 @@ class Nixops extends \FreePBX_Helpers implements \BMO {
         $last = isset($backup['lastSuccess']) ? strtotime($backup['lastSuccess']) : false;
         $age = $last ? max(0, time() - $last) : null;
         return ['volumes' => $volumes, 'load' => sys_getloadavg() ?: [], 'backupAgeSeconds' => $age,
-            'backupHealthy' => ($backup['status'] ?? '') === 'ok' && $age !== null && $age < 36 * 3600,
+            'backupHealthy' => ($backup['status'] ?? '') === 'ok' && $age !== null && $age < $config['backupHours'] * 3600,
+            'diskWarning' => $config['diskWarning'], 'backupHours' => $config['backupHours'],
             'at' => date(DATE_ATOM)];
     }
     private function recording() {
+        $this->permit('media');
         $id = (string)($_REQUEST['id'] ?? '');
         if (!preg_match('/^[A-Za-z0-9._-]{1,150}$/D', $id)) throw new \InvalidArgumentException('Invalid recording ID');
         $rows = $this->query('SELECT calldate,recordingfile FROM ' . $this->table() . " WHERE uniqueid=:id AND recordingfile<>'' LIMIT 1", ['id' => $id]);
@@ -177,6 +182,7 @@ class Nixops extends \FreePBX_Helpers implements \BMO {
         $types = ['wav' => 'audio/wav', 'mp3' => 'audio/mpeg', 'ogg' => 'audio/ogg', 'gsm' => 'audio/gsm'];
         $extension = strtolower(pathinfo($found, PATHINFO_EXTENSION));
         if (!isset($types[$extension])) throw new \RuntimeException('Unsupported recording format');
+        $this->auditEvent('recording.accessed', $id);
         while (ob_get_level()) ob_end_clean();
         header('Content-Type: ' . $types[$extension]);
         header('Content-Length: ' . filesize($found));
@@ -184,7 +190,9 @@ class Nixops extends \FreePBX_Helpers implements \BMO {
         readfile($found);
     }
     private function csv() {
+        $this->permit('media');
         $data = $this->reports(true);
+        $this->auditEvent('report.exported');
         while (ob_get_level()) ob_end_clean();
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="pbx-call-records.csv"');
@@ -212,7 +220,7 @@ class Nixops extends \FreePBX_Helpers implements \BMO {
         try {
             $this->authorize();
             $command = $_REQUEST['command'] ?? '';
-            if (!in_array($command, ['live', 'reports', 'queues', 'backup', 'health'], true)) throw new \InvalidArgumentException('Unknown operation');
+            if (!in_array($command, ['live', 'reports', 'queues', 'backup', 'health', 'capabilities', 'settings', 'saveSettings', 'roles', 'saveRole', 'audit', 'followups', 'saveFollowup', 'customer', 'retention', 'quarantine', 'restoreRecording'], true)) throw new \InvalidArgumentException('Unknown operation');
             return ['success' => true, 'data' => $this->$command()];
         } catch (\Throwable $e) {
             if (http_response_code() < 400) http_response_code(400);

@@ -7,6 +7,32 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Reference inspired admin workspace: lavender canvas, crisp white surfaces, plum accents. */
+.admin-shell{--admin-accent:#40134c;--admin-accent-soft:#f1eaf4;--admin-canvas:#f7f6fa;--admin-line:#e8e5ec;--admin-ink:#171923;--admin-muted:#667085;background:var(--admin-canvas)!important;color:var(--admin-ink)}
+.admin-shell main{background:radial-gradient(circle at 88% 0%,rgba(64,19,76,.035),transparent 30%),var(--admin-canvas)!important}
+.dark .admin-shell{--admin-accent:#c084d5;--admin-accent-soft:#331d3b;--admin-canvas:#11111a;--admin-line:#302b37;--admin-ink:#f4f1f6;--admin-muted:#a9a2b2;background:var(--admin-canvas)!important}
+.dark .admin-shell main{background:radial-gradient(circle at 88% 0%,rgba(192,132,213,.05),transparent 30%),var(--admin-canvas)!important}
+.admin-shell h1{font-size:clamp(1.55rem,2vw,2rem)!important;line-height:1.2;font-weight:700!important;letter-spacing:-.035em;color:var(--admin-ink)}
+.admin-shell h2{font-size:1.18rem!important;line-height:1.35;font-weight:650!important;letter-spacing:-.02em}
+.admin-shell h3{font-size:1rem!important;line-height:1.4;font-weight:650!important}
+.admin-shell p{line-height:1.55}
+.admin-sidebar{border-color:var(--admin-line)!important;background:#fff!important;color:#293044!important}
+.dark .admin-sidebar{background:#17151e!important;color:#e8e3ed!important;border-color:var(--admin-line)!important}
+.admin-sidebar nav [class*="text-\[9.5px\]"]{font-size:10px!important;letter-spacing:.14em}
+.admin-sidebar nav button,.admin-sidebar nav a{font-size:14px!important;line-height:1.45;min-height:40px}
+.admin-sidebar nav a[class*="text-\[11px\]"]{font-size:12px!important;min-height:32px}
+.admin-sidebar nav button[class*="bg-slate-100"],.admin-sidebar nav a[class*="bg-slate-100"]{background:var(--admin-accent-soft)!important;color:var(--admin-accent)!important}
+.admin-sidebar nav button[class*="text-emerald-600"] svg,.admin-sidebar nav a[class*="text-emerald-600"] svg{color:var(--admin-accent)!important}
+.admin-sidebar nav button:hover,.admin-sidebar nav a:hover{background:var(--admin-accent-soft)!important;color:var(--admin-accent)!important}
+.admin-quick-action{display:inline-flex;flex:none;align-items:center;gap:8px;border-radius:10px;padding:9px 10px;color:#596579;font-size:13px;font-weight:600;transition:background .15s,color .15s}
+.admin-quick-action:hover{background:var(--admin-accent-soft);color:var(--admin-accent)}
+.admin-topbar{border-color:var(--admin-line)!important}
+.admin-page{font-size:14px;line-height:1.55}
+.admin-page :is(.app-panel,.minimal-card){border-color:var(--admin-line);box-shadow:0 2px 8px rgba(28,20,35,.035)}
+.dark .admin-page :is(.app-panel,.minimal-card){box-shadow:none}
+.admin-page :is(button,a,input,select,textarea){transition-property:color,background-color,border-color,box-shadow,transform}
+@media(max-width:767px){.admin-shell h1{font-size:1.45rem!important}.admin-shell h2{font-size:1.08rem!important}.admin-sidebar nav button,.admin-sidebar nav a{min-height:42px}.admin-topbar{height:60px}}
+
 /* Shared admin form treatment, including dialogs rendered through portals. */
 :is(.admin-shell,.admin-form-dialog){--admin-field-bg:#fff;--admin-field-ink:#243044;--admin-field-line:#dce2e9;--admin-field-muted:#8792a2}
 .dark :is(.admin-shell,.admin-form-dialog){--admin-field-bg:#0f172a;--admin-field-ink:#e2e8f0;--admin-field-line:#334155;--admin-field-muted:#94a3b8}

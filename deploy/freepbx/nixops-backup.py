@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sqlite3
 import tarfile
 import tempfile
 
@@ -15,6 +16,7 @@ STATE = Path('/var/lib/nixops/backup-status.json')
 
 def manifest(data):
     STATE.parent.mkdir(mode=0o750, parents=True, exist_ok=True)
+    os.chmod(STATE.parent, 0o750)
     os.chown(STATE.parent, 0, grp.getgrnam('asterisk').gr_gid)
     temporary = STATE.with_suffix('.tmp')
     temporary.write_text(json.dumps(data))
@@ -39,8 +41,19 @@ def main():
             stamp = dt.datetime.now(dt.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
             target = ROOT / ('pbx-' + stamp + '.tar.gz')
             pending = target.with_suffix('.pending')
+            console = Path('/var/lib/nixops-console/operations.sqlite')
+            console_copy = Path(work) / 'operations.sqlite'
+            if console.exists():
+                with sqlite3.connect('file:' + str(console) + '?mode=ro', uri=True) as source, sqlite3.connect(console_copy) as destination:
+                    source.backup(destination)
             with tarfile.open(pending, 'w:gz') as archive:
                 archive.add(dump, arcname='pbx-databases.sql')
+                if console_copy.exists():
+                    archive.add(console_copy, arcname='var/lib/nixops-console/operations.sqlite')
+                audit_key = Path('/var/lib/nixops-console/audit.key')
+                if audit_key.exists():
+                    archive.add(audit_key, arcname='var/lib/nixops-console/audit.key')
+                archive.add('/var/www/html/admin/modules/nixops', arcname='var/www/html/admin/modules/nixops')
                 for name in ['/etc/asterisk', '/etc/freepbx.conf', '/opt/pbx-ivr-agent', '/usr/local/bin/ivr-callback.sh', '/etc/systemd/system/pbx-ivr-agent.service', '/etc/iptables/rules.v4']:
                     path = Path(name)
                     if path.exists():

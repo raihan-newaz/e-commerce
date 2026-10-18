@@ -5,6 +5,7 @@
   const $ = id => document.getElementById(id);
   let tab = 'overview', page = 1, total = 0, liveBusy = false, expired = false, audioUrl = '';
   let reportRequest = 0;
+  let permissions = { media: false, followup: false, manage: false };
   const text = (id, value) => { $(id).textContent = String(value); };
   const duration = seconds => { const n = Math.max(0, Number(seconds) || 0); return n >= 3600 ? `${Math.floor(n / 3600)}h ${Math.floor(n % 3600 / 60)}m` : `${Math.floor(n / 60)}m ${n % 60}s`; };
   function fail(error) { $('nx-error').hidden = false; $('nx-error').textContent = error.message || 'Could not load PBX data'; }
@@ -130,12 +131,16 @@
       rows('nx-destinations', data.destinations.map(d => [d.dst || 'Unknown', d.total, d.answered, duration(d.talkSeconds)]), 4);
       rows('nx-records', data.rows.map(row => {
         const actions = document.createElement('div'); actions.className = 'nx-recording-actions';
-        if (row.recorded) {
+        if (row.recorded && permissions.media) {
           for (const [label, play] of [['▶ Play', true], ['↓ Save', false]]) {
             const button = document.createElement('button'); button.type = 'button'; button.className = 'nx-secondary'; button.textContent = label;
             button.addEventListener('click', () => recording(row, play, button)); actions.append(button);
           }
-        } else actions.textContent = 'Not recorded';
+        } else actions.textContent = row.recorded ? 'Restricted' : 'Not recorded';
+        if (permissions.followup && row.disposition !== 'ANSWERED') {
+          const button = document.createElement('button'); button.type = 'button'; button.className = 'nx-secondary'; button.textContent = 'Follow up';
+          button.addEventListener('click', () => root.dispatchEvent(new CustomEvent('nx:followup', { detail: row }))); actions.append(button);
+        }
         return [row.calldate, row.src, row.dst, badge(row.disposition, row.disposition === 'ANSWERED'), duration(row.duration), duration(row.billsec), actions];
       }), 7);
     } catch (error) { if (requestNumber === reportRequest) fail(error); }
@@ -170,16 +175,16 @@
       for (const disk of data.volumes) {
         const used = disk.available ? (1 - disk.free / disk.total) * 100 : null;
         card(disk.name + ' storage', used === null ? 'Unknown' : used.toFixed(1) + '%', disk.available ? (disk.free / 1073741824).toFixed(1) + ' GB free' : 'Storage information unavailable');
-        if (used === null || used >= 85) notices.push(disk.name + ': ' + (used === null ? 'unable to read disk capacity.' : 'storage is nearly full. Review retention and capacity.'));
+        if (used === null || used >= data.diskWarning) notices.push(disk.name + ': ' + (used === null ? 'unable to read disk capacity.' : 'storage is nearly full. Review retention and capacity.'));
       }
       card('Server load', data.load.length ? data.load[0].toFixed(2) : 'Unknown', '1 / 5 / 15 min: ' + data.load.map(n => n.toFixed(2)).join(' / '));
       card('Backup freshness', data.backupHealthy ? 'Healthy' : 'Review', data.backupAgeSeconds === null ? 'No successful snapshot' : duration(data.backupAgeSeconds) + ' since last success');
-      if (!data.backupHealthy) notices.push('Backup is missing, failed or older than 36 hours. Check the backup service.');
+      if (!data.backupHealthy) notices.push(`Backup is missing, failed or older than ${data.backupHours} hours. Check the backup service.`);
       text('nx-health-alerts', notices.length ? notices.join(' ') : 'Storage and backup checks passed.');
       $('nx-health-alerts').className = notices.length ? 'nx-alert' : 'nx-note';
     } catch (error) { fail(error); }
   }
-  async function refresh() { clearError(); if (tab === 'overview') await live(); else if (tab === 'calls') await reports(); else if (tab === 'queues') await queues(); else if (tab === 'health') await health(); else await backup(); }
+  async function refresh() { clearError(); if (tab === 'overview') await live(); else if (tab === 'calls') await reports(); else if (tab === 'queues') await queues(); else if (tab === 'health') await health(); else if (tab === 'backup') await backup(); else root.dispatchEvent(new CustomEvent('nx:view', { detail: tab })); }
   root.querySelectorAll('[data-tab]').forEach(button => button.addEventListener('click', () => {
     tab = button.dataset.tab;
     root.querySelectorAll('[data-tab]').forEach(b => { b.classList.toggle('active', b === button); b.setAttribute('aria-pressed', String(b === button)); });
@@ -216,5 +221,10 @@
   });
   const poll = setInterval(() => { if (tab === 'overview' && !document.hidden) live(); }, 5000);
   window.addEventListener('pagehide', () => { clearInterval(poll); closePlayer(); });
-  refresh();
+  request('capabilities').then(data => {
+    permissions = data; root.dataset.role = data.role;
+    root.querySelectorAll('[data-admin]').forEach(element => { element.hidden = !data.manage; });
+    $('nx-export').hidden = !data.media;
+    refresh();
+  }).catch(fail);
 })();

@@ -3,11 +3,16 @@ import { useNavigate, useLocation } from "react-router-dom";
 import {
   Bell,
   CheckCheck,
+  Globe2,
+  List,
   LogOut,
+  MessageSquare,
   Menu,
   Moon,
+  Search,
   Settings2,
   ShieldCheck,
+  ShoppingCart,
   Sun,
   User as UserIcon,
 } from "lucide-react";
@@ -48,6 +53,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
   const [alertsUser, setAlertsUser] = useState<string | null>(null);
 
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [dhakaTime, setDhakaTime] = useState(() => new Intl.DateTimeFormat("en-BD", { timeZone: "Asia/Dhaka", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true }).format(new Date()));
+  useEffect(() => {
+    const timer = window.setInterval(() => setDhakaTime(new Intl.DateTimeFormat("en-BD", { timeZone: "Asia/Dhaka", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true }).format(new Date())), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
   useEffect(() => {
     let saved: Alert[] = [];
     try {
@@ -129,7 +139,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
   const currentTitle = pageTitleForPath(location.pathname);
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur-md sm:px-6 dark:border-slate-800 dark:bg-slate-900/90">
+    <header className="admin-topbar sticky top-0 z-30 flex h-[68px] items-center justify-between border-b border-slate-200/70 bg-white/95 px-3 backdrop-blur-md sm:px-5 xl:px-7 dark:border-slate-800 dark:bg-slate-900/95">
       {/* Left side: Mobile Toggle & Desktop Search or Breadcrumb */}
       <div className="flex min-w-0 items-center gap-3">
         <IconButton
@@ -146,8 +156,20 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
         </span>
       </div>
 
+      <nav aria-label="Quick actions" className="hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto px-5 xl:flex">
+        <button type="button" onClick={() => navigate("/orders")} className="admin-quick-action"><Search className="h-4 w-4" />Search</button>
+        <button type="button" onClick={() => navigate("/orders")} className="admin-quick-action"><ShoppingCart className="h-4 w-4" />New Order</button>
+        <button type="button" onClick={() => navigate("/orders")} className="admin-quick-action"><Globe2 className="h-4 w-4" />Web Order List</button>
+        <button type="button" onClick={() => navigate("/orders")} className="admin-quick-action"><List className="h-4 w-4" />Order List</button>
+        <button type="button" onClick={() => navigate("/messaging")} className="admin-quick-action"><MessageSquare className="h-4 w-4" />Send Message</button>
+      </nav>
+
       {/* Right side: Theme, Alerts, User Profile */}
       <div className="flex items-center gap-2">
+        <div className="hidden rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-1.5 text-center md:block dark:border-slate-700 dark:bg-slate-800/70">
+          <span className="block text-[9px] font-bold uppercase tracking-[0.13em] text-slate-400">Dhaka time</span>
+          <span className="block font-mono text-[11px] font-semibold tabular-nums text-slate-700 dark:text-slate-200">{dhakaTime}</span>
+        </div>
         {/* Theme switcher */}
         <IconButton
           label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}

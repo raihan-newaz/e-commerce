@@ -2,7 +2,7 @@
 if (PHP_SAPI !== 'cli') { http_response_code(403); exit; }
 require '/etc/freepbx.conf';
 $module = \FreePBX::Nixops();
-$_SESSION['AMP_user'] = new class { public function checkSection($section) { return $section === 'nixops'; } };
+$_SESSION['AMP_user'] = new class { public function checkSection($section) { return in_array($section, ['nixops', '*'], true); } };
 $_SESSION['nixops_token'] = str_repeat('b', 64);
 $_SERVER['HTTP_X_NIXOPS_TOKEN'] = $_SESSION['nixops_token'];
 if (($argv[1] ?? '') === 'csv') {

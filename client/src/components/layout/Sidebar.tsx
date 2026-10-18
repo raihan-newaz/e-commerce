@@ -127,7 +127,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ref={element => { asideRef.current = element; if (element) element.inert = !isDesktop && !isOpen; }}
         aria-hidden={!isDesktop && !isOpen ? true : undefined}
         className={`admin-sidebar fixed inset-y-0 left-0 z-50 flex h-[100dvh] flex-col border-r border-slate-200/80 bg-white text-slate-700 shadow-xl transition-[width,transform] duration-300 lg:z-20 lg:translate-x-0 lg:shadow-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 ${
-          collapsed ? "w-[64px]" : "w-[212px]"
+          collapsed ? "w-[72px]" : "w-[256px]"
         } ${isOpen ? "translate-x-0" : "-translate-x-full"} lg:flex`}
       >
         {/* Header with Logo and Collapse Toggle */}
