@@ -1,13 +1,14 @@
 import { config as appConfig } from '../../config';
 import { Router, Request, Response } from 'express';
 import prisma from '../../prisma';
-import { authenticateToken, requireRole } from '../../middlewares/auth';
+import { authenticateToken, requireRole, AuthRequest } from '../../middlewares/auth';
 import { maskSecret, keepExistingSecret, isAllowedRemoteUrl } from '../../utils/security';
 import { getIvrConfig, dispatchIvrCall, formatBdPhone } from './ivrService';
 import { handlePbxIvrWebhook } from './ivrWebhook';
 import { z } from 'zod';
 import axios from 'axios';
 import crypto from 'crypto';
+import { io } from '../../server';
 
 const router = Router();
 router.use(['/webphone-config', '/active-call', '/test-call', '/manual-dial', '/trunks'], (_req, res, next) => {
@@ -17,6 +18,116 @@ router.use(['/webphone-config', '/active-call', '/test-call', '/manual-dial', '/
 
 // Public / HMAC-protected webhook endpoint for Asterisk dialplan callback
 router.post('/webhook', handlePbxIvrWebhook);
+
+const callStateSchema = z.object({
+  orderId: z.string().optional(), phone: z.string().min(7).max(30),
+  direction: z.enum(['INBOUND', 'OUTBOUND']).default('OUTBOUND'),
+  source: z.enum(['WEBPHONE', 'PBX', 'IVR']).default('WEBPHONE'),
+  status: z.enum(['DIALING', 'RINGING', 'ANSWERED', 'COMPLETED', 'MISSED', 'BUSY', 'FAILED', 'CANCELLED']),
+  providerCallId: z.string().max(120).optional(), disposition: z.string().max(120).optional(),
+  agentName: z.string().max(120).optional(),
+  startedAt: z.string().datetime().optional(), answeredAt: z.string().datetime().optional(), endedAt: z.string().datetime().optional(),
+  durationSeconds: z.number().int().min(0).max(86400).optional(), talkSeconds: z.number().int().min(0).max(86400).optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+router.get('/calls/order/:orderId', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'CALL_CENTER_AGENT']), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const order = await prisma.order.findUnique({ where: { id: String(req.params.orderId) }, select: { id: true, customerPhone: true } });
+    if (!order) { res.status(404).json({ success: false, message: 'Order not found' }); return; }
+    const phoneDigits = order.customerPhone.replace(/\D/g, '');
+    const phoneTail = phoneDigits.slice(-10);
+    const calls = await prisma.callLog.findMany({
+      where: { OR: [{ orderId: order.id }, ...(phoneTail.length >= 10 ? [{ phone: { contains: phoneTail } }] : [{ phone: order.customerPhone }])] },
+      include: { user: { select: { id: true, name: true } }, order: { select: { id: true, orderNumber: true } } },
+      orderBy: { startedAt: 'desc' }, take: 100,
+    });
+    res.json({ success: true, calls });
+  } catch { res.status(500).json({ success: false, message: 'Could not load call history' }); }
+});
+
+router.post('/calls', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'CALL_CENTER_AGENT']), async (req: AuthRequest, res: Response): Promise<void> => {
+  const parsed = callStateSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ success: false, message: 'Invalid call data' }); return; }
+  try {
+    const data = parsed.data;
+    const order = data.orderId ? await prisma.order.findUnique({ where: { id: data.orderId }, select: { id: true, customerPhone: true } }) : null;
+    if (data.orderId && !order) { res.status(404).json({ success: false, message: 'Order not found' }); return; }
+    const payload = {
+      orderId: order?.id, userId: req.user?.id, phone: data.phone, direction: data.direction, source: data.source,
+      status: data.status, providerCallId: data.providerCallId, disposition: data.disposition, agentName: req.user?.name,
+      startedAt: data.startedAt ? new Date(data.startedAt) : new Date(), answeredAt: data.answeredAt ? new Date(data.answeredAt) : undefined,
+      endedAt: data.endedAt ? new Date(data.endedAt) : undefined, durationSeconds: data.durationSeconds || 0,
+      talkSeconds: data.talkSeconds || 0,
+    };
+    const existing = data.providerCallId ? await prisma.callLog.findUnique({ where: { providerCallId: data.providerCallId } }) : null;
+    if (existing && existing.userId !== req.user?.id) { res.status(409).json({ success: false, message: 'Call ID already belongs to another user' }); return; }
+    const call = data.providerCallId
+      ? await prisma.callLog.upsert({ where: { providerCallId: data.providerCallId }, create: payload, update: {
+        status: data.status, disposition: data.disposition, answeredAt: payload.answeredAt, endedAt: payload.endedAt,
+        durationSeconds: payload.durationSeconds, talkSeconds: payload.talkSeconds,
+      } })
+      : await prisma.callLog.create({ data: payload });
+    res.status(201).json({ success: true, call });
+  } catch { res.status(500).json({ success: false, message: 'Could not save call record' }); }
+});
+
+router.patch('/calls/:id', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'CALL_CENTER_AGENT']), async (req: AuthRequest, res: Response): Promise<void> => {
+  const parsed = callStateSchema.partial().omit({ phone: true }).safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ success: false, message: 'Invalid call update' }); return; }
+  try {
+    const existing = await prisma.callLog.findUnique({ where: { id: String(req.params.id) } });
+    if (!existing || (existing.userId && existing.userId !== req.user?.id && req.user?.role !== 'SUPER_ADMIN' && req.user?.role !== 'OPERATIONS_MANAGER')) { res.status(404).json({ success: false, message: 'Call record not found' }); return; }
+    const data = parsed.data;
+    const call = await prisma.callLog.update({ where: { id: existing.id }, data: {
+      status: data.status, direction: data.direction, source: data.source, disposition: data.disposition,
+      providerCallId: data.providerCallId, answeredAt: data.answeredAt ? new Date(data.answeredAt) : undefined,
+      endedAt: data.endedAt ? new Date(data.endedAt) : undefined, durationSeconds: data.durationSeconds,
+      talkSeconds: data.talkSeconds,
+    } });
+    res.json({ success: true, call });
+  } catch { res.status(500).json({ success: false, message: 'Could not update call record' }); }
+});
+
+// PBX CDR/event ingestion. Configure Asterisk to POST signed call completion events here.
+router.post('/cdr-webhook', async (req: Request, res: Response): Promise<void> => {
+  if (!appConfig.integrationsEnabled) { res.status(503).json({ success: false, message: 'Integrations are disabled' }); return; }
+  try {
+    const settings = await getIvrConfig();
+    const body = (req as Request & { rawBody?: Buffer }).rawBody?.toString('utf8');
+    if (!body || !verifyPbxSignature(body, String(req.headers['x-pbx-signature'] || ''), String(req.headers['x-pbx-timestamp'] || ''), settings.apiKey)) {
+      res.status(401).json({ success: false, message: 'Invalid or expired signature' }); return;
+    }
+    const parsed = callStateSchema.extend({ providerCallId: z.string().min(1).max(120) }).safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ success: false, message: 'Invalid PBX CDR event' }); return; }
+    const data = parsed.data;
+    const recordingUrl = typeof data.metadata?.recordingUrl === 'string' ? data.metadata.recordingUrl : undefined;
+    if (recordingUrl) {
+      try {
+        const url = new URL(recordingUrl);
+        if (url.protocol !== 'https:' || url.origin !== new URL(settings.apiUrl).origin) throw new Error();
+      } catch { res.status(400).json({ success: false, message: 'Recording URL must use the configured PBX host over HTTPS' }); return; }
+    }
+    const phone = formatBdPhone(data.phone) || data.phone;
+    const order = data.orderId ? await prisma.order.findUnique({ where: { id: data.orderId }, select: { id: true } })
+      : await prisma.order.findFirst({ where: { customerPhone: { contains: phone.replace(/\D/g, '').slice(-10) }, trashedAt: null }, orderBy: { createdAt: 'desc' }, select: { id: true } });
+    const call = await prisma.callLog.upsert({ where: { providerCallId: data.providerCallId }, create: {
+      providerCallId: data.providerCallId, orderId: order?.id, phone, direction: data.direction, source: 'PBX', status: data.status,
+      disposition: data.disposition, agentName: data.agentName, startedAt: data.startedAt ? new Date(data.startedAt) : new Date(), answeredAt: data.answeredAt ? new Date(data.answeredAt) : undefined,
+      endedAt: data.endedAt ? new Date(data.endedAt) : undefined, durationSeconds: data.durationSeconds || 0, talkSeconds: data.talkSeconds || 0, metadata: data.metadata as any,
+    }, update: { orderId: order?.id, phone, direction: data.direction, status: data.status, disposition: data.disposition, agentName: data.agentName,
+      answeredAt: data.answeredAt ? new Date(data.answeredAt) : undefined, endedAt: data.endedAt ? new Date(data.endedAt) : undefined,
+      durationSeconds: data.durationSeconds || 0, talkSeconds: data.talkSeconds || 0, metadata: data.metadata as any } });
+    io.emit('call:logged', { id: call.id, orderId: call.orderId, phone: call.phone, direction: call.direction, status: call.status, agentName: call.agentName, startedAt: call.startedAt, metadata: call.metadata });
+    res.json({ success: true, callId: call.id });
+  } catch { res.status(500).json({ success: false, message: 'Could not save PBX call event' }); }
+});
+
+function verifyPbxSignature(body: string, signature: string, timestamp: string, secret: string): boolean {
+  if (!secret || !/^\d{10}$/.test(timestamp) || !/^[a-f0-9]{64}$/i.test(signature) || Math.abs(Math.floor(Date.now() / 1000) - Number(timestamp)) > 300) return false;
+  const expected = crypto.createHmac('sha256', secret).update(`${timestamp}.${body}`).digest();
+  return crypto.timingSafeEqual(expected, Buffer.from(signature, 'hex'));
+}
 
 // Get IVR Configuration
 router.get('/config', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'CALL_CENTER_AGENT']), async (req: Request, res: Response): Promise<void> => {

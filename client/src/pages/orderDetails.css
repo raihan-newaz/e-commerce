@@ -173,6 +173,12 @@
 .dark .order-pbx-call { border-color: #285445; background: #132a22; }
 .order-call-history { border: 1px solid var(--detail-line); border-radius: 8px; background: #faf9fb; padding: 8px; }
 .dark .order-call-history { background: #1c1921; }
+.order-actions-card { display: flex; min-width: 0; flex-direction: column; gap: 8px; overflow: hidden; }
+.order-actions-card > * { min-width: 0; }
+.order-call-history { width: 100%; min-width: 0; overflow: hidden; }
+.order-call-history article { min-width: 0; overflow-wrap: anywhere; }
+.order-call-history article time { white-space: nowrap; }
+.order-call-history p { overflow-wrap: anywhere; }
 .order-call-entry { display: flex; justify-content: space-between; gap: 8px; margin-top: 7px; border: 1px solid var(--detail-line); border-radius: 6px; background: #fff; padding: 6px; font-size: 10px; }
 .dark .order-call-entry { background: #17151e; }
 .order-call-entry small { color: var(--detail-muted); }

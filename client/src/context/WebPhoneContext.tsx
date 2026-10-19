@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';
+import { CallerPreviewPopup, type CallerPreview } from '../components/orders/CallerPreviewPopup';
 const WebPhoneModal = React.lazy(() => import('../components/orders/WebPhoneModal').then(module => ({ default: module.WebPhoneModal })));
 
 export interface CallRequest {
@@ -8,6 +10,7 @@ export interface CallRequest {
   orderNumber?: string;
   customerName?: string;
   timestamp?: number;
+  callId?: string;
   isRestoredAfterReload?: boolean;
   ownerId?: string;
 }
@@ -29,6 +32,15 @@ export const WebPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const storageKey = `${STORAGE_KEY}:${user?.id || ''}`;
   const [activeCall, setActiveCall] = useState<CallRequest | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [callerPreview, setCallerPreview] = useState<CallerPreview | null>(null);
+  const [lastCallStatus, setLastCallStatus] = useState('Call details');
+
+  useEffect(() => {
+    if (!user?.id || !['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'CALL_CENTER_AGENT'].includes(user.role)) return;
+    const socket = io();
+    socket.on('call:logged', (call: CallerPreview) => setCallerPreview(call));
+    return () => { socket.disconnect(); };
+  }, [user?.id, user?.role]);
 
   // Restore active call on page reload if active within last 5 minutes
   useEffect(() => {
@@ -40,6 +52,7 @@ export const WebPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const stored = sessionStorage.getItem(storageKey);
       if (stored) {
         const parsed: CallRequest = JSON.parse(stored);
+        parsed.callId ||= `web-${crypto.randomUUID()}`;
         const ageMs = Date.now() - (parsed.timestamp || 0);
         // If stored within 5 minutes, restore widget
         if (ageMs >= 0 && ageMs < 5 * 60 * 1000 && parsed.phone && parsed.ownerId === user.id) {
@@ -58,10 +71,12 @@ export const WebPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (!user) return;
     const callData: CallRequest = {
       ...req,
+      callId: `web-${crypto.randomUUID()}`,
       timestamp: Date.now(),
       ownerId: user.id,
       isRestoredAfterReload: false,
     };
+    setLastCallStatus('DIALING');
     try {
       sessionStorage.setItem(storageKey, JSON.stringify(callData));
     } catch (_) {}
@@ -69,16 +84,18 @@ export const WebPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setIsOpen(true);
   };
 
-  const endCall = () => {
+  const endCall = (status?: string) => {
     try {
       sessionStorage.removeItem(storageKey);
     } catch (_) {}
+    if (status) setLastCallStatus(status);
   };
 
   const closeDialer = () => {
     try {
       sessionStorage.removeItem(storageKey);
     } catch (_) {}
+    if (activeCall) setCallerPreview({ ...activeCall, direction: 'OUTBOUND', status: lastCallStatus, startedAt: activeCall.timestamp ? new Date(activeCall.timestamp).toISOString() : undefined });
     setActiveCall(null);
     setIsOpen(false);
   };
@@ -103,12 +120,14 @@ export const WebPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           orderNumber={activeCall.orderNumber}
           customerName={activeCall.customerName}
           customerPhone={activeCall.phone}
+          callId={activeCall.callId}
           isRestoredAfterReload={activeCall.isRestoredAfterReload}
           onCallEnded={endCall}
           onClose={closeDialer}
         />
         </React.Suspense>
       )}
+      {user && callerPreview && <CallerPreviewPopup call={callerPreview} onClose={() => setCallerPreview(null)}/>}
     </WebPhoneContext.Provider>
   );
 };

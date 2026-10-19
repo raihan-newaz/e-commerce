@@ -148,6 +148,7 @@ model User {
   expenses       Expense[]
   adCosts        AdCost[]
   auditLogs      AuditLog[]
+  callLogs       CallLog[]
 
   @@index([status, role])
 }
@@ -544,6 +545,7 @@ model Order {
   assignedTo  User?        @relation("AssignedAgent", fields: [assignedToId], references: [id], onDelete: SetNull)
   items       OrderItem[]
   messageLogs MessageLog[]
+  callLogs    CallLog[]
   emailDeliveries EmailDelivery[]
   checkoutAttempt CheckoutAttempt?
   paymentAttempts PaymentAttempt[]
@@ -981,6 +983,33 @@ model MessageLog {
 
   @@index([orderId, createdAt])
   @@index([recipient, createdAt])
+}
+
+model CallLog {
+  id              String   @id @default(uuid())
+  providerCallId  String?  @unique @db.VarChar(120)
+  orderId         String?
+  userId          String?
+  phone           String   @db.VarChar(30)
+  direction       String   @db.VarChar(16) // INBOUND, OUTBOUND
+  source          String   @db.VarChar(24) // WEBPHONE, PBX, IVR
+  status          String   @db.VarChar(32) // DIALING, RINGING, ANSWERED, COMPLETED, MISSED, BUSY, FAILED, CANCELLED
+  disposition     String?  @db.VarChar(120)
+  agentName       String?  @db.VarChar(120)
+  startedAt       DateTime @default(now())
+  answeredAt      DateTime?
+  endedAt         DateTime?
+  durationSeconds Int      @default(0)
+  talkSeconds     Int      @default(0)
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  order Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  user  User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([orderId, startedAt])
+  @@index([phone, startedAt])
 }
 
 model AuditLog {

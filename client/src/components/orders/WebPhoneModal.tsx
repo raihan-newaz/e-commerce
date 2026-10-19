@@ -9,8 +9,9 @@ interface WebPhoneModalProps {
   orderNumber?: string;
   customerName?: string;
   customerPhone: string;
+  callId?: string;
   isRestoredAfterReload?: boolean;
-  onCallEnded?: () => void;
+  onCallEnded?: (status: string) => void;
   onClose: () => void;
 }
 
@@ -23,6 +24,7 @@ export const WebPhoneModal: React.FC<WebPhoneModalProps> = ({
   orderNumber,
   customerName,
   customerPhone,
+  callId,
   isRestoredAfterReload = false,
   onCallEnded,
   onClose,
@@ -52,6 +54,28 @@ export const WebPhoneModal: React.FC<WebPhoneModalProps> = ({
   const sessionRef = useRef<any>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const timerRef = useRef<any>(null);
+  const callLogIdRef = useRef<string | null>(null);
+  const callStartedAtRef = useRef(new Date());
+  const answeredAtRef = useRef<Date | null>(null);
+
+  const persistCall = async (status: string, extra: Record<string, unknown> = {}) => {
+    const payload = {
+      phone: customerPhone, orderId, direction: 'OUTBOUND', source: 'WEBPHONE', status,
+      providerCallId: callId,
+      startedAt: callStartedAtRef.current.toISOString(),
+      answeredAt: answeredAtRef.current?.toISOString(), endedAt: extra.endedAt as string | undefined,
+      durationSeconds: extra.durationSeconds as number | undefined,
+      talkSeconds: extra.talkSeconds as number | undefined, disposition: extra.disposition as string | undefined,
+    };
+    try {
+      if (!callLogIdRef.current) {
+        const { data } = await api.post('/ivr/calls', payload);
+        callLogIdRef.current = data.call?.id || null;
+      } else {
+        await api.patch(`/ivr/calls/${callLogIdRef.current}`, payload);
+      }
+    } catch { /* A call should still complete if logging is temporarily unavailable. */ }
+  };
 
   // Clean phone number (e.g. 01701007333)
   const cleanPhone = customerPhone.replace(/\D/g, '').replace(/^88/, '');
@@ -139,6 +163,9 @@ export const WebPhoneModal: React.FC<WebPhoneModalProps> = ({
     try {
       setCallState('INITIALIZING');
       setStatusMessage('Connecting to PBX Server…');
+      callStartedAtRef.current = new Date();
+      answeredAtRef.current = null;
+      await persistCall('DIALING');
 
       const { data } = await api.get('/ivr/webphone-config');
       if (generation !== generationRef.current) return;
@@ -177,6 +204,7 @@ export const WebPhoneModal: React.FC<WebPhoneModalProps> = ({
         ua.stop();
         setCallState('FAILED');
         setStatusMessage(`Registration failed: ${e.cause || 'Unauthorized'}`);
+        void persistCall('FAILED', { endedAt: new Date().toISOString(), disposition: String(e.cause || 'Registration failed') });
       });
 
       ua.start();
@@ -217,11 +245,14 @@ export const WebPhoneModal: React.FC<WebPhoneModalProps> = ({
         if (generation !== generationRef.current) return;
         setCallState('RINGING');
         setStatusMessage('Ringing customer phone…');
+        void persistCall('RINGING');
       },
       confirmed: () => {
         if (generation !== generationRef.current) return;
         setCallState('CONNECTED');
         setStatusMessage('Call connected. Talking…');
+        answeredAtRef.current = new Date();
+        void persistCall('ANSWERED', { answeredAt: answeredAtRef.current.toISOString() });
         // Start live duration timer
         timerRef.current = setInterval(() => {
           setDuration(prev => prev + 1);
@@ -229,11 +260,13 @@ export const WebPhoneModal: React.FC<WebPhoneModalProps> = ({
       },
       ended: () => {
         if (hangingUpRef.current || generation !== generationRef.current) return;
-        handleCallEnded('Call ended');
+        handleCallEnded('Call ended', 'COMPLETED');
       },
       failed: (e: any) => {
         if (hangingUpRef.current || generation !== generationRef.current) return;
-        handleCallEnded(`Call failed: ${e.cause || 'Customer unavailable'}`);
+        const cause = String(e.cause || 'Customer unavailable');
+        const state = /busy/i.test(cause) ? 'BUSY' : 'MISSED';
+        handleCallEnded(`Call failed: ${cause}`, state);
       },
       peerconnection: (data: any) => {
         const pc = data.peerconnection;
@@ -271,14 +304,15 @@ export const WebPhoneModal: React.FC<WebPhoneModalProps> = ({
     }
   };
 
-  const handleCallEnded = (msg: string) => {
+  const handleCallEnded = (msg: string, status: string = 'COMPLETED') => {
     generationRef.current++;
     startingRef.current = false;
     try { uaRef.current?.stop(); } catch { /* Cleanup is best effort. */ }
     setCallState('ENDED');
     setStatusMessage(msg);
     if (timerRef.current) clearInterval(timerRef.current);
-    if (onCallEnded) onCallEnded();
+    void persistCall(status, { endedAt: new Date().toISOString(), durationSeconds: Math.floor((Date.now() - callStartedAtRef.current.getTime()) / 1000), talkSeconds: duration, disposition: msg });
+    if (onCallEnded) onCallEnded(status);
   };
 
   const handleHangup = async () => {
@@ -311,7 +345,8 @@ export const WebPhoneModal: React.FC<WebPhoneModalProps> = ({
     }
 
     hangingUpRef.current = false;
-    handleCallEnded('Call terminated by agent');
+    await persistCall(answeredAtRef.current ? 'COMPLETED' : 'CANCELLED', { endedAt: new Date().toISOString(), durationSeconds: Math.floor((Date.now() - callStartedAtRef.current.getTime()) / 1000), talkSeconds: duration, disposition: 'Call terminated by agent' });
+    handleCallEnded('Call terminated by agent', answeredAtRef.current ? 'COMPLETED' : 'CANCELLED');
     toast('Call ended & Asterisk channel killed', { icon: '📞' });
   };
 
@@ -348,7 +383,7 @@ export const WebPhoneModal: React.FC<WebPhoneModalProps> = ({
             : 'w-[calc(100vw-2rem)] max-w-sm sm:w-96 shadow-2xl'
         }`}
       >
-        <div className="max-h-[calc(100dvh-1rem)] overflow-y-auto rounded-2xl border-2 border-emerald-500/80 bg-white shadow-2xl dark:border-emerald-600/60 dark:bg-slate-900 ring-4 ring-emerald-500/10">
+        <div className="max-h-[calc(100dvh-1rem)] overflow-y-auto rounded-[1.35rem] border border-white/80 bg-white shadow-[0_24px_80px_-20px_rgba(30,15,45,.45)] ring-1 ring-slate-900/5 dark:border-slate-700 dark:bg-slate-900">
           {/* Header - DRAG HANDLE */}
           <div
             onMouseDown={(e) => {
@@ -360,7 +395,7 @@ export const WebPhoneModal: React.FC<WebPhoneModalProps> = ({
                 handleDragStart(e.touches[0].clientX, e.touches[0].clientY);
               }
             }}
-            className="flex items-center justify-between border-b border-slate-100 bg-slate-900 px-4 py-3 text-white dark:border-slate-800 dark:bg-slate-950 cursor-grab active:cursor-grabbing select-none touch-none"
+            className="flex items-center justify-between border-b border-white/10 bg-gradient-to-r from-[#32103d] via-[#4a1458] to-[#32103d] px-4 py-3.5 text-white cursor-grab active:cursor-grabbing select-none touch-none"
             title="মাউস দিয়ে চেপে ধরে যেকোনো জায়গায় ড্র্যাগ/মুভ করুন (Drag to move)"
           >
             <div className="flex items-center gap-2">
@@ -371,8 +406,8 @@ export const WebPhoneModal: React.FC<WebPhoneModalProps> = ({
                 callState === 'ENDED' || callState === 'FAILED' ? 'bg-rose-400' :
                 'animate-pulse bg-sky-400'
               }`} />
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
-                Direct Web Call
+              <span className="text-[11px] font-semibold uppercase tracking-[.16em] text-white/90">
+                EcomDrive · Web call
               </span>
             </div>
             <div
@@ -402,7 +437,7 @@ export const WebPhoneModal: React.FC<WebPhoneModalProps> = ({
           </div>
 
           {/* Body */}
-          <div className="p-5 text-center">
+          <div className="bg-gradient-to-b from-violet-50/70 to-white p-5 text-center dark:from-slate-800/50 dark:to-slate-900">
             {/* Customer Details */}
             <div className="mb-4">
               <p className="text-base font-bold text-slate-900 dark:text-white">
@@ -488,11 +523,11 @@ export const WebPhoneModal: React.FC<WebPhoneModalProps> = ({
                   <button
                     type="button"
                     onClick={handleHangup}
-                    className="flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-rose-600 px-6 font-bold text-white shadow-lg shadow-rose-600/30 transition hover:bg-rose-700 active:scale-95 cursor-pointer"
+                    className="flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-rose-600 px-6 font-semibold text-white shadow-lg shadow-rose-600/20 transition hover:bg-rose-700 active:scale-95 cursor-pointer"
                     title="Hang up active call"
                   >
                     <PhoneOff className="h-5 w-5" />
-                    <span className="text-base font-black">কল কাটুন (End Call)</span>
+                    <span className="text-base font-black">End call</span>
                   </button>
                 ) : (
                   <button

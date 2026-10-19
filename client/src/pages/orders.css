@@ -104,6 +104,19 @@
 .orders-page .orders-table-card table { min-width: 1240px; }
 .orders-page .orders-table-card thead th { color: #596174; font-size: 11px; font-weight: 600; }
 .orders-page .orders-table-card tbody td { vertical-align: middle; }
+.orders-page .orders-table-card table { font-size: 14px; }
+.orders-page .orders-table-card thead th { font-size: 14px; }
+.orders-page .orders-table-card tbody td { font-size: 14px; line-height: 1.4; padding-top: 12px; padding-bottom: 12px; }
+.orders-page .orders-table-card tbody td:nth-child(2) > div:first-child,
+.orders-page .orders-table-card tbody td:nth-child(3) > div:first-child,
+.orders-page .orders-table-card tbody td:nth-child(5) > div > div > div:first-child,
+.orders-page .orders-table-card tbody td:nth-child(8) { font-size: 14px; }
+.orders-page .orders-table-card tbody td:nth-child(2) > div:last-child,
+.orders-page .orders-table-card tbody td:nth-child(3) > div:nth-child(2),
+.orders-page .orders-table-card tbody td:nth-child(3) > div:nth-child(3),
+.orders-page .orders-table-card tbody td:nth-child(4) > div:last-child,
+.orders-page .orders-table-card tbody td:nth-child(5) > div > div > div:nth-child(2),
+.orders-page .orders-table-card tbody td:nth-child(5) > div > div > span { font-size: 12px; }
 .orders-page .orders-open-link { display: inline-flex; min-height: 29px; align-items: center; gap: 4px; border: 1px solid #e8e2ec; border-radius: 8px; background: #fff; padding: 0 8px; color: #40134c; font-size: 11px; font-weight: 600; white-space: nowrap; }
 .orders-page .orders-open-link:hover { border-color: #c7b1cf; background: #f8f3fa; }
 .dark .orders-page .orders-open-link { border-color: #3a3340; background: #17151e; color: #e1c4eb; }

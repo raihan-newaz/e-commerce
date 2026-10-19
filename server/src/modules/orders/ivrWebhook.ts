@@ -46,6 +46,12 @@ export const handlePbxIvrWebhook = async (req: Request, res: Response): Promise<
       const time = new Date().toLocaleString('en-GB', { timeZone: 'Asia/Dhaka', hour12: true });
       const note = `[${time}] [Automated IVR Call] [call:${call.id}] ${event.status} (${call.recipient})`;
       await tx.messageLog.update({ where: { id: call.id }, data: { status: event.status, body: note } });
+      const callStatus = event.status === 'NO_ANSWER' ? 'MISSED' : event.status === 'BUSY' ? 'BUSY' : ['CONFIRMED', 'CANCELLED', 'CALL_ENDED_NO_INPUT', 'INVALID_INPUT'].includes(event.status) ? 'COMPLETED' : 'FAILED';
+      await tx.callLog.upsert({
+        where: { providerCallId: `IVR:${call.id}` },
+        create: { providerCallId: `IVR:${call.id}`, orderId: call.orderId, phone: call.recipient, direction: 'OUTBOUND', source: 'IVR', status: callStatus, disposition: event.status, agentName: 'Automated IVR', startedAt: call.createdAt, endedAt: new Date() },
+        update: { status: callStatus, disposition: event.status, endedAt: new Date() },
+      });
       if (!call.orderId) return null;
       await tx.$queryRaw`SELECT id FROM \`Order\` WHERE id = ${call.orderId} FOR UPDATE`;
       const order = await tx.order.findUnique({ where: { id: call.orderId }, include: { items: true } });

@@ -782,11 +782,10 @@ export const OrdersPage: React.FC = () => {
                     />
                   </th>
                   <th className="py-3.5 px-3 min-w-[125px]">Created At</th>
-                  <th className="py-3.5 px-3 min-w-[80px]">Auto Call</th>
                   <th className="py-3.5 px-3 min-w-[170px]">Customer</th>
                   <th className="py-3.5 px-3 min-w-[150px]">Note</th>
                   <th className="py-3.5 px-3 min-w-[180px]">Order Items</th>
-                  <th className="py-3.5 px-3 min-w-[90px] text-center">Success Rate</th>
+                  <th className="py-3.5 px-3 min-w-[145px] text-center">Overall Success Rate</th>
                   <th className="py-3.5 px-3 min-w-[90px]">Tags</th>
                   <th className="py-3.5 px-3 min-w-[85px]">Site</th>
                   <th className="py-3.5 px-3 text-center min-w-[70px] w-16">Actions</th>
@@ -812,18 +811,20 @@ export const OrdersPage: React.FC = () => {
                       />
                     </td>
 
-                    <td className="py-3.5 px-3 min-w-[125px] whitespace-nowrap">
-                      <div className="font-medium text-slate-800 dark:text-slate-200">{new Date(o.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}, {new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                    <td className="py-3.5 px-3 min-w-[100px]">
+                      <div className="font-medium leading-5 text-slate-800 dark:text-slate-200">
+                        <div className="whitespace-nowrap">{new Date(o.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</div>
+                        <div className="whitespace-nowrap">{new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                      </div>
                       <div className="mt-1 text-[10px] text-slate-400">ID: {o.orderNumber}</div>
-                    </td>
-
-                    <td className="py-3.5 px-3" onClick={(event) => event.stopPropagation()}>
-                      <button type="button" title={`Call ${o.customerName}`} aria-label={`Call ${o.customerName}`} onClick={() => startCall({ orderId: o.id, orderNumber: o.orderNumber || o.id.slice(0, 8), customerName: o.customerName, phone: o.customerPhone })} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-purple-50 hover:text-[#40134c] dark:hover:bg-purple-950/30"><Phone className="h-4 w-4" /></button>
                     </td>
 
                     <td className="py-3.5 px-3 min-w-[170px]">
                       <div className="flex items-center gap-1.5 font-medium text-slate-900 dark:text-slate-100"><span>{o.customerName}</span>{o.isFraudSuspect && <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[9px] font-semibold text-rose-700">RISK</span>}</div>
-                      <div className="mt-0.5 text-[11px] text-slate-600 dark:text-slate-300">{o.customerPhone}</div>
+                      <div className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-600 dark:text-slate-300">
+                        <span>{o.customerPhone}</span>
+                        <button type="button" title={`Call ${o.customerName}`} aria-label={`Call ${o.customerName} at ${o.customerPhone}`} onClick={(event) => { event.stopPropagation(); startCall({ orderId: o.id, orderNumber: o.orderNumber || o.id.slice(0, 8), customerName: o.customerName, phone: o.customerPhone }); }} className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-purple-50 hover:text-[#40134c] dark:hover:bg-purple-950/30"><Phone className="h-3.5 w-3.5" /></button>
+                      </div>
                       <div className="mt-0.5 max-w-[190px] truncate text-[10px] text-slate-400">{o.customerAddress}</div>
                     </td>
 
@@ -836,7 +837,7 @@ export const OrdersPage: React.FC = () => {
                       <div className="space-y-2">{o.items.map((it) => <div key={it.id} className="flex items-start justify-between gap-2"><div className="min-w-0"><div className="truncate text-xs text-slate-800 dark:text-slate-200">{it.productName}</div><div className="text-[10px] text-slate-500">৳{Number(it.unitPrice).toLocaleString()}</div></div><span className="shrink-0 text-xs text-slate-500">{it.quantity}x</span></div>)}</div>
                     </td>
 
-                    <td className="py-3.5 px-3 text-center tabular-nums">{typeof o.customer?.successRate === 'number' ? `${Math.round(o.customer.successRate)}%` : '—'}</td>
+                    <td className="py-3.5 px-3 text-center font-medium tabular-nums">{typeof o.customer?.successRate === 'number' ? `${Math.round(o.customer.successRate)}%` : '—'}</td>
 
                     <td className="py-3.5 px-3" onClick={event => event.stopPropagation()}><div className="flex flex-wrap gap-1">{activeTab !== 'TRASH' ? <button onClick={() => handleSinglePriority(o.id, o.priority === 'URGENT' ? 'NORMAL' : 'URGENT')} className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${o.priority === 'URGENT' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500 dark:bg-slate-800'}`}>{o.priority === 'URGENT' ? 'Urgent' : 'Normal'}</button> : <span className="text-xs text-slate-500">{o.priority}</span>}{o.isDuplicate && <span className="rounded-md bg-orange-50 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700">Duplicate</span>}{o.isFraudSuspect && <span className="rounded-md bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700">Suspect</span>}</div></td>
 
