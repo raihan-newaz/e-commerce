@@ -15,7 +15,7 @@ import CourierLocationCard from '../components/orders/CourierLocationCard';
 import OrderRiskCard from '../components/orders/OrderRiskCard';
 import { useWebPhone } from '../context/WebPhoneContext';
 import { OrderNotesCard } from '../components/orders/OrderNotesCard';
-import CourierFraudCheckCard from '../components/orders/CourierFraudCheckCard';
+import CourierFraudCheckCard, { type BdCourierCheckResult, type CourierStat } from '../components/orders/CourierFraudCheckCard';
 
 const statuses = ['PENDING', 'CONFIRMED', 'PACKAGING', 'HANDED_OVER', 'IN_TRANSIT', 'DELIVERED', 'PARTIAL_DELIVERED', 'HOLD', 'CANCELLED', 'RETURNED', 'FAKE_TRASH'];
 const money = (value: number) => `৳${Number(value || 0).toLocaleString()}`;
@@ -36,6 +36,9 @@ export const OrderDetailsPage: React.FC = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [dispatchOpen, setDispatchOpen] = useState(false);
   const [customerHistory, setCustomerHistory] = useState<CustomerHistory | null>(null);
+  const [fraudCheckResult, setFraudCheckResult] = useState<BdCourierCheckResult | null>(null);
+  const [fraudCheckError, setFraudCheckError] = useState('');
+  const [fraudCheckBusy, setFraudCheckBusy] = useState(false);
   const [trackingRefreshing, setTrackingRefreshing] = useState(false);
   const [pathaoEvents, setPathaoEvents] = useState<Array<{ id: string; event: string; occurredAt: string; applied: boolean; reason?: string; returnConsignmentId?: string; collectedAmount?: number; deliveryFee?: number; invoiceId?: string }>>([]);
   const [pathaoRecoveryCode, setPathaoRecoveryCode] = useState('');
@@ -205,17 +208,32 @@ export const OrderDetailsPage: React.FC = () => {
     finally { setSteadfastRecoveryBusy(false); }
   };
 
+  const checkCourierFraud = async () => {
+    if (!order) return;
+    setFraudCheckBusy(true); setFraudCheckError('');
+    try {
+      const { data } = await api.post(`/couriers/bdcourier/orders/${order.id}/fraud-check`);
+      setFraudCheckResult(data.result || null);
+      if (data.result?.status === 'error') setFraudCheckError(data.result.message || 'BD Courier could not find a report for this phone number');
+      else toast.success('Courier fraud history loaded');
+    } catch (error: any) {
+      setFraudCheckError(error.response?.data?.message || 'Could not check courier history');
+      toast.error(error.response?.data?.message || 'Could not check courier history');
+    } finally { setFraudCheckBusy(false); }
+  };
+
   if (loading) return <div className="py-24 text-center text-sm text-slate-500">Loading order…</div>;
   if (!order) return <div className="py-24 text-center"><p className="font-bold">Order not found</p><Link className="mt-3 inline-block text-sm font-bold text-emerald-600 dark:text-emerald-400 hover:underline" to="/orders">Back to orders</Link></div>;
   let checkoutDetails: Record<string, string> = {};
   try { checkoutDetails = JSON.parse(order.checkoutDetails || '{}'); } catch { checkoutDetails = {}; }
+  const courierBreakdown = fraudCheckResult?.data || fraudCheckResult?.courierData || {};
   const providerCards = [
-    { name: 'Overall', tone: 'violet', active: true, state: pretty(order.status), detail: `Order #${order.orderNumber}` },
-    { name: 'Pathao', tone: 'rose', active: order.courierName === 'PATHAO', state: order.courierName === 'PATHAO' ? pretty(order.courierStatus || order.status) : 'Not assigned', detail: order.courierName === 'PATHAO' ? order.courierTrackingCode || 'No tracking yet' : 'No booking for this order' },
-    { name: 'Steadfast', tone: 'teal', active: order.courierName === 'STEADFAST', state: order.courierName === 'STEADFAST' ? pretty(order.courierStatus || order.status) : 'Not assigned', detail: order.courierName === 'STEADFAST' ? order.courierTrackingCode || 'No tracking yet' : 'No booking for this order' },
-    { name: 'RedX', tone: 'red', active: order.courierName === 'REDX', state: order.courierName === 'REDX' ? pretty(order.courierStatus || order.status) : 'Not assigned', detail: order.courierName === 'REDX' ? order.courierTrackingCode || 'No tracking yet' : 'No booking for this order' },
-    { name: 'Paperfly', tone: 'amber', active: order.courierName === 'PAPERFLY', state: order.courierName === 'PAPERFLY' ? pretty(order.courierStatus || order.status) : 'Not assigned', detail: order.courierName === 'PAPERFLY' ? order.courierTrackingCode || 'No tracking yet' : 'No booking for this order' },
-  ];
+    { name: 'Overall', key: 'summary', tone: 'violet', active: true, state: pretty(order.status), detail: `Order #${order.orderNumber}` },
+    { name: 'Pathao', key: 'pathao', tone: 'rose', active: order.courierName === 'PATHAO', state: order.courierName === 'PATHAO' ? pretty(order.courierStatus || order.status) : 'Not assigned', detail: order.courierName === 'PATHAO' ? order.courierTrackingCode || 'No tracking yet' : 'No booking for this order' },
+    { name: 'Steadfast', key: 'steadfast', tone: 'teal', active: order.courierName === 'STEADFAST', state: order.courierName === 'STEADFAST' ? pretty(order.courierStatus || order.status) : 'Not assigned', detail: order.courierName === 'STEADFAST' ? order.courierTrackingCode || 'No tracking yet' : 'No booking for this order' },
+    { name: 'RedX', key: 'redx', tone: 'red', active: order.courierName === 'REDX', state: order.courierName === 'REDX' ? pretty(order.courierStatus || order.status) : 'Not assigned', detail: order.courierName === 'REDX' ? order.courierTrackingCode || 'No tracking yet' : 'No booking for this order' },
+    { name: 'Paperfly', key: 'paperfly', tone: 'amber', active: order.courierName === 'PAPERFLY', state: order.courierName === 'PAPERFLY' ? pretty(order.courierStatus || order.status) : 'Not assigned', detail: order.courierName === 'PAPERFLY' ? order.courierTrackingCode || 'No tracking yet' : 'No booking for this order' },
+  ].map(provider => ({ ...provider, stats: courierBreakdown[provider.key] as CourierStat | undefined }));
   return <div className="order-details-page mx-auto max-w-[1600px] space-y-3 pb-12">
     <div className="order-detail-header flex flex-col justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center">
       <div className="flex min-w-0 items-center gap-3">
@@ -237,8 +255,8 @@ export const OrderDetailsPage: React.FC = () => {
     <div className="order-editor-grid grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_380px]">
       <div className="min-w-0 space-y-3">
         <section className="courier-performance-strip" aria-label="Order and courier status">
-          <article className="courier-performance-card courier-record-card"><div className="courier-card-heading"><span className="courier-logo-mark">M</span><b>Our Record</b>{customerHistory && customerHistory.totalPrevious > 0 && <span className="courier-card-count">{customerHistory.totalPrevious}</span>}</div><div className="courier-record-line"><span>Total previous</span><b>{customerHistory?.totalPrevious ?? 0}</b></div><div className="courier-record-line"><span>Delivered</span><b className="text-emerald-700">{customerHistory?.completed ?? 0}</b></div><div className="courier-record-line"><span>Cancelled / returned</span><b>{(customerHistory?.cancelled ?? 0) + (customerHistory?.returned ?? 0)}</b></div></article>
-          {providerCards.map((provider) => <article key={provider.name} className={`courier-performance-card courier-tone-${provider.tone} ${provider.active ? 'is-current' : ''}`}><div className="courier-card-heading"><span className="courier-logo-mark">{provider.name === 'Steadfast' ? '➤' : provider.name === 'RedX' ? 'R' : provider.name === 'Paperfly' ? 'P' : provider.name === 'Pathao' ? 'p' : '↗'}</span><b>{provider.name}</b>{provider.active && <span className="courier-current-dot" aria-label="Current courier"/>}</div><div className="courier-provider-state">{provider.state}</div><div className="courier-provider-detail" title={provider.detail}>{provider.detail}</div><div className={`courier-provider-progress ${provider.active ? 'active' : ''}`} /></article>)}
+          <article className="courier-performance-card courier-record-card"><div className="courier-card-heading"><span className="courier-logo-mark">M</span><b>Our Record</b>{customerHistory && customerHistory.totalPrevious > 0 && <span className="courier-card-count">{customerHistory.totalPrevious}</span>}<button type="button" aria-label="Check BD Courier fraud history" title="Check BD Courier fraud history" onClick={() => void checkCourierFraud()} disabled={fraudCheckBusy} className="ml-auto rounded bg-white/20 px-1.5 py-1 text-[9px] font-bold hover:bg-white/30 disabled:opacity-60">{fraudCheckBusy ? '…' : 'Check'}</button></div><div className="courier-record-line"><span>Total previous</span><b>{customerHistory?.totalPrevious ?? 0}</b></div><div className="courier-record-line"><span>Delivered</span><b className="text-emerald-700">{customerHistory?.completed ?? 0}</b></div><div className="courier-record-line"><span>Cancelled / returned</span><b>{(customerHistory?.cancelled ?? 0) + (customerHistory?.returned ?? 0)}</b></div>{fraudCheckResult?.reports?.length ? <div className="courier-record-line"><span>Fraud reports</span><b className="text-rose-600">{fraudCheckResult.reports.length}</b></div> : null}</article>
+          {providerCards.map((provider) => <article key={provider.name} className={`courier-performance-card courier-tone-${provider.tone} ${provider.active ? 'is-current' : ''}`}><div className="courier-card-heading"><span className="courier-logo-mark">{provider.name === 'Steadfast' ? '➤' : provider.name === 'RedX' ? 'R' : provider.name === 'Paperfly' ? 'P' : provider.name === 'Pathao' ? 'p' : '↗'}</span><b>{provider.name}</b>{provider.active && <span className="courier-current-dot" aria-label="Current courier"/>}</div>{provider.stats ? <><div className="courier-record-line"><span>Success rate</span><b>{Number(provider.stats.success_ratio || 0).toLocaleString()}%</b></div><div className="courier-record-line"><span>Total</span><b>{Number(provider.stats.total_parcel || 0).toLocaleString()}</b></div><div className="courier-record-line"><span>Success</span><b className="text-emerald-700">{Number(provider.stats.success_parcel || 0).toLocaleString()}</b></div><div className="courier-record-line"><span>Cancelled</span><b>{Number(provider.stats.cancelled_parcel || 0).toLocaleString()}</b></div></> : <><div className="courier-provider-state">{provider.state}</div><div className="courier-provider-detail" title={provider.detail}>{provider.detail}</div></>}<div className={`courier-provider-progress ${provider.active ? 'active' : ''}`} style={provider.stats ? { width: `${Math.max(0, Math.min(100, Number(provider.stats.success_ratio || 0)))}%` } : undefined} /></article>)}
         </section>
         <section className="order-editor-section"><h3 className="order-section-kicker">Customer details</h3><div className="grid gap-3 border border-slate-200 bg-white p-3.5 dark:border-slate-800 dark:bg-slate-900 md:grid-cols-3"><div><label className="order-field-label">Mobile number</label><div className="order-reference-field flex items-center justify-between gap-2"><button type="button" onClick={() => copy(order.customerPhone)} className="truncate text-left">{order.customerPhone}</button><div className="flex shrink-0 items-center gap-1"><button aria-label="Call customer" onClick={() => startCall({ orderId: order.id, orderNumber: order.orderNumber, customerName: order.customerName, phone: order.customerPhone })} className="rounded-md p-1 text-emerald-700 hover:bg-emerald-50"><Phone className="h-4 w-4"/></button><a aria-label="WhatsApp customer" target="_blank" rel="noreferrer" href={`https://wa.me/88${order.customerPhone.replace(/\D/g, '')}`} className="rounded-md p-1 text-emerald-600 hover:bg-emerald-50"><MessageCircle className="h-4 w-4"/></a></div></div></div><div><label className="order-field-label">Name</label><div className="order-reference-field">{order.customerName || '—'}</div></div><div><label className="order-field-label">Delivery method</label><div className="order-reference-field flex items-center justify-between gap-2"><span>{pretty(order.courierName || 'Not selected')}</span>{!order.courierName && <button type="button" onClick={() => setDispatchOpen(true)} className="text-xs font-semibold text-purple-800 hover:underline">Choose courier</button>}</div></div></div></section>
 
@@ -276,7 +294,7 @@ export const OrderDetailsPage: React.FC = () => {
     </section>}
     {order.courierName === 'REDX' && !order.courierConsignmentId && ['BOOKING_REQUESTED', 'BOOKING_UNCERTAIN'].includes(order.courierStatus || '') && <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 dark:border-amber-700/50 dark:bg-amber-500/10"><h3 className="font-semibold">Resolve RedX booking</h3><p className="mt-1 text-xs">Check invoice {order.orderNumber} in RedX before attempting another dispatch.</p><div className="mt-3 flex flex-wrap gap-2"><input value={redxRecoveryId} onChange={e => setRedxRecoveryId(e.target.value)} placeholder="Verified tracking ID" className="min-w-[190px] flex-1 rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm"/><button disabled={redxBusy || !redxRecoveryId.trim()} onClick={() => resolveRedx('ATTACH')} className="rounded-lg bg-slate-900 px-3 py-2 text-xs text-white disabled:opacity-50">Verify & attach</button>{order.courierStatus === 'BOOKING_UNCERTAIN' && <button disabled={redxBusy} onClick={() => resolveRedx('CLEAR')} className="rounded-lg border border-amber-400 px-3 py-2 text-xs text-amber-900 disabled:opacity-50">No booking exists — unlock retry</button>}</div></section>}
     <CustomerHistoryCard history={customerHistory}/>
-    <CourierFraudCheckCard orderId={order.id}/>
+    <CourierFraudCheckCard result={fraudCheckResult} error={fraudCheckError} busy={fraudCheckBusy} onCheck={() => void checkCourierFraud()}/>
     {!order.courierName && order.status !== 'HOLD' && !['DELIVERED', 'RETURNED', 'CANCELLED'].includes(order.status) && <button onClick={() => setDispatchOpen(true)} className="w-fit rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 px-4 py-2 text-sm font-medium shadow transition">Select courier & dispatch</button>}
     {editOpen && <OrderEditModal order={order} onClose={() => setEditOpen(false)} onSuccess={load}/>}
     {dispatchOpen && <CourierDispatchModal order={order} onClose={() => setDispatchOpen(false)} onSuccess={(updated) => { setOrder({ ...order, ...updated }); load(); }}/>} 
