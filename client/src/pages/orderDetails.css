@@ -39,18 +39,18 @@
 
 .courier-performance-strip {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 165px), 1fr));
   gap: 8px;
   min-width: 0;
-  overflow-x: auto;
+  align-items: stretch;
+  overflow: visible;
   padding: 1px 1px 4px;
-  scrollbar-width: thin;
 }
 
 .courier-performance-card {
   position: relative;
   display: flex;
-  min-width: 142px;
+  min-width: 0;
   min-height: 128px;
   flex-direction: column;
   overflow: hidden;
@@ -72,6 +72,9 @@
 .courier-performance-card.is-current { border-color: #c9b2d0; box-shadow: 0 0 0 1px rgb(64 19 76 / 8%); }
 
 .courier-card-heading { display: flex; min-width: 0; align-items: center; gap: 6px; color: #fff; font-size: 11px; font-weight: 700; }
+.courier-card-heading b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.courier-record-card .courier-card-heading .courier-card-count { margin-left: auto; flex: 0 0 auto; }
+.courier-record-card .courier-card-heading button { flex: 0 0 auto; }
 .courier-performance-card::before { flex: 0 0 7px; }
 .courier-logo-mark { display: grid; width: 21px; height: 21px; flex: 0 0 21px; place-items: center; border-radius: 6px; background: rgb(255 255 255 / 22%); font-size: 11px; }
 .courier-record-card .courier-card-heading { background: #511561; color: #fff; }
@@ -83,7 +86,9 @@
 .courier-provider-detail { overflow: hidden; margin-top: 3px; color: var(--detail-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .courier-provider-progress { height: 5px; margin-top: auto; border-radius: 99px; background: #e8e6eb; }
 .courier-provider-progress.active { background: #159447; }
-.courier-record-line { display: flex; justify-content: space-between; gap: 5px; margin-top: 7px; color: #697381; font-size: 10px; }
+.courier-record-line { display: flex; min-width: 0; justify-content: space-between; gap: 5px; margin-top: 7px; color: #697381; font-size: 10px; }
+.courier-record-line > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.courier-record-line > b { flex: 0 0 auto; }
 .courier-record-line:first-of-type { margin-top: 10px; }
 .courier-record-line b { color: #2f2935; }
 .dark .courier-record-line b { color: #eee8f2; }
@@ -183,7 +188,6 @@
 
 @media (max-width: 1279px) {
   .order-editor-grid { grid-template-columns: minmax(0, 1fr) 340px; }
-  .courier-performance-strip { grid-template-columns: repeat(5, minmax(155px, 1fr)); }
 }
 
 @media (max-width: 1023px) {
@@ -199,7 +203,7 @@
   .order-details-page { max-width: 100%; }
   .order-details-page .order-detail-header { padding: 12px; }
   .order-details-page .order-detail-header > div:last-child { width: 100%; justify-content: flex-start; }
-  .courier-performance-strip { grid-template-columns: repeat(5, minmax(150px, 1fr)); }
+  .courier-performance-strip { grid-template-columns: repeat(auto-fit, minmax(min(100%, 155px), 1fr)); }
   .order-detail-aside { display: flex; flex-direction: column; }
   .order-edit-line { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
   .order-line-value { align-items: flex-start; }
