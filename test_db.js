@@ -1,0 +1,1 @@
+const { PrismaClient } = require("./server/node_modules/@prisma/client"); const p = new PrismaClient(); p.\("SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()").then(r => { console.log(JSON.stringify(r.map(x => Object.values(x)[0]))); process.exit(0); }).catch(e => { console.error(e); process.exit(1); });

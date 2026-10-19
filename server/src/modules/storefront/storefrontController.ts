@@ -1,3 +1,4 @@
+import { config as appConfig } from '../../config';
 import crypto from 'crypto';
 import { replayCheckout } from './checkoutReplay';
 import { queueOrderEmail } from '../email/service';
@@ -18,7 +19,8 @@ import { getCache, setCache } from '../../redis';
 import { evaluateOrderRisk, normalizeClientIp, recordRiskDecision } from '../orders/orderProtection';
 import { draftTokenHash } from '../orders/incompleteOrderRoutes';
 import { saveOrderCourierSuggestions } from '../couriers/orderLocationService';
-import { dispatchIvrCall, getIvrConfig } from '../orders/ivrService';
+import { getIvrConfig } from '../orders/ivrService';
+import { queueIvrCall } from '../orders/ivrJobs';
 export { productSlug } from '../inventory/productValidation';
 
 const checkoutSchema = z.object({
@@ -339,6 +341,7 @@ export const createStorefrontOrder = async (req: Request & { customer?: { id: st
 
     const deliveryCharge = landingDeliveryCharge(baseDeliveryCharge, freeDeliveryMinQuantity, items);
 
+    const ivrSettings = appConfig.integrationsEnabled && paymentMethod === 'COD' ? await getIvrConfig() : null;
     const order = await prisma.$transaction(async (tx) => {
       await tx.checkoutAttempt.create({data:{key:idempotencyKey,payloadHash:payloadFingerprint}});
       let incompleteDraft = parsed.data.draftToken ? await tx.incompleteCheckout.findUnique({ where: { tokenHash: draftTokenHash(parsed.data.draftToken) } }) : null;
@@ -484,6 +487,7 @@ export const createStorefrontOrder = async (req: Request & { customer?: { id: st
         include: { items: true },
       });
       await queueOrderEmail(createdOrder.id, 'ORDER_PLACED', '', tx);
+      if (ivrSettings?.isEnabled && createdOrder.status === 'PENDING') await queueIvrCall(createdOrder.id, ivrSettings.orderCallDelayMinutes, `initial:${createdOrder.id}`, false, tx);
       await tx.checkoutAttempt.update({where:{key:idempotencyKey},data:{orderId:createdOrder.id}});
       if (incompleteDraft) await tx.incompleteCheckout.update({ where: { id: incompleteDraft.id }, data: { status: 'CONVERTED', orderId: createdOrder.id } });
       await recordRiskDecision(tx, riskInput, risk, createdOrder.id);
@@ -566,32 +570,6 @@ export const createStorefrontOrder = async (req: Request & { customer?: { id: st
     })();
     void sendOrderNotification({ eventTrigger: 'ORDER_PLACED', order }).catch(error => console.error('Storefront SMS notification failed:', error));
 
-    // Automated Outbound Voice Call (IVR Order Confirmation)
-    if (order.status === 'PENDING' && order.paymentMethod === 'COD') {
-      void (async () => {
-        try {
-          const ivrConfig = await getIvrConfig();
-          const delayMinutes = ivrConfig.orderCallDelayMinutes || 0;
-          if (delayMinutes > 0) {
-            setTimeout(() => {
-              void dispatchIvrCall({
-                id: order.id,
-                customerPhone: order.customerPhone,
-                grandTotal: order.grandTotal
-              }).catch(err => console.error('[IVR-DELAYED-CALL-ERROR]', err));
-            }, delayMinutes * 60 * 1000);
-          } else {
-            await dispatchIvrCall({
-              id: order.id,
-              customerPhone: order.customerPhone,
-              grandTotal: order.grandTotal
-            });
-          }
-        } catch (err) {
-          console.error('[IVR-AUTO-CALL] Failed to queue call:', err);
-        }
-      })();
-    }
 
     const responsePayload = {
       success: true,
@@ -611,6 +589,7 @@ export const createStorefrontOrder = async (req: Request & { customer?: { id: st
 
     res.status(201).json(responsePayload);
   } catch (error: any) {
+    console.error('Storefront checkout error:', error?.message || error, error?.stack);
     try {
       if (error?.protectionBlock && error.riskInput && error.risk) await prisma.$transaction(tx => recordRiskDecision(tx, error.riskInput, error.risk));
       if (idempotencyKey && await replayCheckout(idempotencyKey,payloadFingerprint,res)) return;

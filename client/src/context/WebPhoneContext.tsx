@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { WebPhoneModal } from '../components/orders/WebPhoneModal';
+import { useAuth } from './AuthContext';
+const WebPhoneModal = React.lazy(() => import('../components/orders/WebPhoneModal').then(module => ({ default: module.WebPhoneModal })));
 
 export interface CallRequest {
   phone: string;
@@ -8,6 +9,7 @@ export interface CallRequest {
   customerName?: string;
   timestamp?: number;
   isRestoredAfterReload?: boolean;
+  ownerId?: string;
 }
 
 interface WebPhoneContextType {
@@ -23,37 +25,45 @@ const WebPhoneContext = createContext<WebPhoneContextType | undefined>(undefined
 const STORAGE_KEY = 'nix_active_webphone_call';
 
 export const WebPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, loading } = useAuth();
+  const storageKey = `${STORAGE_KEY}:${user?.id || ''}`;
   const [activeCall, setActiveCall] = useState<CallRequest | null>(null);
   const [isOpen, setIsOpen] = useState(false);
 
   // Restore active call on page reload if active within last 5 minutes
   useEffect(() => {
+    if (loading) return;
+    setActiveCall(null); setIsOpen(false);
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
+      localStorage.removeItem(STORAGE_KEY);
+      if (!user) return;
+      const stored = sessionStorage.getItem(storageKey);
       if (stored) {
         const parsed: CallRequest = JSON.parse(stored);
         const ageMs = Date.now() - (parsed.timestamp || 0);
         // If stored within 5 minutes, restore widget
-        if (ageMs < 5 * 60 * 1000 && parsed.phone) {
+        if (ageMs >= 0 && ageMs < 5 * 60 * 1000 && parsed.phone && parsed.ownerId === user.id) {
           setActiveCall({ ...parsed, isRestoredAfterReload: true });
           setIsOpen(true);
         } else {
-          localStorage.removeItem(STORAGE_KEY);
+          sessionStorage.removeItem(storageKey);
         }
       }
     } catch (_) {
-      localStorage.removeItem(STORAGE_KEY);
+      sessionStorage.removeItem(storageKey);
     }
-  }, []);
+  }, [user?.id, loading]);
 
   const startCall = (req: CallRequest) => {
+    if (!user) return;
     const callData: CallRequest = {
       ...req,
       timestamp: Date.now(),
+      ownerId: user.id,
       isRestoredAfterReload: false,
     };
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(callData));
+      sessionStorage.setItem(storageKey, JSON.stringify(callData));
     } catch (_) {}
     setActiveCall(callData);
     setIsOpen(true);
@@ -61,13 +71,13 @@ export const WebPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const endCall = () => {
     try {
-      localStorage.removeItem(STORAGE_KEY);
+      sessionStorage.removeItem(storageKey);
     } catch (_) {}
   };
 
   const closeDialer = () => {
     try {
-      localStorage.removeItem(STORAGE_KEY);
+      sessionStorage.removeItem(storageKey);
     } catch (_) {}
     setActiveCall(null);
     setIsOpen(false);
@@ -85,7 +95,8 @@ export const WebPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     >
       {children}
 
-      {isOpen && activeCall && (
+      {user && isOpen && activeCall?.ownerId === user.id && (
+        <React.Suspense fallback={<div role="status" className="fixed right-4 top-4 z-50 rounded bg-white p-4 shadow">Loading phone…</div>}>
         <WebPhoneModal
           key={`${activeCall.phone}-${activeCall.timestamp}`}
           orderId={activeCall.orderId}
@@ -96,6 +107,7 @@ export const WebPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           onCallEnded={endCall}
           onClose={closeDialer}
         />
+        </React.Suspense>
       )}
     </WebPhoneContext.Provider>
   );

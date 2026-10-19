@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "lint": "eslint server/src/modules/builder client/src/builder server/src/scripts/installBuilder.ts",
+    "lint": "node scripts/lint.cjs",
     "typecheck": "npm --prefix server run typecheck && npm --prefix client run typecheck && npm --prefix storefront run typecheck",
     "test:builder": "npm --prefix server run test:builder",
     "test:builder:e2e": "playwright test",
@@ -18,7 +18,8 @@
     "test:unified": "node --test scripts/tests/*.test.cjs",
     "db:clone": "node scripts/clone-database.cjs",
     "audit:data": "node scripts/audit-data.cjs",
-    "setup": "node scripts/install.cjs"
+    "setup": "node scripts/install.cjs",
+    "lint:full": "eslint server/src client/src storefront/src"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

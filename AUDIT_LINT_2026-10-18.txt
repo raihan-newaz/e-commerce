@@ -1,0 +1,30 @@
+
+> nix-ecommerce@1.0.0 lint
+> eslint server/src/modules/builder client/src/builder server/src/scripts/installBuilder.ts
+
+
+D:\Antigravity\Ecommerce\server\src\modules\builder\core\registry.ts
+  182:7  error  The value assigned to 'svgPath' is not used in subsequent statements                   no-useless-assignment
+  447:9  error  'initScript' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Antigravity\Ecommerce\server\src\modules\builder\core\styles.ts
+  52:9  error  Unexpected control character(s) in regular expression: \x00, \x08, \x0b, \x0c, \x0e, \x1f  no-control-regex
+
+D:\Antigravity\Ecommerce\server\src\modules\builder\formService.ts
+   10:10   error  'getNextOrderNumber' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  116:218  error  Unexpected any. Specify a different type                                              @typescript-eslint/no-explicit-any
+  116:244  error  Unexpected any. Specify a different type                                              @typescript-eslint/no-explicit-any
+
+D:\Antigravity\Ecommerce\server\src\modules\builder\tests\publicationFlow.test.ts
+   52:31  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   53:26  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   54:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   55:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   56:26  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  179:31  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  180:26  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  183:28  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  189:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+✖ 15 problems (15 errors, 0 warnings)
+

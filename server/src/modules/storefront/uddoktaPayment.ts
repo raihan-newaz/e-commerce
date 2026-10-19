@@ -93,7 +93,6 @@ async function verifyAttempt(attemptId: string, invoiceId: string) {
   if (!attempt || (attempt.invoiceId && attempt.invoiceId !== invoiceId)) throw new Error('Payment attempt not found');
   if (attempt.status === 'PAID') return attempt;
   if (attempt.status === 'INITIATION_FAILED' || attempt.order.status === 'CANCELLED' || attempt.order.trashedAt) throw new Error('This order is not payable');
-  if (!attempt.invoiceId) await prisma.paymentAttempt.updateMany({ where: { id: attempt.id, invoiceId: null }, data: { invoiceId } });
   const { body } = await gatewayPost('/api/verify-payment', { invoice_id: invoiceId });
   if (body?.status !== 'COMPLETED') return attempt;
   if (body.invoice_id !== invoiceId || body.metadata?.attempt_id !== attempt.id || body.metadata?.order_id !== attempt.orderId ||
@@ -101,14 +100,15 @@ async function verifyAttempt(attemptId: string, invoiceId: string) {
       !validId(body.transaction_id)) throw new Error('Payment verification mismatch');
   let newlyPaid = false;
   await prisma.$transaction(async (tx) => {
-    const claimed = await tx.paymentAttempt.updateMany({ where: { id: attempt.id, status: { not: 'PAID' }, invoiceId }, data: {
+    const claimed = await tx.paymentAttempt.updateMany({ where: { id: attempt.id, status: { not: 'PAID' }, OR: [{ invoiceId: null }, { invoiceId }] }, data: {
       status: 'PAID', invoiceId, transactionId: body.transaction_id, verifiedAt: new Date(),
     } });
     if (!claimed.count) return;
     newlyPaid = true;
-    await tx.order.update({ where: { id: attempt.orderId }, data: {
+    const payable = await tx.order.updateMany({ where: { id: attempt.orderId, status: { notIn: ['CANCELLED', 'RETURNED'] }, trashedAt: null, grandTotal: attempt.expectedAmount }, data: {
       paymentStatus: 'PAID', advancePaid: attempt.expectedAmount, codAmount: 0,
     } });
+    if (payable.count !== 1) throw new Error('Order is no longer payable');
   });
   if (newlyPaid) {
     const paidOrder = await prisma.order.findUnique({ where: { id: attempt.orderId }, include: { items: true, customer: { select: { email: true } } } });

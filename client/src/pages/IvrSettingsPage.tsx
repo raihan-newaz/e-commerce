@@ -75,6 +75,7 @@ export const IvrSettingsPage: React.FC = () => {
     allowManualCall: true,
   });
 
+  const [trunksUnavailable, setTrunksUnavailable] = useState(false);
   const [trunks, setTrunks] = useState<PbxTrunk[]>([]);
   const [customCallerId, setCustomCallerId] = useState(false);
   const [logs, setLogs] = useState<IvrLog[]>([]);
@@ -92,7 +93,7 @@ export const IvrSettingsPage: React.FC = () => {
       const [cfgRes, logRes, trunkRes] = await Promise.all([
         api.get('/ivr/config'),
         api.get('/ivr/logs'),
-        api.get('/ivr/trunks').catch(() => ({ data: { trunks: [] } })),
+        api.get('/ivr/trunks').catch(() => ({ data: { success: false, trunks: [] } })),
       ]);
 
       if (cfgRes.data?.success && cfgRes.data.config) {
@@ -101,6 +102,7 @@ export const IvrSettingsPage: React.FC = () => {
       if (logRes.data?.success) {
         setLogs(logRes.data.logs || []);
       }
+      setTrunksUnavailable(trunkRes.data?.success === false);
       if (trunkRes.data?.trunks && Array.isArray(trunkRes.data.trunks)) {
         setTrunks(trunkRes.data.trunks);
       }
@@ -321,7 +323,7 @@ export const IvrSettingsPage: React.FC = () => {
                     )}
                   </select>
                 )}
-                <p className="text-[11px] text-slate-400 mt-1">Select from registered Asterisk trunks or enter custom</p>
+                <p className="text-[11px] text-slate-400 mt-1">{trunksUnavailable ? 'PBX status unavailable. Trunk registration could not be verified.' : 'Select an Asterisk trunk or enter a custom caller ID'}</p>
               </div>
 
               <div className="md:col-span-2">

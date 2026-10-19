@@ -1,3 +1,4 @@
+import { config as appConfig } from '../../config';
 import { Router, Request, Response } from 'express';
 import prisma from '../../prisma';
 import { authenticateToken, requireRole } from '../../middlewares/auth';
@@ -9,6 +10,10 @@ import axios from 'axios';
 import crypto from 'crypto';
 
 const router = Router();
+router.use(['/webphone-config', '/active-call', '/test-call', '/manual-dial', '/trunks'], (_req, res, next) => {
+  if (!appConfig.integrationsEnabled) { res.status(503).json({ success: false, message: 'External integrations are disabled' }); return; }
+  next();
+});
 
 // Public / HMAC-protected webhook endpoint for Asterisk dialplan callback
 router.post('/webhook', handlePbxIvrWebhook);
@@ -45,19 +50,12 @@ router.post('/config/reveal', authenticateToken, requireRole(['SUPER_ADMIN']), a
 router.get('/trunks', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER']), async (req: Request, res: Response): Promise<void> => {
   try {
     const config = await getIvrConfig();
-    const pbxRes = await axios.get(`${config.apiUrl.replace(/\/+$/, '')}/api/trunks`, { timeout: 4000 });
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const signature = crypto.createHmac('sha256', config.apiKey).update(timestamp + '.').digest('hex');
+    const pbxRes = await axios.get(`${config.apiUrl.replace(/\/+$/, '')}/api/trunks`, { timeout: 4000, maxRedirects: 0, headers: { 'X-PBX-Timestamp': timestamp, 'X-PBX-Signature': signature } });
     res.json(pbxRes.data);
   } catch {
-    // Fallback if PBX unreachable or old version
-    res.json({
-      success: true,
-      trunks: [
-        { name: 'icctalk_09639139179', callerId: '09639139179', provider: 'ICC Talk', status: 'Registered' },
-        { name: 'SarkerComm_09649979999', callerId: '09649979999', provider: 'Sarker Comm', status: 'Registered' },
-        { name: 'SarkerComm_09649777707', callerId: '09649777707', provider: 'Sarker Comm', status: 'Offline' },
-        { name: 'SarkerComm__09649666606', callerId: '09649666606', provider: 'Sarker Comm', status: 'Offline' }
-      ]
-    });
+    res.status(503).json({ success: false, trunks: [], message: 'PBX trunk status is unavailable' });
   }
 });
 
@@ -251,7 +249,7 @@ router.get('/logs', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_M
   try {
     const logs = await prisma.messageLog.findMany({
       where: {
-        channel: 'IVR_CALL'
+        OR: [{ channel: 'IVR_CALL' }, { channel: 'IVR_JOB', status: 'UNKNOWN' }]
       },
       include: {
         order: {
@@ -280,11 +278,12 @@ router.get('/logs', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_M
 router.get('/webphone-config', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'CALL_CENTER_AGENT']), async (req: Request, res: Response): Promise<void> => {
   try {
     const config = await getIvrConfig();
-    const wsServer = process.env.PBX_WEBRTC_WS_SERVER?.trim();
+    const origin = new URL(appConfig.publicOrigin);
+    const wsServer = `${origin.protocol === 'https:' ? 'wss:' : 'ws:'}//${origin.host}/ws-sip`;
     const sipDomain = process.env.PBX_WEBRTC_SIP_DOMAIN?.trim();
     const extension = process.env.PBX_WEBRTC_EXTENSION?.trim();
     const password = process.env.PBX_WEBRTC_PASSWORD;
-    if (!wsServer || !sipDomain || !extension || !password) {
+    if (!process.env.PBX_SIP_UPSTREAM_URL || !sipDomain || !extension || !password) {
       res.status(503).json({ success: false, message: 'WebPhone credentials are not configured on the server.' });
       return;
     }
@@ -308,7 +307,9 @@ router.get('/webphone-config', authenticateToken, requireRole(['SUPER_ADMIN', 'O
 // Hangup Active Call
 router.post('/active-call/hangup', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'CALL_CENTER_AGENT']), async (req: Request, res: Response): Promise<void> => {
   try {
-    const { phone, orderId } = req.body;
+    const phone = formatBdPhone(String(req.body?.phone || ''));
+    const orderId = typeof req.body?.orderId === 'string' ? req.body.orderId : undefined;
+    if (!phone) { res.status(400).json({ success: false, message: 'Valid phone is required' }); return; }
     const config = await getIvrConfig();
     if (!config.apiUrl || !config.apiKey) {
       res.status(503).json({ success: false, message: 'IVR endpoint and signing secret are not configured.' });
@@ -316,7 +317,7 @@ router.post('/active-call/hangup', authenticateToken, requireRole(['SUPER_ADMIN'
     }
     const timestamp = Math.floor(Date.now() / 1000);
     const payload = JSON.stringify({ phone, orderId, timestamp });
-    const signature = crypto.createHmac('sha256', config.apiKey).update(payload).digest('hex');
+    const signature = crypto.createHmac('sha256', config.apiKey).update(`${timestamp}.${payload}`).digest('hex');
 
     const agentUrl = new URL(config.apiUrl);
     const hangupUrl = `${agentUrl.protocol}//${agentUrl.host}/api/call/hangup`;
@@ -329,10 +330,13 @@ router.post('/active-call/hangup', authenticateToken, requireRole(['SUPER_ADMIN'
         'X-PBX-Timestamp': String(timestamp),
       },
       body: payload,
+      signal: AbortSignal.timeout(10000),
+      redirect: 'error',
     });
 
     const data = await response.json();
-    res.json(data);
+    if (!response.ok || data?.success === false) { res.status(502).json({ success: false, message: 'PBX could not confirm hangup' }); return; }
+    res.json({ ...data, success: true });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }

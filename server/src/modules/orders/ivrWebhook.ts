@@ -1,184 +1,71 @@
 import { Request, Response } from 'express';
 import crypto from 'crypto';
+import { z } from 'zod';
 import prisma from '../../prisma';
-import { logAudit } from '../audit/auditService';
+import { config as appConfig } from '../../config';
 import { notifyOrderStatus } from '../messaging/messageService';
-import { getIvrConfig, dispatchIvrCall } from './ivrService';
+import { getIvrConfig, formatBdPhone } from './ivrService';
+import { queueIvrCall } from './ivrJobs';
+import { transitionOrder } from './orderTransition';
+import { appendOrderNote } from './orderNotes';
 
-function verifyWebhookSignature(payloadStr: string, signature: string, timestamp: string, secret: string): boolean {
-  if (!signature || !timestamp || !secret) return false;
-  const now = Math.floor(Date.now() / 1000);
-  // Allow up to 5 minutes clock drift
-  if (Math.abs(now - parseInt(timestamp, 10)) > 300) {
-    return false;
-  }
-  const expectedSig = crypto
-    .createHmac('sha256', secret)
-    .update(payloadStr)
-    .digest('hex');
-
-  try {
-    return crypto.timingSafeEqual(Buffer.from(expectedSig), Buffer.from(signature));
-  } catch {
-    return false;
-  }
+export function verifyWebhookSignature(body: string, signature: string, timestamp: string, secret: string): boolean {
+  if (!secret || !/^\d{10}$/.test(timestamp) || !/^[a-f0-9]{64}$/i.test(signature)) return false;
+  if (Math.abs(Math.floor(Date.now() / 1000) - Number(timestamp)) > 300) return false;
+  const expected = crypto.createHmac('sha256', secret).update(`${timestamp}.${body}`).digest();
+  return crypto.timingSafeEqual(expected, Buffer.from(signature, 'hex'));
 }
 
+const eventSchema = z.object({
+  callId: z.string().min(1).max(100), orderId: z.string().min(1).max(100), phone: z.string().min(1).max(30),
+  status: z.enum(['CONFIRMED', 'CANCELLED', 'CALL_ENDED_NO_INPUT', 'INVALID_INPUT', 'NO_ANSWER', 'BUSY']),
+});
+
 export const handlePbxIvrWebhook = async (req: Request, res: Response): Promise<void> => {
+  if (!appConfig.integrationsEnabled) { res.status(503).json({ success: false, message: 'Integrations are disabled' }); return; }
   try {
-    const signature = String(req.headers['x-pbx-signature'] || '');
-    const timestamp = String(req.headers['x-pbx-timestamp'] || '');
-
-    const config = await getIvrConfig();
-
-    // Raw body validation
-    const rawBody = (req as any).rawBody ? (req as any).rawBody.toString('utf8') : JSON.stringify(req.body);
-
-    if (!verifyWebhookSignature(rawBody, signature, timestamp, config.apiKey)) {
-      res.status(401).json({ success: false, message: 'Invalid or expired signature' });
-      return;
+    const settings = await getIvrConfig();
+    const body = (req as Request & { rawBody?: Buffer }).rawBody?.toString('utf8');
+    if (!body || !verifyWebhookSignature(body, String(req.headers['x-pbx-signature'] || ''), String(req.headers['x-pbx-timestamp'] || ''), settings.apiKey)) {
+      res.status(401).json({ success: false, message: 'Invalid or expired signature' }); return;
     }
-
-    const { orderId, status: ivrStatus, phone } = req.body;
-
-    if (!orderId || !ivrStatus) {
-      res.status(400).json({ success: false, message: 'Missing orderId or status' });
-      return;
-    }
-
-    // Handle test call webhooks
-    if (String(orderId).startsWith('TEST-')) {
-      const lastTestLog = await prisma.messageLog.findFirst({
-        where: { recipient: phone, channel: 'IVR_CALL', eventTrigger: 'TEST_CALL' },
-        orderBy: { createdAt: 'desc' }
-      });
-      if (lastTestLog) {
-        await prisma.messageLog.update({
-          where: { id: lastTestLog.id },
-          data: {
-            status: ivrStatus,
-            body: `Test call ended with result: ${ivrStatus}`
-          }
-        }).catch(() => {});
+    const parsed = eventSchema.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ success: false, message: 'Invalid IVR event' }); return; }
+    const event = parsed.data;
+    const result = await prisma.$transaction(async tx => {
+      // The app-generated callId binds callbacks to one dispatch, recipient and order.
+      await tx.$queryRaw`SELECT id FROM MessageLog WHERE id = ${event.callId} FOR UPDATE`;
+      const call = await tx.messageLog.findUnique({ where: { id: event.callId } });
+      if (!call || call.channel !== 'IVR_CALL' || call.recipient !== formatBdPhone(event.phone) ||
+        (event.orderId.startsWith('TEST-') ? call.eventTrigger !== event.orderId : call.orderId !== event.orderId)) {
+        throw Object.assign(new Error('Call not found'), { status: 404 });
       }
-      res.status(200).json({ success: true, message: `Test call webhook handled: ${ivrStatus}` });
-      return;
-    }
-
-    const order = await prisma.order.findUnique({
-      where: { id: String(orderId) }
-    });
-
-    if (!order) {
-      res.status(404).json({ success: false, message: 'Order not found' });
-      return;
-    }
-
-    let newOrderStatus: string | null = null;
-    let noteText = '';
-    const timeStr = new Date().toLocaleString('en-GB', {
-      timeZone: 'Asia/Dhaka',
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true,
-    });
-
-    if (ivrStatus === 'CONFIRMED') {
-      newOrderStatus = 'CONFIRMED';
-      noteText = `[${timeStr}] [Automated IVR Call] Customer answered call on ${phone} and pressed 1 to CONFIRM order.`;
-    } else if (ivrStatus === 'CANCELLED') {
-      newOrderStatus = 'CANCELLED';
-      noteText = `[${timeStr}] [Automated IVR Call] Customer answered call on ${phone} and pressed 2 to CANCEL order.`;
-    } else if (ivrStatus === 'CALL_ENDED_NO_INPUT' || ivrStatus === 'INVALID_INPUT' || ivrStatus === 'NO_ANSWER' || ivrStatus === 'BUSY') {
-      noteText = `[${timeStr}] [Automated IVR Call] Call to ${phone} ended with result: ${ivrStatus}.`;
-    }
-
-    // Update MessageLog
-    const lastLog = await prisma.messageLog.findFirst({
-      where: { orderId: order.id, channel: 'IVR_CALL' },
-      orderBy: { createdAt: 'desc' }
-    });
-    if (lastLog) {
-      await prisma.messageLog.update({
-        where: { id: lastLog.id },
-        data: {
-          status: ivrStatus,
-          body: noteText
-        }
-      }).catch(() => {});
-    }
-
-    // Handle automated retry if customer didn't answer or provide input
-    const isUnanswered = ['CALL_ENDED_NO_INPUT', 'INVALID_INPUT', 'NO_ANSWER', 'BUSY'].includes(ivrStatus);
-
-    if (isUnanswered && order.status === 'PENDING' && config.isEnabled) {
-      const attempts = await prisma.messageLog.count({
-        where: { orderId: order.id, channel: 'IVR_CALL' }
-      });
-
-      if (attempts < config.maxRetries) {
-        const retryDelayMs = config.retryDelayMinutes * 60 * 1000;
-        noteText += ` (Attempt ${attempts}/${config.maxRetries}. Retrying in ${config.retryDelayMinutes} min)`;
-
-        setTimeout(() => {
-          void dispatchIvrCall({
-            id: order.id,
-            customerPhone: order.customerPhone,
-            grandTotal: order.grandTotal
-          }, true).catch(err => console.error('[IVR-RETRY-ERROR]', err));
-        }, retryDelayMs);
-      } else {
-        noteText += ` (Reached max retries: ${attempts}/${config.maxRetries}. Needs manual agent follow-up)`;
+      const dedupeKey = `ivr-result:${event.callId}`;
+      if (await tx.messageLog.findUnique({ where: { dedupeKey } })) return null;
+      await tx.messageLog.create({ data: { channel: 'IVR_RECEIPT', recipient: call.recipient, orderId: call.orderId, dedupeKey, status: event.status, body: 'Final call result accepted' } });
+      const time = new Date().toLocaleString('en-GB', { timeZone: 'Asia/Dhaka', hour12: true });
+      const note = `[${time}] [Automated IVR Call] [call:${call.id}] ${event.status} (${call.recipient})`;
+      await tx.messageLog.update({ where: { id: call.id }, data: { status: event.status, body: note } });
+      if (!call.orderId) return null;
+      await tx.$queryRaw`SELECT id FROM \`Order\` WHERE id = ${call.orderId} FOR UPDATE`;
+      const order = await tx.order.findUnique({ where: { id: call.orderId }, include: { items: true } });
+      if (!order || order.trashedAt) return null;
+      let updated = null;
+      if (order.status === 'PENDING' && ['CONFIRMED', 'CANCELLED'].includes(event.status) &&
+        (order.riskReviewStatus !== 'REVIEW_REQUIRED' || event.status === 'CANCELLED')) {
+        updated = await transitionOrder(tx, order, event.status);
+        await tx.auditLog.create({ data: { action: 'STATUS_CHANGE', entity: 'ORDER', entityId: order.id, userName: 'Asterisk IVR', details: JSON.stringify({ from: order.status, to: event.status, callId: call.id }) } });
+      } else if (order.status === 'PENDING' && settings.isEnabled && !['CONFIRMED', 'CANCELLED'].includes(event.status)) {
+        const attempts = await tx.messageLog.count({ where: { orderId: order.id, channel: 'IVR_CALL' } });
+        if (attempts <= settings.maxRetries) await queueIvrCall(order.id, settings.retryDelayMinutes, `retry:${call.id}`, true, tx);
       }
-    }
-
-    const currentNotes = order.internalNote ? `${order.internalNote}\n${noteText}` : noteText;
-
-    if (newOrderStatus && order.status === 'PENDING') {
-      const updatedOrder = await prisma.order.update({
-        where: { id: order.id },
-        data: {
-          status: newOrderStatus,
-          internalNote: currentNotes,
-          cancelledAt: newOrderStatus === 'CANCELLED' ? new Date() : undefined
-        }
-      });
-
-      // Send SMS / WhatsApp order status notification if configured
-      await notifyOrderStatus(updatedOrder).catch(() => {});
-
-      // Log system audit
-      await logAudit({
-        action: 'STATUS_CHANGE',
-        entity: 'ORDER',
-        entityId: order.id,
-        userId: 'SYSTEM_IVR',
-        userName: 'Asterisk IVR Auto-Dialer',
-        details: {
-          from: order.status,
-          to: newOrderStatus,
-          reason: noteText,
-          ivrStatus
-        }
-      }).catch(() => {});
-
-      res.status(200).json({ success: true, message: `Order updated to ${newOrderStatus}`, orderId });
-      return;
-    }
-
-    // Just record note if order wasn't PENDING
-    await prisma.order.update({
-      where: { id: order.id },
-      data: { internalNote: currentNotes }
+      await appendOrderNote(tx, order.id, note);
+      return updated;
     });
-
-    res.status(200).json({ success: true, message: 'Note recorded', orderId });
-  } catch (error: any) {
-    console.error('[PBX-WEBHOOK-ERROR]', error);
-    res.status(500).json({ success: false, message: error.message || 'Webhook processing error' });
+    if (result) void notifyOrderStatus(result).catch(() => console.warn('IVR status notification failed'));
+    res.json({ success: true });
+  } catch (error) {
+    const status = error instanceof Error && 'status' in error ? Number(error.status) : 500;
+    res.status(status).json({ success: false, message: status === 404 ? 'Call not found' : 'Unable to process IVR result' });
   }
 };

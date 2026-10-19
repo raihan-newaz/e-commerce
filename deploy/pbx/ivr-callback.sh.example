@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /usr/bin/node /opt/pbx-ivr-agent/callback.cjs "$@"

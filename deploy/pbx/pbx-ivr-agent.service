@@ -1,0 +1,20 @@
+[Unit]
+Description=PBX IVR agent (signed protocol v2)
+After=network.target asterisk.service
+
+[Service]
+Type=simple
+User=asterisk
+Group=asterisk
+WorkingDirectory=/opt/pbx-ivr-agent
+ExecStart=/usr/bin/node /opt/pbx-ivr-agent/agent.cjs
+Environment=PBX_BIND_HOST=127.0.0.1
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0077
+StateDirectory=pbx-ivr-agent
+
+[Install]
+WantedBy=multi-user.target

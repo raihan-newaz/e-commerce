@@ -16,8 +16,7 @@ interface WebPhoneModalProps {
 
 type CallState = 'INITIALIZING' | 'CONNECTING' | 'RINGING' | 'CONNECTED' | 'ENDED' | 'FAILED' | 'RELOAD_ACTIVE';
 
-// Module-level cache to eliminate repeated HTTP roundtrips
-let cachedWebPhoneConfig: any = null;
+
 
 export const WebPhoneModal: React.FC<WebPhoneModalProps> = ({
   orderId,
@@ -46,6 +45,9 @@ export const WebPhoneModal: React.FC<WebPhoneModalProps> = ({
   const dragStartRef = useRef<{ startX: number; startY: number; initX: number; initY: number } | null>(null);
   const modalRef = useRef<HTMLDivElement | null>(null);
 
+  const generationRef = useRef(0);
+  const startingRef = useRef(false);
+  const hangingUpRef = useRef(false);
   const uaRef = useRef<JsSIP.UA | null>(null);
   const sessionRef = useRef<any>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -61,6 +63,19 @@ export const WebPhoneModal: React.FC<WebPhoneModalProps> = ({
     const defaultY = 24;
     setPosition({ x: defaultX, y: defaultY });
   }, []);
+
+  useEffect(() => {
+    const clamp = () => {
+      const width = modalRef.current?.offsetWidth || Math.min(384, window.innerWidth - 16);
+      const height = modalRef.current?.offsetHeight || 320;
+      setPosition(current => current ? { x: Math.max(8, Math.min(current.x, window.innerWidth - width - 8)), y: Math.max(8, Math.min(current.y, window.innerHeight - height - 8)) } : current);
+    };
+    const observer = new ResizeObserver(clamp);
+    if (modalRef.current) observer.observe(modalRef.current);
+    window.addEventListener('resize', clamp);
+    clamp();
+    return () => { observer.disconnect(); window.removeEventListener('resize', clamp); };
+  }, [isMinimized]);
 
   const handleDragStart = (clientX: number, clientY: number) => {
     if (!position) return;
@@ -118,19 +133,17 @@ export const WebPhoneModal: React.FC<WebPhoneModalProps> = ({
   }, []);
 
   const startWebPhoneSession = async () => {
+    if (startingRef.current) return;
+    startingRef.current = true;
+    const generation = ++generationRef.current;
     try {
       setCallState('INITIALIZING');
       setStatusMessage('Connecting to PBX Server…');
 
-      let cfg = cachedWebPhoneConfig;
-      if (!cfg) {
-        const { data } = await api.get('/ivr/webphone-config');
-        if (!data?.success || !data?.config) {
-          throw new Error('Failed to load phone configuration');
-        }
-        cfg = data.config;
-        cachedWebPhoneConfig = cfg;
-      }
+      const { data } = await api.get('/ivr/webphone-config');
+      if (generation !== generationRef.current) return;
+      if (!data?.success || !data?.config) throw new Error('Failed to load phone configuration');
+      const cfg = data.config;
 
       const socket = new JsSIP.WebSocketInterface(cfg.wsServer);
 
@@ -147,38 +160,45 @@ export const WebPhoneModal: React.FC<WebPhoneModalProps> = ({
       uaRef.current = ua;
 
       ua.on('connected', () => {
+        if (generation !== generationRef.current) return;
         setStatusMessage('Connected to PBX. Registering…');
       });
 
+      let dialed = false;
       ua.on('registered', () => {
+        if (dialed || generation !== generationRef.current) return;
+        dialed = true;
         setStatusMessage('Ready. Calling customer…');
         dialCustomer(ua, cfg.sipDomain, cfg);
       });
 
       ua.on('registrationFailed', (e: any) => {
+        if (generation !== generationRef.current) return;
+        ua.stop();
         setCallState('FAILED');
         setStatusMessage(`Registration failed: ${e.cause || 'Unauthorized'}`);
       });
 
       ua.start();
     } catch (err: any) {
+      if (generation !== generationRef.current) return;
       setCallState('FAILED');
       setStatusMessage(err.message || 'Could not connect to PBX');
       toast.error('Web Phone connection failed');
-    }
+    } finally { if (generation === generationRef.current) startingRef.current = false; }
   };
 
   useEffect(() => {
-    let isMounted = true;
 
     if (!isRestoredAfterReload) {
       void startWebPhoneSession();
     }
 
     return () => {
-      isMounted = false;
+      generationRef.current++;
+      startingRef.current = false;
       if (timerRef.current) clearInterval(timerRef.current);
-      if (sessionRef.current && sessionRef.current.isEstablished()) {
+      if (sessionRef.current && !sessionRef.current.isEnded()) {
         try { sessionRef.current.terminate(); } catch (_) {}
       }
       if (uaRef.current) {
@@ -188,15 +208,18 @@ export const WebPhoneModal: React.FC<WebPhoneModalProps> = ({
   }, []);
 
   const dialCustomer = (ua: JsSIP.UA, domain: string, cfg: any) => {
+    const generation = generationRef.current;
     setCallState('CONNECTING');
     setStatusMessage(`Dialing ${cleanPhone}…`);
 
     const eventHandlers = {
       progress: () => {
+        if (generation !== generationRef.current) return;
         setCallState('RINGING');
         setStatusMessage('Ringing customer phone…');
       },
       confirmed: () => {
+        if (generation !== generationRef.current) return;
         setCallState('CONNECTED');
         setStatusMessage('Call connected. Talking…');
         // Start live duration timer
@@ -205,9 +228,11 @@ export const WebPhoneModal: React.FC<WebPhoneModalProps> = ({
         }, 1000);
       },
       ended: () => {
+        if (hangingUpRef.current || generation !== generationRef.current) return;
         handleCallEnded('Call ended');
       },
       failed: (e: any) => {
+        if (hangingUpRef.current || generation !== generationRef.current) return;
         handleCallEnded(`Call failed: ${e.cause || 'Customer unavailable'}`);
       },
       peerconnection: (data: any) => {
@@ -247,6 +272,9 @@ export const WebPhoneModal: React.FC<WebPhoneModalProps> = ({
   };
 
   const handleCallEnded = (msg: string) => {
+    generationRef.current++;
+    startingRef.current = false;
+    try { uaRef.current?.stop(); } catch { /* Cleanup is best effort. */ }
     setCallState('ENDED');
     setStatusMessage(msg);
     if (timerRef.current) clearInterval(timerRef.current);
@@ -254,6 +282,12 @@ export const WebPhoneModal: React.FC<WebPhoneModalProps> = ({
   };
 
   const handleHangup = async () => {
+    if (hangingUpRef.current) return;
+    hangingUpRef.current = true;
+    if (timerRef.current) clearInterval(timerRef.current);
+    generationRef.current++;
+    startingRef.current = false;
+    try { uaRef.current?.stop(); } catch { /* Cleanup is best effort. */ }
     // 1. Terminate browser WebRTC session
     if (sessionRef.current) {
       try {
@@ -263,12 +297,20 @@ export const WebPhoneModal: React.FC<WebPhoneModalProps> = ({
 
     // 2. Terminate server Asterisk channel via backend
     try {
-      await api.post('/ivr/active-call/hangup', {
+      const { data } = await api.post('/ivr/active-call/hangup', {
         phone: cleanPhone,
         orderId: orderId,
       });
-    } catch (_) {}
+      if (!data?.success) throw new Error('Hangup not confirmed');
+    } catch {
+      hangingUpRef.current = false;
+      setCallState('RELOAD_ACTIVE');
+      setStatusMessage('PBX hangup নিশ্চিত হয়নি। আবার কল কাটুন চাপুন।');
+      toast.error('Could not confirm PBX hangup. Please retry.');
+      return;
+    }
 
+    hangingUpRef.current = false;
     handleCallEnded('Call terminated by agent');
     toast('Call ended & Asterisk channel killed', { icon: '📞' });
   };
@@ -302,11 +344,11 @@ export const WebPhoneModal: React.FC<WebPhoneModalProps> = ({
           !position ? 'top-4 right-4 sm:top-6 sm:right-8' : ''
         } ${
           isMinimized
-            ? 'w-80 shadow-2xl'
+            ? 'w-80 max-w-[calc(100vw-1rem)] shadow-2xl'
             : 'w-[calc(100vw-2rem)] max-w-sm sm:w-96 shadow-2xl'
         }`}
       >
-        <div className="overflow-hidden rounded-2xl border-2 border-emerald-500/80 bg-white shadow-2xl dark:border-emerald-600/60 dark:bg-slate-900 ring-4 ring-emerald-500/10">
+        <div className="max-h-[calc(100dvh-1rem)] overflow-y-auto rounded-2xl border-2 border-emerald-500/80 bg-white shadow-2xl dark:border-emerald-600/60 dark:bg-slate-900 ring-4 ring-emerald-500/10">
           {/* Header - DRAG HANDLE */}
           <div
             onMouseDown={(e) => {
@@ -318,7 +360,7 @@ export const WebPhoneModal: React.FC<WebPhoneModalProps> = ({
                 handleDragStart(e.touches[0].clientX, e.touches[0].clientY);
               }
             }}
-            className="flex items-center justify-between border-b border-slate-100 bg-slate-900 px-4 py-3 text-white dark:border-slate-800 dark:bg-slate-950 cursor-grab active:cursor-grabbing select-none"
+            className="flex items-center justify-between border-b border-slate-100 bg-slate-900 px-4 py-3 text-white dark:border-slate-800 dark:bg-slate-950 cursor-grab active:cursor-grabbing select-none touch-none"
             title="মাউস দিয়ে চেপে ধরে যেকোনো জায়গায় ড্র্যাগ/মুভ করুন (Drag to move)"
           >
             <div className="flex items-center gap-2">

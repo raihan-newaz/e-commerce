@@ -7,8 +7,7 @@ import { documentForms, FormInputError, validateSubmission } from './core/forms'
 import { escapeHtml } from './core/registry';
 import type { PageDocument } from './core/schema';
 import { failure, validatedDocument } from './service';
-import { getNextOrderNumber } from '../orders/orderNumberService';
-import { evaluateOrderRisk, recordRiskDecision } from '../orders/orderProtection';
+import { evaluateOrderRisk, recordRiskDecision, type RiskInput, type RiskResult } from '../orders/orderProtection';
 import { saveOrderCourierSuggestions } from '../couriers/orderLocationService';
 import { draftTokenHash } from '../orders/incompleteOrderRoutes';
 
@@ -113,7 +112,7 @@ export async function submitBuilderForm(req: Request, res: Response, next: NextF
 
     // Automatically create OMS order if submission contains customer order fields
     try { await processOrderFromSubmission(values, doc.slug, id, String(req.body._draft_token || id), req.ip || ''); }
-    catch (error) { if (error instanceof Error && 'status' in error && typeof error.status === 'number') { if ('riskInput' in error && 'risk' in error) await prisma.$transaction(tx => recordRiskDecision(tx, (error as any).riskInput, (error as any).risk)); res.status(error.status).type('html').send(receipt('Order needs attention', [error.message], doc.slug)); return; } throw error; }
+    catch (error) { if (error instanceof Error && 'status' in error && typeof error.status === 'number') { if ('riskInput' in error && 'risk' in error) await prisma.$transaction(tx => recordRiskDecision(tx, error.riskInput as RiskInput, error.risk as RiskResult)); res.status(error.status).type('html').send(receipt('Order needs attention', [error.message], doc.slug)); return; } throw error; }
 
     res.status(200).type('html').send(receipt('Response received', [String(form.node.props.successMessage || 'Thank you. Your response has been received.')], doc.slug));
   } catch (error) {

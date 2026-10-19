@@ -53,6 +53,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    try { sessionStorage.removeItem(`nix_active_webphone_call:${user?.id || ''}`); localStorage.removeItem('nix_active_webphone_call'); } catch { /* Cleanup is best effort. */ }
+
     setToken(null);
     setUser(null);
     void api.post('/auth/logout')

@@ -1,3 +1,4 @@
+import { config as appConfig } from '../../config';
 import axios from 'axios';
 import crypto from 'crypto';
 import prisma from '../../prisma';
@@ -88,107 +89,45 @@ export function isWithinCallingHours(startTime: string, endTime: string): boolea
     const [endH, endM] = endTime.split(':').map(Number);
     const endTotal = endH * 60 + endM;
 
-    return currentTotal >= startTotal && currentTotal <= endTotal;
+    if (![currentTotal, startTotal, endTotal].every(Number.isFinite)) return false;
+    return startTotal <= endTotal ? currentTotal >= startTotal && currentTotal <= endTotal : currentTotal >= startTotal || currentTotal <= endTotal;
   } catch {
     return true;
   }
 }
 
-export async function dispatchIvrCall(order: { id: string; customerPhone: string; grandTotal?: number }, isRetry = false, isManual = false) {
-  const config = await getIvrConfig();
+
+export async function dispatchIvrCall(order: { id: string; customerPhone: string; grandTotal?: number }, isRetry = false, isManual = false, callId: string = crypto.randomUUID()) {
+  if (!appConfig.integrationsEnabled) return { skipped: true, reason: 'Integrations are disabled' };
+  const settings = await getIvrConfig();
   const isTest = order.id.startsWith('TEST-');
-
-  if (!config.apiUrl || !config.apiKey) {
-    return { success: false, error: 'IVR endpoint and signing secret must be configured' };
+  if (!settings.apiUrl || !settings.apiKey) return { success: false, error: 'IVR endpoint and signing secret must be configured' };
+  if (!settings.isEnabled && !isTest && !isManual) return { skipped: true, reason: 'IVR is disabled' };
+  if (!isTest) {
+    const current = await prisma.order.findUnique({ where: { id: order.id } });
+    if (!current || current.trashedAt || current.riskReviewStatus === 'REVIEW_REQUIRED' || (!isManual && current.status !== 'PENDING') || ['CANCELLED', 'RETURNED', 'DELIVERED', 'FAKE_TRASH'].includes(current.status)) return { skipped: true, reason: 'Order is no longer eligible for calling' };
+    order = current;
   }
-
-  if (!config.isEnabled && !isTest && !isManual) {
-    return { skipped: true, reason: 'PBX IVR calling is disabled in settings' };
-  }
-
-  if (!isTest && !isManual && config.minOrderAmount > 0 && (order.grandTotal || 0) < config.minOrderAmount) {
-    return { skipped: true, reason: `Order total ৳${order.grandTotal} is below minimum threshold ৳${config.minOrderAmount}` };
-  }
-
-  // Active hours check (only applies to automated customer orders, admin manual calls and test calls can be dialed anytime)
-  if (!isTest && !isManual && !isWithinCallingHours(config.callStartTime, config.callEndTime)) {
-    return { skipped: true, reason: `Outside allowed IVR calling hours (${config.callStartTime} - ${config.callEndTime} Asia/Dhaka)` };
-  }
-
+  if (!isTest && !isManual && (order.grandTotal || 0) < settings.minOrderAmount) return { skipped: true, reason: 'Below minimum amount' };
+  if (!isTest && !isManual && !isWithinCallingHours(settings.callStartTime, settings.callEndTime)) return { deferred: true, reason: 'Outside calling hours' };
   const phone = formatBdPhone(order.customerPhone);
-  if (!phone) {
-    return { success: false, error: 'Invalid Bangladesh phone number for IVR call' };
-  }
-
-  const timestamp = Math.floor(Date.now() / 1000);
-  const payload = {
-    orderId: order.id,
-    phone,
-    amount: Math.round(order.grandTotal || 0),
-    callerId: config.callerId
-  };
-  const payloadStr = JSON.stringify(payload);
-
-  const signature = crypto
-    .createHmac('sha256', config.apiKey)
-    .update(payloadStr)
-    .digest('hex');
-
-  // Create message log
-  const isRealOrder = !order.id.startsWith('TEST-');
-  let logId: string | null = null;
+  if (!phone) return { success: false, error: 'Invalid Bangladesh phone number' };
+  await prisma.messageLog.upsert({ where: { id: callId }, update: {}, create: {
+    id: callId, recipient: phone, channel: 'IVR_CALL', eventTrigger: isTest ? order.id : isRetry ? 'RETRY_CALL' : 'ORDER_PLACED', status: 'QUEUED', body: 'IVR call queued', orderId: isTest ? null : order.id,
+  } });
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const payload = JSON.stringify({ callId, orderId: order.id, phone, amount: Math.round(order.grandTotal || 0), callerId: settings.callerId });
+  const signature = crypto.createHmac('sha256', settings.apiKey).update(timestamp + '.' + payload).digest('hex');
   try {
-    const createdLog = await prisma.messageLog.create({
-      data: {
-        recipient: phone,
-        channel: 'IVR_CALL',
-        eventTrigger: isRetry ? 'RETRY_CALL' : (order.id.startsWith('TEST-') ? 'TEST_CALL' : 'ORDER_PLACED'),
-        status: 'QUEUED',
-        body: `IVR call queued for ${order.id}. Caller ID: ${config.callerId}, Amount: ৳${Math.round(order.grandTotal || 0)}`,
-        orderId: isRealOrder ? order.id : null,
-      }
+    const response = await axios.post(settings.apiUrl.replace(/\/+$/, '') + '/api/call/dispatch', payload, {
+      headers: { 'Content-Type': 'application/json', 'X-PBX-Signature': signature, 'X-PBX-Timestamp': timestamp, 'X-PBX-Signature-Version': '2', 'Idempotency-Key': callId }, timeout: 10000, maxRedirects: 0,
     });
-    logId = createdLog.id;
-  } catch (e) {
-    console.error('[IVR-LOG-CREATE-ERROR]', e);
-  }
-
-  try {
-    const response = await axios.post(`${config.apiUrl.replace(/\/+$/, '')}/api/call/dispatch`, payload, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-PBX-Signature': signature,
-        'X-PBX-Timestamp': String(timestamp)
-      },
-      timeout: 10000
-    });
-
-    if (logId) {
-      await prisma.messageLog.update({
-        where: { id: logId },
-        data: {
-          status: 'SENT',
-          body: `Call dispatched to Asterisk PBX. Call ID: ${response.data?.callId || 'ok'}`
-        }
-      }).catch(() => {});
-    }
-
+    if (response.data?.success === false) throw new Error('PBX rejected call');
+    // A callback may already have arrived; never overwrite its final result.
+    await prisma.messageLog.updateMany({ where: { id: callId, status: 'QUEUED' }, data: { status: 'SENT', body: 'Call dispatched to PBX' } });
     return { success: true, data: response.data };
-  } catch (error: any) {
-    const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message;
-    console.error(`[IVR-DISPATCH-ERROR] Order ${order.id}:`, errorMsg);
-
-    if (logId) {
-      await prisma.messageLog.update({
-        where: { id: logId },
-        data: {
-          status: 'FAILED',
-          errorMessage: errorMsg,
-          body: `Failed to dispatch call: ${errorMsg}`
-        }
-      }).catch(() => {});
-    }
-
-    return { success: false, error: errorMsg };
+  } catch {
+    await prisma.messageLog.updateMany({ where: { id: callId, status: 'QUEUED' }, data: { status: 'UNKNOWN', errorMessage: 'Dispatch failed or acknowledgement was lost; check PBX before redialing' } });
+    return { success: false, error: 'Call dispatch could not be confirmed' };
   }
 }

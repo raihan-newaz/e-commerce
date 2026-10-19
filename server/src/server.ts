@@ -1,3 +1,5 @@
+import { installSipProxy } from './sipProxy';
+import { startIvrWorker } from './modules/orders/ivrJobs';
 import adminDropdownRoutes from './modules/adminDropdowns/routes';
 import express from 'express';
 import http from 'http';
@@ -53,43 +55,7 @@ export const io = new SocketIOServer(server, {
   },
 });
 
-// Proxy WebRTC SIP WebSocket to Asterisk PBX (103.169.160.153:8088/ws)
-server.on('upgrade', (req, socket, head) => {
-  if (req.url && (req.url === '/ws-sip' || req.url.startsWith('/ws-sip'))) {
-    const proxyReq = http.request({
-      hostname: '103.169.160.153',
-      port: 8088,
-      path: '/ws',
-      method: req.method,
-      headers: {
-        ...req.headers,
-        host: '103.169.160.153:8088',
-      },
-    });
-
-    proxyReq.on('upgrade', (proxyRes, proxySocket, proxyHead) => {
-      socket.write(
-        `HTTP/1.1 101 Switching Protocols\r\n` +
-        Object.entries(proxyRes.headers)
-          .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}\r\n`)
-          .join('') +
-        '\r\n'
-      );
-      if (proxyHead && proxyHead.length) {
-        socket.write(proxyHead);
-      }
-      proxySocket.pipe(socket);
-      socket.pipe(proxySocket);
-    });
-
-    proxyReq.on('error', (err) => {
-      console.error('SIP WebSocket proxy error:', err.message);
-      socket.destroy();
-    });
-
-    proxyReq.end();
-  }
-});
+installSipProxy(server);
 
 io.use(async (socket, next) => {
   try {
@@ -254,6 +220,7 @@ mountWebApps(app);
 app.use(errorHandler);
 
 const emailTimer = startEmailWorker();
+const ivrTimer = startIvrWorker();
 const PORT = config.port;
 server.listen(PORT, config.apiHost, () => {
   console.log(`🚀 NIX OMS & ERP Server running on http://${config.apiHost}:${PORT}`);
@@ -264,6 +231,7 @@ const shutdown = () => {
   if (shuttingDown) return;
   shuttingDown = true;
   clearInterval(emailTimer);
+  clearInterval(ivrTimer);
   const deadline = setTimeout(() => process.exit(1), 40000);
   deadline.unref();
   // Stop accepting HTTP and disconnect long-lived sockets while in-flight

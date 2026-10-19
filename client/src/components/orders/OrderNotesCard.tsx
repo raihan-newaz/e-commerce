@@ -3,7 +3,6 @@ import { Calendar, CheckCircle2, Clock, FileText, MessageSquare, PhoneCall, Plus
 import toast from 'react-hot-toast';
 import api from '../../lib/api';
 import type { Order } from '../../types';
-import { useAuth } from '../../context/AuthContext';
 
 interface OrderNotesCardProps {
   order: Order;
@@ -21,7 +20,6 @@ interface ParsedNoteEntry {
 }
 
 export const OrderNotesCard: React.FC<OrderNotesCardProps> = ({ order, onRefresh }) => {
-  const { user } = useAuth();
   const [newNote, setNewNote] = useState('');
   const [savingNote, setSavingNote] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
@@ -39,6 +37,7 @@ export const OrderNotesCard: React.FC<OrderNotesCardProps> = ({ order, onRefresh
       const d = new Date(dateStr);
       if (isNaN(d.getTime())) return String(dateStr);
       return d.toLocaleString('en-GB', {
+        timeZone: 'Asia/Dhaka',
         day: '2-digit',
         month: 'short',
         year: 'numeric',
@@ -61,7 +60,7 @@ export const OrderNotesCard: React.FC<OrderNotesCardProps> = ({ order, onRefresh
     rawLines.forEach((line, index) => {
       // Check for timestamp like [18/10/2026, 01:25:00 am] or [18 Oct 2026, 01:25 am]
       const tsMatch = line.match(/^\[([0-9A-Za-z/,\s:APMapm]+)\]\s*(.*)$/);
-      let timestamp = formatDhakaDateTime(order.updatedAt || order.createdAt);
+      let timestamp = 'Time not recorded';
       let content = line;
 
       if (tsMatch && (tsMatch[1].includes(':') || tsMatch[1].includes('/'))) {
@@ -141,7 +140,7 @@ export const OrderNotesCard: React.FC<OrderNotesCardProps> = ({ order, onRefresh
         const logTime = formatDhakaDateTime(log.createdAt);
         // Avoid duplicate if note with same timestamp/status already captured
         const alreadyExists = parsedNotes.some(
-          (n) => n.type === 'ivr' && (n.timestamp.includes(logTime.slice(0, 12)) || n.content.includes(log.status || ''))
+          (n) => n.type === 'ivr' && n.content.includes(`[call:${log.id}]`)
         );
         if (!alreadyExists) {
           let statusBadge = log.status || 'IVR Call';
@@ -177,25 +176,7 @@ export const OrderNotesCard: React.FC<OrderNotesCardProps> = ({ order, onRefresh
 
     setSavingNote(true);
     try {
-      const nowFormatted = new Date().toLocaleString('en-GB', {
-        timeZone: 'Asia/Dhaka',
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-      });
-
-      const author = user?.name || 'Staff';
-      const formattedEntry = `[${nowFormatted}] ${author}: ${newNote.trim()}`;
-      const updatedNotes = order.internalNote
-        ? `${order.internalNote}\n${formattedEntry}`
-        : formattedEntry;
-
-      const res = await api.patch(`/orders/${order.id}`, {
-        internalNote: updatedNotes,
-      });
+      const res = await api.post(`/orders/${order.id}/notes`, { text: newNote.trim() });
 
       if (res.data?.success) {
         toast.success('Internal note added successfully');

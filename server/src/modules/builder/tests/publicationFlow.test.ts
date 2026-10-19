@@ -49,11 +49,11 @@ test('publication flow: saving checkout draft keeps live StorePage blocks and st
   };
 
   try {
-    (prisma.builderLanding as any).findUnique = async () => mockBuilderLanding;
-    (prisma.storePage as any).findUnique = async () => mockStorePage;
-    (prisma.landingCheckoutDraft as any).findUnique = async () => null;
-    (prisma.landingCheckoutDraft as any).create = async () => ({ version: 1 });
-    (prisma.storePage as any).update = async () => {
+    (prisma.builderLanding as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>).findUnique = async () => mockBuilderLanding;
+    (prisma.storePage as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>).findUnique = async () => mockStorePage;
+    (prisma.landingCheckoutDraft as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>).findUnique = async () => null;
+    (prisma.landingCheckoutDraft as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>).create = async () => ({ version: 1 });
+    (prisma.storePage as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>).update = async () => {
       storePageUpdated = true;
       return mockStorePage;
     };
@@ -176,17 +176,17 @@ test('publication flow: failed publish leaves previous live revision intact', as
   };
 
   try {
-    (prisma.builderLanding as any).findUnique = async () => mockBuilderLanding;
-    (prisma.storePage as any).update = async () => {
+    (prisma.builderLanding as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>).findUnique = async () => mockBuilderLanding;
+    (prisma.storePage as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>).update = async () => {
       storePagePublished = true;
     };
-    (prisma.builderPage as any).updateMany = async () => {
+    (prisma.builderPage as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>).updateMany = async () => {
       builderPagePublished = true;
       return { count: 1 };
     };
 
     // Attempt publish with stale version / invalid checkout
-    let publishError: any = null;
+    let publishError: unknown = null;
     try {
       await publishLanding('builder-page-1', 999, { id: 'user-1', name: 'Admin' });
     } catch (err) {

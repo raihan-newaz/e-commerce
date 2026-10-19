@@ -179,7 +179,7 @@ add('animated-headline', 'Animated Headline', 'General', {
   const marker = String(n.props.marker || 'circle');
   const tag = /^(h[1-6]|div|p)$/.test(String(n.props.tag)) ? n.props.tag : 'h3';
   const color = n.props.markerColor ? ` stroke="${escapeHtml(n.props.markerColor)}"` : ' stroke="#e11d48"';
-  let svgPath = '';
+  let svgPath: string;
   if (marker === 'x') {
     svgPath = '<path d="M497.4,23.9C301.6,40,155.9,80.6,4,144.4"></path><path d="M14.1,27.6c204.5,20.3,393.8,74,467.3,111.7"></path>';
   } else if (marker === 'underline_zigzag') {
@@ -444,36 +444,6 @@ add('image-carousel', 'Image Carousel', 'Media', {
     </button>
   ` : '';
 
-  const initScript = `
-    <script>
-      (function(){
-        const el = document.getElementById('${id}');
-        if(!el) return;
-        const track = el.querySelector('.carousel-track');
-        const prev = el.querySelector('.carousel-prev');
-        const next = el.querySelector('.carousel-next');
-        const dots = el.querySelectorAll('.carousel-dot');
-        let current = 0;
-        const total = ${list.length};
-        function goTo(idx) {
-          current = (idx + total) % total;
-          track.style.transform = 'translateX(-' + (current * 100) + '%)';
-          dots.forEach((d, i) => {
-            d.style.background = i === current ? '#ffffff' : 'rgba(255,255,255,0.5)';
-            d.style.transform = i === current ? 'scale(1.2)' : 'scale(1)';
-          });
-        }
-        if(prev) prev.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); goTo(current - 1); });
-        if(next) next.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); goTo(current + 1); });
-        dots.forEach(d => d.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); goTo(Number(d.dataset.index)); }));
-        ${n.props.autoplay !== false ? `
-          let timer = setInterval(() => goTo(current + 1), ${Number(n.props.interval) || 3500});
-          el.addEventListener('mouseenter', () => clearInterval(timer));
-          el.addEventListener('mouseleave', () => { clearInterval(timer); timer = setInterval(() => goTo(current + 1), ${Number(n.props.interval) || 3500}); });
-        ` : ''}
-      })();
-    </script>
-  `;
 
   return `<div${a} id="${id}" class="elementor-image-carousel-wrapper e-image-carousel" data-autoplay="${n.props.autoplay !== false ? 'true' : 'false'}" data-interval="${Number(n.props.interval) || 3500}" style="position:relative;overflow:hidden;border-radius:inherit;aspect-ratio:${ratio};"><div class="carousel-track" style="display:flex;height:100%;transition:transform 0.45s cubic-bezier(0.25, 1, 0.5, 1);">${slidesHtml}</div>${arrowsHtml}${dotsHtml}</div>`;
 });

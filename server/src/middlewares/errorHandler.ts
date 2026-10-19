@@ -11,8 +11,7 @@ export const errorHandler = (
   const rawStatus = err instanceof ZodError ? 400 : Number(err.status);
   const status = rawStatus >= 400 && rawStatus < 600 ? rawStatus : 500;
   if (status >= 500) {
-    if (config.isDev) console.error('Unhandled Server Error:', err);
-    else console.error('Request failed', { status, name: err instanceof Error ? err.name : 'Error' });
+    console.error('Unhandled Server Error:', err?.message || err, err?.stack);
   }
   const message = status >= 500
     ? 'Internal server error'

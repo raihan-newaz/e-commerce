@@ -49,7 +49,7 @@ export const hasControlCharacters = (value: string) => [...value].some(char => c
 
 export function safeCustomCss(value: unknown): boolean {
   return typeof value === 'string' && value.length <= 20000
-    && !/[<>\\\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(value)
+    && !/[<>\\]/.test(value) && ![...value].some(char => char.charCodeAt(0) < 32 && !['\t', '\n', '\r'].includes(char))
     && !/\/\*|\*\/|@import|@charset|url\s*\(|image-set\s*\(|expression\s*\(|javascript|behavior|-moz-binding/i.test(value);
 }
 

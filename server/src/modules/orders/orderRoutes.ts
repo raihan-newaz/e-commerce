@@ -1,3 +1,4 @@
+import { addOrderNote } from './orderNotes';
 import { Router } from 'express';
 import {
   listOrders,
@@ -26,6 +27,7 @@ router.post('/pbx-ivr-result', handlePbxIvrWebhook);
 router.get('/', authenticateToken, listOrders);
 router.get('/:id', authenticateToken, getOrderById);
 router.post('/', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'CALL_CENTER_AGENT']), createOrder);
+router.post('/:id/notes', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'CALL_CENTER_AGENT']), addOrderNote);
 router.patch('/:id', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'CALL_CENTER_AGENT']), updateOrder);
 router.patch('/:id/assignment', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'CALL_CENTER_AGENT']), updateOrderAssignment);
 router.patch('/:id/priority', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'CALL_CENTER_AGENT']), updateOrderPriority);
