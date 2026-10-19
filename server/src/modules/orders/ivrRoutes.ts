@@ -9,6 +9,7 @@ import { z } from 'zod';
 import axios from 'axios';
 import crypto from 'crypto';
 import { io } from '../../server';
+import { Prisma } from '@prisma/client';
 
 const router = Router();
 router.use(['/webphone-config', '/active-call', '/test-call', '/manual-dial', '/trunks'], (_req, res, next) => {
@@ -109,15 +110,16 @@ router.post('/cdr-webhook', async (req: Request, res: Response): Promise<void> =
       } catch { res.status(400).json({ success: false, message: 'Recording URL must use the configured PBX host over HTTPS' }); return; }
     }
     const phone = formatBdPhone(data.phone) || data.phone;
+    const metadata = data.metadata as unknown as Prisma.InputJsonObject | undefined;
     const order = data.orderId ? await prisma.order.findUnique({ where: { id: data.orderId }, select: { id: true } })
       : await prisma.order.findFirst({ where: { customerPhone: { contains: phone.replace(/\D/g, '').slice(-10) }, trashedAt: null }, orderBy: { createdAt: 'desc' }, select: { id: true } });
     const call = await prisma.callLog.upsert({ where: { providerCallId: data.providerCallId }, create: {
       providerCallId: data.providerCallId, orderId: order?.id, phone, direction: data.direction, source: 'PBX', status: data.status,
       disposition: data.disposition, agentName: data.agentName, startedAt: data.startedAt ? new Date(data.startedAt) : new Date(), answeredAt: data.answeredAt ? new Date(data.answeredAt) : undefined,
-      endedAt: data.endedAt ? new Date(data.endedAt) : undefined, durationSeconds: data.durationSeconds || 0, talkSeconds: data.talkSeconds || 0, metadata: data.metadata as any,
+      endedAt: data.endedAt ? new Date(data.endedAt) : undefined, durationSeconds: data.durationSeconds || 0, talkSeconds: data.talkSeconds || 0, metadata,
     }, update: { orderId: order?.id, phone, direction: data.direction, status: data.status, disposition: data.disposition, agentName: data.agentName,
       answeredAt: data.answeredAt ? new Date(data.answeredAt) : undefined, endedAt: data.endedAt ? new Date(data.endedAt) : undefined,
-      durationSeconds: data.durationSeconds || 0, talkSeconds: data.talkSeconds || 0, metadata: data.metadata as any } });
+      durationSeconds: data.durationSeconds || 0, talkSeconds: data.talkSeconds || 0, metadata } });
     io.emit('call:logged', { id: call.id, orderId: call.orderId, phone: call.phone, direction: call.direction, status: call.status, agentName: call.agentName, startedAt: call.startedAt, metadata: call.metadata });
     res.json({ success: true, callId: call.id });
   } catch { res.status(500).json({ success: false, message: 'Could not save PBX call event' }); }

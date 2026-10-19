@@ -6,6 +6,7 @@ import { AlertTriangle, ArrowLeft, Box, Copy, Loader2, MessageCircle, Phone, Pho
 import { Link, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../lib/api';
+import { apiErrorMessage } from '../lib/apiErrorMessage';
 import type { Order } from '../types';
 import { InvoiceModal } from '../components/orders/InvoiceModal';
 import { OrderEditModal } from '../components/orders/OrderEditModal';
@@ -17,6 +18,8 @@ import OrderRiskCard from '../components/orders/OrderRiskCard';
 import { useWebPhone } from '../context/WebPhoneContext';
 import { OrderNotesCard } from '../components/orders/OrderNotesCard';
 import CourierFraudCheckCard, { type BdCourierCheckResult, type CourierStat } from '../components/orders/CourierFraudCheckCard';
+
+type CallLogEntry = { id: string; orderId?: string | null; providerCallId?: string | null; direction: string; source: string; status: string; agentName?: string | null; user?: { name?: string | null } | null; startedAt: string; durationSeconds?: number; talkSeconds?: number; disposition?: string | null; metadata?: Record<string, unknown> | null };
 
 const statuses = ['PENDING', 'CONFIRMED', 'PACKAGING', 'HANDED_OVER', 'IN_TRANSIT', 'DELIVERED', 'PARTIAL_DELIVERED', 'HOLD', 'CANCELLED', 'RETURNED', 'FAKE_TRASH'];
 const money = (value: number) => `৳${Number(value || 0).toLocaleString()}`;
@@ -59,7 +62,7 @@ export const OrderDetailsPage: React.FC = () => {
   const [staffList, setStaffList] = useState<any[]>([]);
   const [ivrManualEnabled, setIvrManualEnabled] = useState(false);
   const [ivrDialing, setIvrDialing] = useState(false);
-  const [callLogs, setCallLogs] = useState<any[]>([]);
+  const [callLogs, setCallLogs] = useState<CallLogEntry[]>([]);
   const [callLogsBusy, setCallLogsBusy] = useState(false);
   const { startCall } = useWebPhone();
 
@@ -100,7 +103,7 @@ export const OrderDetailsPage: React.FC = () => {
     }
   };
 
-  const load = async () => { const serial=++loadSerial.current; try { const {data}=await api.get('/orders/'+id); if(serial===loadSerial.current){setOrder(data.order);setNextStatus(data.order.status);setCustomerHistory(data.customerHistory || null);setFraudCheckResult(data.courierFraudCheck?.result || null);setFraudCheckedAt(data.courierFraudCheck?.checkedAt || null);setAutoFraudCheckEnabled(Boolean(data.autoCheckBdCourier));setFraudCheckError('');} } catch(error:any){if(serial===loadSerial.current)toast.error(error.response?.data?.message || 'Order not found');} finally {if(serial===loadSerial.current)setLoading(false);} };
+  const load = async () => { const serial=++loadSerial.current; try { const {data}=await api.get('/orders/'+id); if(serial===loadSerial.current){setOrder(data.order);setNextStatus(data.order.status);setCustomerHistory(data.customerHistory || null);setFraudCheckResult(data.courierFraudCheck?.result || null);setFraudCheckedAt(data.courierFraudCheck?.checkedAt || null);setAutoFraudCheckEnabled(Boolean(data.autoCheckBdCourier));setFraudCheckError('');} } catch(error: unknown){if(serial===loadSerial.current)toast.error(apiErrorMessage(error, 'Order not found'));} finally {if(serial===loadSerial.current)setLoading(false);} };
   useEffect(()=>{setLoading(true);setOrder(null);setNextStatus('');setFraudCheckResult(null);setFraudCheckedAt(null);setFraudCheckError('');setFraudCheckBusy(false);autoFraudCheckOrder.current=null;fraudCheckRequest.current++;void load();return()=>{loadSerial.current++;fraudCheckRequest.current++;};},[id]);
   useEffect(() => {
     if (!canManage) return;
@@ -145,7 +148,7 @@ export const OrderDetailsPage: React.FC = () => {
     api.get(`/couriers/redx/events?orderId=${encodeURIComponent(id)}`).then(({ data }) => setRedxEvents(data.events || [])).catch(() => setRedxEvents([]));
     if (order.courierConsignmentId) api.get(`/couriers/redx/orders/${id}`).then(({ data }) => setRedxTracking(data.tracking || [])).catch(() => setRedxTracking([]));
   }, [id, order?.courierName, order?.courierConsignmentId]);
-  const updateStatus = async (status: string) => { if (!order || status === order.status) { setNextStatus(order?.status || ''); return; } setUpdating(true); try { await api.patch(`/orders/${order.id}/status`, { status }); setNextStatus(status); toast.success(`Order moved to ${pretty(status)}`); load(); } catch (error: any) { setNextStatus(order.status); toast.error(error.response?.data?.message || 'Could not update status'); } finally { setUpdating(false); } };
+  const updateStatus = async (status: string) => { if (!order || status === order.status) { setNextStatus(order?.status || ''); return; } setUpdating(true); try { await api.patch(`/orders/${order.id}/status`, { status }); setNextStatus(status); toast.success(`Order moved to ${pretty(status)}`); load(); } catch (error: unknown) { setNextStatus(order.status); toast.error(apiErrorMessage(error, 'Could not update status')); } finally { setUpdating(false); } };
   const copy = (value: string) => navigator.clipboard.writeText(value).then(() => toast.success('Copied'));
   const refreshPathao = async () => {
     if (!order) return;
@@ -240,10 +243,11 @@ export const OrderDetailsPage: React.FC = () => {
       setFraudCheckedAt(data.checkedAt || new Date().toISOString());
       if (data.result?.status === 'error') setFraudCheckError(data.result.message || 'BD Courier could not find a report for this phone number');
       else if (!silent) toast.success('Courier history updated and saved');
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (requestId !== fraudCheckRequest.current) return;
-      setFraudCheckError(error.response?.data?.message || 'Could not check courier history');
-      if (!silent) toast.error(error.response?.data?.message || 'Could not check courier history');
+      const message = apiErrorMessage(error, 'Could not check courier history');
+      setFraudCheckError(message);
+      if (!silent) toast.error(message);
     } finally { if (requestId === fraudCheckRequest.current) setFraudCheckBusy(false); }
   };
   useEffect(() => {
@@ -255,7 +259,7 @@ export const OrderDetailsPage: React.FC = () => {
   if (loading) return <div className="py-24 text-center text-sm text-slate-500">Loading order…</div>;
   if (!order) return <div className="py-24 text-center"><p className="font-bold">Order not found</p><Link className="mt-3 inline-block text-sm font-bold text-emerald-600 dark:text-emerald-400 hover:underline" to="/orders">Back to orders</Link></div>;
   let checkoutDetails: Record<string, string> = {};
-  try { checkoutDetails = JSON.parse(order.checkoutDetails || '{}'); } catch { checkoutDetails = {}; }
+  try { checkoutDetails = JSON.parse(order.checkoutDetails || '{}'); } catch { /* malformed legacy checkout data is omitted */ }
   const courierBreakdown = fraudCheckResult?.data || fraudCheckResult?.courierData || {};
   const providerCards = [
     { name: 'Overall', key: 'summary', tone: 'violet', active: true, state: pretty(order.status), detail: `Order #${order.orderNumber}` },

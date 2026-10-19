@@ -565,7 +565,7 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
     }
 
     const overrideReason = typeof req.body.overrideReason === 'string' ? req.body.overrideReason.trim() : '';
-    const riskInput = { phone: customerPhone, address: customerAddress || '', items: items.map((item: any) => ({ productId: item.productId, variantId: item.variantId, quantity: Number(item.quantity || 1) })), ip: normalizeClientIp(req.ip), deviceFingerprint: normalizeDeviceFingerprint(String(req.headers['x-device-fingerprint'] || '')), source: 'STAFF' as const, override: req.user?.role === 'SUPER_ADMIN' && overrideReason.length >= 3 };
+    const riskInput = { phone: customerPhone, address: customerAddress || '', items: items.map(item => ({ productId: item.productId, variantId: item.variantId, quantity: Number(item.quantity || 1) })), ip: normalizeClientIp(req.ip), deviceFingerprint: normalizeDeviceFingerprint(String(req.headers['x-device-fingerprint'] || '')), source: 'STAFF' as const, override: req.user?.role === 'SUPER_ADMIN' && overrideReason.length >= 3 };
     const risk = await prisma.$transaction(tx => evaluateOrderRisk(tx, riskInput));
     if (risk.decision === 'BLOCK') { await prisma.$transaction(tx => recordRiskDecision(tx, riskInput, risk)); res.status(409).json({ success: false, message: 'Order blocked by protection rules. Super Admin can override with a reason.', reasons: risk.reasons }); return; }
     let customer = await prisma.customer.findUnique({

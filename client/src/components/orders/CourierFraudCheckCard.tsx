@@ -2,7 +2,7 @@ import { AlertTriangle, Loader2, ShieldCheck, Search } from 'lucide-react';
 
 export type CourierStat = { name?: string; total_parcel?: number; success_parcel?: number; cancelled_parcel?: number; success_ratio?: number };
 export type FraudReport = { id?: string | number; name?: string; details?: string; created_at?: string; courierName?: string; courierLogo?: string };
-export type BdCourierCheckResult = { status?: string; message?: string; data?: Record<string, CourierStat | any>; courierData?: Record<string, CourierStat | any>; reports?: FraudReport[] };
+export type BdCourierCheckResult = { status?: string; message?: string; data?: Record<string, CourierStat>; courierData?: Record<string, CourierStat>; reports?: FraudReport[] };
 
 const number = (value: unknown) => Number.isFinite(Number(value)) ? Number(value).toLocaleString() : '0';
 

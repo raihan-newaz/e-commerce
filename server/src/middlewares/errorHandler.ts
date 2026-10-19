@@ -1,6 +1,5 @@
 import { ZodError } from 'zod';
 import { Request, Response, NextFunction } from 'express';
-import { config } from '../config';
 
 export const errorHandler = (
   err: any,

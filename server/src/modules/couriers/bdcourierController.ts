@@ -1,5 +1,5 @@
-import axios, { AxiosError } from 'axios';
-import { Request, Response } from 'express';
+import axios from 'axios';
+import { Response } from 'express';
 import { z } from 'zod';
 import prisma from '../../prisma';
 import { AuthRequest } from '../../middlewares/auth';
@@ -16,9 +16,10 @@ const getApiKey = async () => {
 };
 
 const relayApiError = (error: unknown, res: Response) => {
-  const response = (error as AxiosError<any>)?.response;
+  const response = axios.isAxiosError(error) ? error.response : undefined;
   const status = response?.status;
-  const message = typeof response?.data?.message === 'string' ? response.data.message : undefined;
+  const responseData = response?.data as { message?: unknown } | undefined;
+  const message = typeof responseData?.message === 'string' ? responseData.message : undefined;
   if (status === 401 || status === 403) { res.status(502).json({ success: false, message: message || 'BD Courier rejected the API key' }); return; }
   if (status === 429) { res.status(429).json({ success: false, message: message || 'BD Courier search limit reached. Check your plan and usage.' }); return; }
   if (status && status >= 400 && status < 500) { res.status(502).json({ success: false, message: message || `BD Courier request failed (${status})` }); return; }
@@ -31,8 +32,8 @@ export const checkBdCourierConnection = async (_req: AuthRequest, res: Response)
     const { data } = await axios.get(`${API_BASE_URL}/check-connection`, { headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' }, timeout });
     res.setHeader('Cache-Control', 'no-store');
     res.json({ success: true, data });
-  } catch (error: any) {
-    if (error.status) { res.status(error.status).json({ success: false, message: error.message }); return; }
+  } catch (error: unknown) {
+    if (error instanceof Error && 'status' in error && typeof error.status === 'number') { res.status(error.status).json({ success: false, message: error.message }); return; }
     relayApiError(error, res);
   }
 };
@@ -43,8 +44,8 @@ export const getBdCourierPlan = async (_req: AuthRequest, res: Response): Promis
     const { data } = await axios.get(`${API_BASE_URL}/my-plan`, { headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' }, timeout });
     res.setHeader('Cache-Control', 'no-store');
     res.json({ success: true, data });
-  } catch (error: any) {
-    if (error.status) { res.status(error.status).json({ success: false, message: error.message }); return; }
+  } catch (error: unknown) {
+    if (error instanceof Error && 'status' in error && typeof error.status === 'number') { res.status(error.status).json({ success: false, message: error.message }); return; }
     relayApiError(error, res);
   }
 };
@@ -71,8 +72,8 @@ export const checkBdCourierOrder = async (req: AuthRequest, res: Response): Prom
     });
     res.setHeader('Cache-Control', 'no-store');
     res.json({ success: true, result: saved.result, checkedAt: saved.checkedAt });
-  } catch (error: any) {
-    if (error.status) { res.status(error.status).json({ success: false, message: error.message }); return; }
+  } catch (error: unknown) {
+    if (error instanceof Error && 'status' in error && typeof error.status === 'number') { res.status(error.status).json({ success: false, message: error.message }); return; }
     relayApiError(error, res);
   }
 };

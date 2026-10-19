@@ -2,6 +2,7 @@ import { AdminSelect } from '../components/admin/AdminSelect';
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../lib/api';
+import { apiErrorMessage } from '../lib/apiErrorMessage';
 import {
   Settings,
   Truck,
@@ -22,6 +23,7 @@ type CourierToggleProps = {
   label: string;
   onChange: (checked: boolean) => void;
 };
+type BdCourierPlan = { plan_name?: string; has_subscription?: boolean; api_calls?: number; remaining_free_calls?: number; remaining_paid_calls?: number };
 
 const CourierToggle: React.FC<CourierToggleProps> = ({ checked, disabled, label, onChange }) => (
   <div className="flex items-center gap-3">
@@ -70,7 +72,7 @@ export const SettingsPage: React.FC = () => {
   const [bdCourierEnabled, setBdCourierEnabled] = useState(false);
   const [bdCourierBusy, setBdCourierBusy] = useState(false);
   const [bdCourierConnection, setBdCourierConnection] = useState('');
-  const [bdCourierPlan, setBdCourierPlan] = useState<any>(null);
+  const [bdCourierPlan, setBdCourierPlan] = useState<BdCourierPlan | null>(null);
 
   const [pathaoClientId, setPathaoClientId] = useState('');
   const [pathaoClientSecret, setPathaoClientSecret] = useState('');
@@ -183,7 +185,7 @@ export const SettingsPage: React.FC = () => {
           setRedxEnabled(Boolean(rdx.isEnabled));
           setRedxWebhookSecret(rdx.webhookSecret || '');
         }
-        const bdCourier = courierRes.data.configs.find((c: any) => c.provider === 'BDCOURIER');
+        const bdCourier = (courierRes.data.configs as Array<{ provider: string; apiKey?: string; isEnabled?: boolean }>).find(c => c.provider === 'BDCOURIER');
         if (bdCourier) {
           setBdCourierApiKey(bdCourier.apiKey || '');
           setBdCourierEnabled(Boolean(bdCourier.isEnabled));
@@ -292,8 +294,8 @@ export const SettingsPage: React.FC = () => {
       await api.put(`/couriers/configs/${provider}`, { isEnabled: enabled });
       setEnabled(enabled);
       toast.success(`${name} ${enabled ? 'activated' : 'deactivated'}`);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || `Could not ${enabled ? 'activate' : 'deactivate'} ${name}`);
+    } catch (error: unknown) {
+      toast.error(apiErrorMessage(error, `Could not ${enabled ? 'activate' : 'deactivate'} ${name}`));
     } finally {
       setBusy(false);
     }
@@ -311,7 +313,7 @@ export const SettingsPage: React.FC = () => {
     try {
       await api.put('/couriers/configs/BDCOURIER', { apiKey: bdCourierApiKey, isEnabled: bdCourierEnabled });
       toast.success('BD Courier API settings saved');
-    } catch (error: any) { toast.error(error.response?.data?.message || 'Could not save BD Courier settings'); }
+    } catch (error: unknown) { toast.error(apiErrorMessage(error, 'Could not save BD Courier settings')); }
     finally { setBdCourierBusy(false); }
   };
 
@@ -321,8 +323,8 @@ export const SettingsPage: React.FC = () => {
       const { data } = await api.get('/couriers/bdcourier/connection');
       setBdCourierConnection(data.data?.message || 'Connection successful');
       toast.success('BD Courier API key verified');
-    } catch (error: any) {
-      const message = error.response?.data?.message || 'BD Courier connection failed';
+    } catch (error: unknown) {
+      const message = apiErrorMessage(error, 'BD Courier connection failed');
       setBdCourierConnection(message); toast.error(message);
     } finally { setBdCourierBusy(false); }
   };
@@ -330,7 +332,7 @@ export const SettingsPage: React.FC = () => {
   const loadBdCourierPlan = async () => {
     setBdCourierBusy(true);
     try { const { data } = await api.get('/couriers/bdcourier/plan'); setBdCourierPlan(data.data?.data || null); }
-    catch (error: any) { toast.error(error.response?.data?.message || 'Could not load BD Courier plan'); }
+    catch (error: unknown) { toast.error(apiErrorMessage(error, 'Could not load BD Courier plan')); }
     finally { setBdCourierBusy(false); }
   };
 

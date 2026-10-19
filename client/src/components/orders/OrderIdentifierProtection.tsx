@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Ban, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../lib/api';
+import { apiErrorMessage } from '../../lib/apiErrorMessage';
 
 type Identifier = { value: string | null; blockId: string | null };
 type Identifiers = { ip: Identifier; phone: Identifier; device: Identifier };
@@ -28,7 +29,7 @@ export function OrderIdentifierProtection({ orderId, orderNumber, canManage }: {
       }
       await load();
       toast.success(item.blockId ? 'Identifier unblocked' : 'Identifier blocked');
-    } catch (error: any) { toast.error(error.response?.data?.message || 'Could not update block status'); }
+    } catch (error: unknown) { toast.error(apiErrorMessage(error, 'Could not update block status')); }
     finally { setBusy(null); }
   };
 
