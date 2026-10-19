@@ -350,6 +350,18 @@ export const createStorefrontOrder = async (req: Request & { customer?: { id: st
         incompleteDraft = await tx.incompleteCheckout.findUnique({ where: { id: incompleteDraft.id } });
         if (incompleteDraft?.orderId) throw new Error('This checkout has already been converted to an order');
       }
+      const rawEmail = typeof inputCustomer.email === 'string' ? inputCustomer.email.trim().toLowerCase() : '';
+      let customerEmailToSet: string | null = rawEmail || null;
+      if (customerEmailToSet) {
+        const emailOwner = await tx.customer.findUnique({
+          where: { email: customerEmailToSet },
+          select: { id: true, phone: true },
+        });
+        if (emailOwner && emailOwner.phone !== phone) {
+          customerEmailToSet = null;
+        }
+      }
+
       const existingCustomer = await tx.customer.findUnique({ where: { phone } });
       const customer = await tx.customer.upsert({
         where: { phone },
@@ -360,7 +372,7 @@ export const createStorefrontOrder = async (req: Request & { customer?: { id: st
               address: inputCustomer.address,
               district: inputCustomer.district || null,
               city: inputCustomer.city,
-              ...(inputCustomer.email ? { email: inputCustomer.email } : {}),
+              ...(customerEmailToSet ? { email: customerEmailToSet } : {}),
               totalOrders: { increment: 1 },
             },
         create: {
@@ -369,7 +381,7 @@ export const createStorefrontOrder = async (req: Request & { customer?: { id: st
           address: inputCustomer.address,
           district: inputCustomer.district || null,
           city: inputCustomer.city,
-          email: inputCustomer.email || null,
+          email: customerEmailToSet,
           totalOrders: 1,
         },
       });
@@ -464,7 +476,7 @@ export const createStorefrontOrder = async (req: Request & { customer?: { id: st
           city: inputCustomer.city,
           customerNote: inputCustomer.note,
           checkoutDetails: JSON.stringify(checkoutDetails),
-          customerEmail: inputCustomer.email || null,
+          customerEmail: rawEmail || null,
           status: risk.decision === 'HOLD' ? 'HOLD' : 'PENDING',
           paymentMethod,
           paymentStatus: 'PENDING',

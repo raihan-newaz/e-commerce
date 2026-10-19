@@ -119,6 +119,14 @@ export const updateCustomer = async (req: AuthRequest, res: Response): Promise<v
   try {
     const id = req.params.id as string;
     const { name, alternativePhone, email, address, district, city, zone, area, isBlacklisted, tags, notes } = req.body;
+    const cleanEmail = typeof email === 'string' && email.trim() ? email.trim().toLowerCase() : null;
+    if (cleanEmail) {
+      const existingOwner = await prisma.customer.findUnique({ where: { email: cleanEmail }, select: { id: true } });
+      if (existingOwner && existingOwner.id !== id) {
+        res.status(409).json({ success: false, message: 'Another customer is already using this email' });
+        return;
+      }
+    }
 
     const updated = await prisma.customer.update({
       select: customerSelect,
@@ -126,7 +134,7 @@ export const updateCustomer = async (req: AuthRequest, res: Response): Promise<v
       data: {
         name,
         alternativePhone,
-        email,
+        email: cleanEmail,
         address,
         district,
         city,

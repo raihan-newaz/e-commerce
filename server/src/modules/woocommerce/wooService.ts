@@ -79,9 +79,21 @@ export class WooCommerceService {
       where: { phone: customerPhone },
     });
 
+    const rawWooEmail = wooOrder.billing?.email?.trim().toLowerCase() || '';
+    let safeWooEmail: string | null = rawWooEmail || null;
+    if (safeWooEmail) {
+      const emailOwner = await prisma.customer.findUnique({
+        where: { email: safeWooEmail },
+        select: { phone: true },
+      });
+      if (emailOwner && emailOwner.phone !== customerPhone) {
+        safeWooEmail = null;
+      }
+    }
+
     customer = await prisma.customer.upsert({
       where: { phone: customerPhone },
-      create: { name: customerName, phone: customerPhone, email: wooOrder.billing?.email || undefined, address: customerAddress, city, district: state },
+      create: { name: customerName, phone: customerPhone, email: safeWooEmail || undefined, address: customerAddress, city, district: state },
       update: {},
     });
 
