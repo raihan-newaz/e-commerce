@@ -16,6 +16,32 @@ import SecretInput from '../components/SecretInput';
 import { useAuth } from '../context/AuthContext';
 import { pageTitleForPath, pageDescriptionForPath, roleLabel } from '../components/layout/navigation';
 
+type CourierToggleProps = {
+  checked: boolean;
+  disabled: boolean;
+  label: string;
+  onChange: (checked: boolean) => void;
+};
+
+const CourierToggle: React.FC<CourierToggleProps> = ({ checked, disabled, label, onChange }) => (
+  <div className="flex items-center gap-3">
+    <span className={`text-xs font-semibold ${checked ? 'text-purple-800 dark:text-purple-300' : 'text-slate-500 dark:text-slate-400'}`}>
+      {checked ? 'Active' : 'Deactivated'}
+    </span>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={`${label} ${checked ? 'active' : 'deactivated'}`}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60 ${checked ? 'bg-purple-800 dark:bg-purple-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+    >
+      <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${checked ? 'translate-x-6' : 'translate-x-1'}`} />
+    </button>
+  </div>
+);
+
 export const SettingsPage: React.FC = () => {
   const { user: currentUser } = useAuth();
   const { section: routeSection = 'woocommerce' } = useParams();
@@ -242,6 +268,25 @@ export const SettingsPage: React.FC = () => {
       toast.success('Steadfast settings saved');
     } catch (error: any) { toast.error(error.response?.data?.message || 'Could not save Steadfast settings'); }
     finally { setSfBusy(false); }
+  };
+
+  const updateCourierActive = async (
+    provider: 'STEADFAST' | 'PATHAO' | 'REDX',
+    enabled: boolean,
+    setEnabled: React.Dispatch<React.SetStateAction<boolean>>,
+    setBusy: React.Dispatch<React.SetStateAction<boolean>>,
+    name: string,
+  ) => {
+    setBusy(true);
+    try {
+      await api.put(`/couriers/configs/${provider}`, { isEnabled: enabled });
+      setEnabled(enabled);
+      toast.success(`${name} ${enabled ? 'activated' : 'deactivated'}`);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || `Could not ${enabled ? 'activate' : 'deactivate'} ${name}`);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const testSteadfast = async () => {
@@ -510,10 +555,13 @@ export const SettingsPage: React.FC = () => {
           <nav aria-label="Courier providers" className="flex flex-wrap gap-2">{['Steadfast', 'Pathao', 'RedX'].map(provider => <a key={provider} href={`#courier-${provider.toLowerCase()}`} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900">{provider}</a>)}</nav>
           {/* Steadfast */}
           <div id="courier-steadfast" className="scroll-mt-36 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-card space-y-3">
-            <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <Truck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              Steadfast Courier API Keys
-            </h3>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <Truck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                Steadfast Courier API Keys
+              </h3>
+              <CourierToggle checked={sfEnabled} disabled={sfBusy} label="Steadfast" onChange={(enabled) => void updateCourierActive('STEADFAST', enabled, setSfEnabled, setSfBusy, 'Steadfast')} />
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 mb-1">API Key</label>
@@ -535,7 +583,6 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
             <div className="space-y-2 border-t border-slate-100 pt-3 text-xs dark:border-slate-800">
-              <label className="flex items-center gap-2 font-semibold"><input type="checkbox" checked={sfEnabled} onChange={(e) => setSfEnabled(e.target.checked)}/> Enable Steadfast dispatch</label>
               <p className="text-slate-500">API endpoint: https://portal.packzy.com/api/v1. Credentials stay encrypted on the server.</p>
               <label className="block text-slate-700 dark:text-slate-300">Webhook authentication token<SecretInput autoComplete="new-password" value={sfWebhookSecret} onChange={(e) => setSfWebhookSecret(e.target.value)} loadSavedSecret={() => revealCourierSecret('STEADFAST', 'webhookSecret')} placeholder="Same Bearer token configured in Steadfast" className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono dark:border-slate-800 dark:bg-slate-950"/></label>
               <div className="flex flex-wrap gap-2"><button type="button" onClick={generateSteadfastWebhookToken} className="rounded-lg border border-slate-300 px-3 py-2 font-semibold dark:border-slate-700">Generate token</button><button type="button" disabled={sfBusy} onClick={saveSteadfast} className="rounded-lg bg-emerald-600 px-3 py-2 font-bold text-white disabled:opacity-50">Save Steadfast</button><button type="button" disabled={sfBusy} onClick={testSteadfast} className="rounded-lg border border-emerald-300 px-3 py-2 font-bold text-emerald-700 disabled:opacity-50">Test connection</button></div>
@@ -547,13 +594,16 @@ export const SettingsPage: React.FC = () => {
 
           {/* Pathao */}
           <div id="courier-pathao" className="scroll-mt-36 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-card space-y-3">
-            <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <Truck className="w-4 h-4 text-rose-600 dark:text-rose-400" />
-              Pathao Courier
-            </h3>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <Truck className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+                Pathao Courier
+              </h3>
+              <CourierToggle checked={pathaoEnabled} disabled={pathaoBusy} label="Pathao" onChange={(enabled) => void updateCourierActive('PATHAO', enabled, setPathaoEnabled, setPathaoBusy, 'Pathao')} />
+            </div>
             <p className="text-xs text-slate-500">Save merchant credentials, load your approved stores, then select a pickup store and enable dispatch.</p>
             <label className="block text-xs text-slate-700 dark:text-slate-300">Environment
-              <AdminSelect dropdownKey="pages.SettingsPage.tsx.1" value={pathaoBaseUrl} onChange={(e) => { setPathaoBaseUrl(e.target.value); setPathaoStores([]); setPathaoStoreId(''); setPathaoEnabled(false); }} className="mt-1 w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-slate-100">
+              <AdminSelect dropdownKey="pages.SettingsPage.tsx.1" value={pathaoBaseUrl} onChange={(e) => { setPathaoBaseUrl(e.target.value); setPathaoStores([]); setPathaoStoreId(''); }} className="mt-1 w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-slate-100">
                 <option value="https://api-hermes.pathao.com">Live</option>
                 <option value="https://courier-api-sandbox.pathao.com">Sandbox</option>
               </AdminSelect>
@@ -596,7 +646,6 @@ export const SettingsPage: React.FC = () => {
               </label>
               <button type="button" disabled={pathaoBusy} onClick={loadPathaoStores} className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold dark:border-slate-700">Load stores</button>
             </div>
-            <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300"><input type="checkbox" checked={pathaoEnabled} onChange={(e) => setPathaoEnabled(e.target.checked)} />Enable Pathao dispatch</label>
             <button type="button" disabled={pathaoBusy} onClick={savePathao} className="rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 px-4 py-2 text-xs font-bold transition-colors disabled:opacity-50">{pathaoBusy ? 'Working…' : 'Save Pathao connection'}</button>
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60 space-y-3">
               <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">Pathao webhook</h4>
@@ -636,10 +685,13 @@ export const SettingsPage: React.FC = () => {
 
           {/* RedX */}
           <div id="courier-redx" className="scroll-mt-36 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-card space-y-3">
-            <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <Truck className="w-4 h-4 text-red-600 dark:text-red-400" />
-              RedX OpenAPI
-            </h3>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <Truck className="w-4 h-4 text-red-600 dark:text-red-400" />
+                RedX OpenAPI
+              </h3>
+              <CourierToggle checked={redxEnabled} disabled={redxBusy} label="RedX" onChange={(enabled) => void updateCourierActive('REDX', enabled, setRedxEnabled, setRedxBusy, 'RedX')} />
+            </div>
             <label className="block text-xs text-slate-700 dark:text-slate-300">Environment
               <AdminSelect dropdownKey="pages.SettingsPage.tsx.6" value={redxBaseUrl} onChange={e => setRedxBaseUrl(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-white">
                 <option value="https://sandbox.redx.com.bd/v1.0.0-beta">Sandbox — simulated parcels</option>
@@ -655,7 +707,6 @@ export const SettingsPage: React.FC = () => {
                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-slate-100 font-mono"
               />
             </div>
-            <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300"><input type="checkbox" checked={redxEnabled} onChange={e => setRedxEnabled(e.target.checked)} /> Enable RedX dispatch</label>
             <div className="space-y-2 rounded-xl border border-slate-200 p-3 text-xs dark:border-slate-800">
               <p className="font-medium">Status callback</p>
               <p className="break-all font-mono text-slate-500">{redxWebhookUrl || 'Loading callback URL…'}</p>
