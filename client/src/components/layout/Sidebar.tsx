@@ -6,6 +6,7 @@ import {
   ChevronRight,
   ExternalLink,
   Store,
+  Search,
   X,
   Boxes,
 } from "lucide-react";
@@ -57,6 +58,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return () => { document.removeEventListener('keydown', keyboard); previous?.focus(); };
   }, [isDesktop, isOpen]);
   const [storeConnected, setStoreConnected] = React.useState<boolean | null>(null);
+  const [storeName, setStoreName] = React.useState("NIX Commerce");
+  const [quickSearch, setQuickSearch] = React.useState("");
+  const quickSearchRef = React.useRef<HTMLInputElement>(null);
   const storefrontUrl = window.location.origin;
   const settingsItem = navigationGroups.flatMap(group => group.items).find(item => item.path === '/settings');
   const SettingsIcon = settingsItem?.icon || Store;
@@ -107,9 +111,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   React.useEffect(() => {
     api.get("/storefront/settings")
-      .then(() => setStoreConnected(true))
+      .then((response) => {
+        setStoreConnected(true);
+        const configuredName = response.data?.settings?.storeName;
+        if (typeof configuredName === "string" && configuredName.trim()) setStoreName(configuredName.trim());
+      })
       .catch(() => setStoreConnected(false));
   }, []);
+
+  React.useEffect(() => {
+    const focusQuickSearch = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        if (collapsed) onToggleCollapsed();
+        window.requestAnimationFrame(() => quickSearchRef.current?.focus());
+      }
+    };
+    window.addEventListener("keydown", focusQuickSearch);
+    return () => window.removeEventListener("keydown", focusQuickSearch);
+  }, [collapsed, onToggleCollapsed]);
 
   return (
     <>
@@ -127,7 +147,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ref={element => { asideRef.current = element; if (element) element.inert = !isDesktop && !isOpen; }}
         aria-hidden={!isDesktop && !isOpen ? true : undefined}
         className={`admin-sidebar fixed inset-y-0 left-0 z-50 flex h-[100dvh] flex-col border-r border-slate-200/80 bg-white text-slate-700 shadow-xl transition-[width,transform] duration-300 lg:z-20 lg:translate-x-0 lg:shadow-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 ${
-          collapsed ? "w-[72px]" : "w-[256px]"
+          collapsed ? "w-[72px]" : "w-[288px]"
         } ${isOpen ? "translate-x-0" : "-translate-x-full"} lg:flex`}
       >
         {/* Header with Logo and Collapse Toggle */}
@@ -140,7 +160,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             to="/"
             className="flex min-w-0 items-center gap-2"
             onClick={onClose}
-            aria-label="NIX Commerce home"
+            aria-label={`${storeName} home`}
           >
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-xs font-bold text-white shadow-sm shadow-emerald-500/20">
               N
@@ -148,7 +168,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {!collapsed && (
               <div className="min-w-0">
                 <p className="truncate text-xs font-bold tracking-tight text-slate-900 dark:text-white">
-                  NIX Commerce
+                  {storeName}
                 </p>
                 <p className="truncate text-[9.5px] font-medium text-slate-400 dark:text-slate-500">
                   Operations workspace
@@ -181,6 +201,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
+        {!collapsed && (
+          <div className="px-3 pb-2 pt-2">
+            <label className="admin-sidebar-search flex h-10 items-center gap-2 rounded-xl border border-slate-200/80 bg-slate-50/80 px-3 text-slate-500 dark:border-slate-800 dark:bg-slate-800/60">
+              <Search className="h-4 w-4 shrink-0" />
+              <input
+                ref={quickSearchRef}
+                type="search"
+                value={quickSearch}
+                onChange={(event) => setQuickSearch(event.target.value)}
+                placeholder="Quick search"
+                aria-label="Search admin navigation"
+                className="min-w-0 flex-1 border-0 bg-transparent p-0 text-xs outline-none ring-0 placeholder:text-slate-500 focus:border-0 focus:outline-none focus:ring-0 dark:text-slate-100"
+              />
+              <kbd className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[9px] font-semibold text-slate-400 dark:border-slate-700 dark:bg-slate-900">Ctrl K</kbd>
+            </label>
+          </div>
+        )}
+
         {/* Collapsed top expand button */}
         {collapsed && (
           <div className="hidden border-b border-slate-100 py-2 text-center lg:block dark:border-slate-800">
@@ -199,8 +237,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <nav aria-label="Main navigation" className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <div className="px-2 py-3">
           {navigationGroups.filter(group => group.label !== 'Administration').map((group, groupIndex) => {
+            const query = quickSearch.trim().toLocaleLowerCase();
             const visibleItems = group.items.filter((item) =>
-              canSeeNavigationItem(item, user?.role, user?.builderAccess),
+              canSeeNavigationItem(item, user?.role, user?.builderAccess) &&
+              (!query || item.label.toLocaleLowerCase().includes(query) || item.children?.some(child => child.label.toLocaleLowerCase().includes(query))),
             );
             if (!visibleItems.length) return null;
 
@@ -317,7 +357,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           })}
           </div>
 
-          {settingsItem && (
+          {settingsItem && (!quickSearch.trim() || settingsItem.label.toLocaleLowerCase().includes(quickSearch.trim().toLocaleLowerCase()) || settingsItem.children?.some(child => child.label.toLocaleLowerCase().includes(quickSearch.trim().toLocaleLowerCase()))) && (
             <div className="mx-2 mb-3">
               <button
                 type="button"
@@ -359,7 +399,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {!collapsed && openSubmenus['/settings'] && (
                 <div id="navigation-settings" className="ml-3 mt-1 space-y-0.5 border-l border-slate-200/80 pl-2.5 dark:border-slate-800">
                   {settingsItem.children
-                    ?.filter(child => !child.roles || (user && child.roles.includes(user.role)))
+                    ?.filter(child => (!child.roles || (user && child.roles.includes(user.role))) && (!quickSearch.trim() || child.label.toLocaleLowerCase().includes(quickSearch.trim().toLocaleLowerCase())))
                     .map((child) => (
                       <NavLink
                         key={child.path}

@@ -5,9 +5,9 @@
    ELEMENTOR DUAL THEME ENGINE (LIGHT & DARK MODE)
    ========================================================= */
 :root, .studio-app.light, html:not(.dark) .studio-app {
-  --e-bg-app: #eef1f5;
+  --e-bg-app: #f7f6fa;
   --e-bg-sidebar: #ffffff;
-  --e-bg-header: #f8f9fa;
+  --e-bg-header: #f7f6fa;
   --e-bg-card: #ffffff;
   --e-bg-card-hover: #f1f3f5;
   --e-bg-input: #ffffff;
@@ -16,44 +16,44 @@
   --e-bg-summary: #f8f9fa;
   --e-bg-summary-hover: #e9ecef;
   --e-bg-dock: #f8f9fa;
-  --e-border-base: #e2e8f0;
-  --e-border-light: #f1f5f9;
-  --e-border-dark: #cbd5e1;
-  --e-text-primary: #1e293b;
-  --e-text-secondary: #475569;
-  --e-text-muted: #64748b;
-  --e-accent-blue: #0284c7;
+  --e-border-base: #e8e5ec;
+  --e-border-light: #f1edf3;
+  --e-border-dark: #cfc5d4;
+  --e-text-primary: #171923;
+  --e-text-secondary: #475467;
+  --e-text-muted: #667085;
+  --e-accent-blue: #40134c;
   --e-accent-pink: #93003c;
   --e-accent-green: #39b54a;
   --e-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
 .dark, html.dark, .studio-app.dark, html.dark .studio-app {
-  --e-bg-app: #1a1b1d;
-  --e-bg-sidebar: #26292c;
-  --e-bg-header: #1e2023;
-  --e-bg-card: #2b2e32;
-  --e-bg-card-hover: #34383c;
-  --e-bg-input: #202224;
-  --e-bg-input-focus: #1a1c1e;
-  --e-bg-popover: #202224;
-  --e-bg-summary: #232629;
-  --e-bg-summary-hover: #2b2e32;
-  --e-bg-dock: #1e2023;
-  --e-border-base: #34383c;
-  --e-border-light: #2b2e32;
-  --e-border-dark: #3e444a;
-  --e-text-primary: #ffffff;
-  --e-text-secondary: #d5d8dc;
-  --e-text-muted: #8d96a0;
-  --e-accent-blue: #58bcee;
+  --e-bg-app: #11111a;
+  --e-bg-sidebar: #17151e;
+  --e-bg-header: #17151e;
+  --e-bg-card: #1d1a24;
+  --e-bg-card-hover: #282330;
+  --e-bg-input: #17151e;
+  --e-bg-input-focus: #211c27;
+  --e-bg-popover: #1d1a24;
+  --e-bg-summary: #1a1720;
+  --e-bg-summary-hover: #282330;
+  --e-bg-dock: #17151e;
+  --e-border-base: #302b37;
+  --e-border-light: #25212b;
+  --e-border-dark: #3e3645;
+  --e-text-primary: #f4f1f6;
+  --e-text-secondary: #d5cedd;
+  --e-text-muted: #a9a2b2;
+  --e-accent-blue: #c084d5;
   --e-accent-pink: #93003c;
   --e-accent-green: #39b54a;
   --e-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
 .studio-app, .studio-manager, .studio-loading {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  font-family: 'Manrope', 'Hind Siliguri', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   color: var(--e-text-secondary);
   font-size: 12px;
   line-height: 1.4;
@@ -115,6 +115,9 @@
   background: #2ea33e !important;
   border-color: #2ea33e !important;
 }
+
+.studio-app .studio-primary, .studio-manager .studio-primary { background: var(--e-accent-blue) !important; border-color: var(--e-accent-blue) !important; }
+.studio-app .studio-primary:hover, .studio-manager .studio-primary:hover { filter: brightness(.92); }
 
 /* Header & Elementor Top Toolbar */
 .studio-toolbar {

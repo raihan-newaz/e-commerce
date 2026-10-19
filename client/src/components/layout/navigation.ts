@@ -60,7 +60,7 @@ export const settingsItems = settingsGroups.flatMap(group => group.items);
 // These rules control discoverability. Backend authorization remains authoritative.
 export const navigationGroups: NavigationGroup[] = [
   { label: 'Orders & customers', items: [
-    { label: 'Overview', path: '/', icon: LayoutDashboard, description: 'Business health and action center' },
+    { label: 'Dashboard', path: '/', icon: LayoutDashboard, description: 'Business health and action center' },
     { label: 'Orders', path: '/orders', icon: ShoppingBag, description: 'Process, assign, and dispatch orders' },
     { label: 'Incomplete Orders', path: '/incomplete-orders', icon: PackageSearch, description: 'Follow up abandoned checkouts and convert confirmed customers', roles: ['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'CALL_CENTER_AGENT'] },
     { label: 'Customers', path: '/crm', icon: UsersRound, description: 'Customer intelligence and risk' },

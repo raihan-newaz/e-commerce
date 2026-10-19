@@ -18,7 +18,6 @@ import {
 import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { StatusBadge } from '../components/ui/StatusBadge';
-import { MetricKpiCard } from '../components/dashboard/MetricKpiCard';
 import { SalesReturnsChart } from '../components/dashboard/SalesReturnsChart';
 import { ConversionFunnelCard } from '../components/dashboard/ConversionFunnelCard';
 import { RadialGaugeCard } from '../components/dashboard/RadialGaugeCard';
@@ -64,6 +63,8 @@ export const DashboardPage: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [range, setRange] = useState('today');
   const [channel, setChannel] = useState('all');
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [activeDashboardTab, setActiveDashboardTab] = useState('My Dashboard');
   const [isDateOpen, setIsDateOpen] = useState(false);
   const [isChannelOpen, setIsChannelOpen] = useState(false);
   const [greenStats, setGreenStats] = useState<Record<string, string | null> | null>(null);
@@ -126,7 +127,7 @@ export const DashboardPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [range, channel]);
+  }, [range, channel, refreshKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -180,16 +181,17 @@ export const DashboardPage: React.FC = () => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="space-y-5 pb-12 sm:space-y-6"
+      id="dashboard-top"
+      className="dashboard-page flex flex-col space-y-5 pb-12 sm:space-y-6"
     >
       {/* Top Header: Title and Quick Selectors */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="dashboard-page-header flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl lg:text-3xl dark:text-white">
-            General metrics
+            Ecommerce Dashboard
           </h1>
           <p className="mt-0.5 text-[11px] text-slate-400 sm:text-xs dark:text-slate-500">
-            Real-time business performance and operational intelligence
+            Orders, sales, courier performance, products, marketing, and team execution in one view
           </p>
         </div>
 
@@ -296,10 +298,34 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {greenStats && <section className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-900 dark:bg-emerald-950/20"><div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="text-sm font-semibold text-emerald-950 dark:text-emerald-200">GreenSMS account</h2><p className="text-xs text-slate-500">Live data from the SMS provider</p></div><Link to="/messaging" className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">All SMS data <ArrowRight className="h-3.5 w-3.5"/></Link></div><div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">{([['balance', 'Balance'], ['rate', 'Rate / SMS'], ['expiry', 'Validity'], ['tokenmonthlysms', 'Sent this month']] as const).map(([key, label]) => <div key={key} className="rounded-xl bg-white p-3 dark:bg-slate-900"><span className="text-[11px] text-slate-500">{label}</span><p className="mt-1 text-lg font-semibold">{greenStats[key] ?? '—'}</p></div>)}</div></section>}
+      <nav aria-label="Dashboard sections" className="dashboard-tabs flex items-center gap-1 overflow-x-auto rounded-xl border border-[#e8e5ec] bg-white p-2 dark:border-slate-800 dark:bg-slate-900">
+        <a aria-current={activeDashboardTab === 'My Dashboard' ? 'page' : undefined} className={`dashboard-tab ${activeDashboardTab === 'My Dashboard' ? 'is-active' : ''}`} href="#dashboard-top" onClick={() => setActiveDashboardTab('My Dashboard')}>My Dashboard</a>
+        <a aria-current={activeDashboardTab === 'Overview' ? 'location' : undefined} className={`dashboard-tab ${activeDashboardTab === 'Overview' ? 'is-active' : ''}`} href="#dashboard-overview" onClick={() => setActiveDashboardTab('Overview')}>Overview</a>
+        <a aria-current={activeDashboardTab === 'Decision' ? 'location' : undefined} className={`dashboard-tab ${activeDashboardTab === 'Decision' ? 'is-active' : ''}`} href="#dashboard-decision" onClick={() => setActiveDashboardTab('Decision')}>Decision</a>
+        <a aria-current={activeDashboardTab === 'Operations' ? 'location' : undefined} className={`dashboard-tab ${activeDashboardTab === 'Operations' ? 'is-active' : ''}`} href="#dashboard-operations" onClick={() => setActiveDashboardTab('Operations')}>Operations</a>
+        <Link aria-current={activeDashboardTab === 'Products' ? 'page' : undefined} className={`dashboard-tab ${activeDashboardTab === 'Products' ? 'is-active' : ''}`} to="/products" onClick={() => setActiveDashboardTab('Products')}>Products</Link>
+        <a aria-current={activeDashboardTab === 'Marketing' ? 'location' : undefined} className={`dashboard-tab ${activeDashboardTab === 'Marketing' ? 'is-active' : ''}`} href="#dashboard-marketing" onClick={() => setActiveDashboardTab('Marketing')}>Marketing</a>
+        <Link aria-current={activeDashboardTab === 'Customers & Team' ? 'page' : undefined} className={`dashboard-tab ${activeDashboardTab === 'Customers & Team' ? 'is-active' : ''}`} to="/crm" onClick={() => setActiveDashboardTab('Customers & Team')}>Customers &amp; Team</Link>
+        <a aria-current={activeDashboardTab === 'Activity' ? 'location' : undefined} className={`dashboard-tab ${activeDashboardTab === 'Activity' ? 'is-active' : ''}`} href="#dashboard-activity" onClick={() => setActiveDashboardTab('Activity')}>Activity</a>
+      </nav>
+
+      <div className="dashboard-configure-bar flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#e8e5ec] bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+        <div>
+          <h2 className="text-sm font-semibold">My Dashboard</h2>
+          <p className="text-xs text-slate-500">Live metrics for the selected period and sales channel.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link to="/analytics" className="dashboard-outline-button">Founder Dashboard</Link>
+          <button type="button" className="dashboard-outline-button" onClick={() => setRefreshKey(value => value + 1)} disabled={isRefreshing}>
+            <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} /> {isRefreshing ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
+      </div>
+
+      {greenStats && <section className="dashboard-sms rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-900 dark:bg-emerald-950/20"><div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="text-sm font-semibold text-emerald-950 dark:text-emerald-200">GreenSMS account</h2><p className="text-xs text-slate-500">Live data from the SMS provider</p></div><Link to="/messaging" className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">All SMS data <ArrowRight className="h-3.5 w-3.5"/></Link></div><div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">{([['balance', 'Balance'], ['rate', 'Rate / SMS'], ['expiry', 'Validity'], ['tokenmonthlysms', 'Sent this month']] as const).map(([key, label]) => <div key={key} className="rounded-xl bg-white p-3 dark:bg-slate-900"><span className="text-[11px] text-slate-500">{label}</span><p className="mt-1 text-lg font-semibold">{greenStats[key] ?? '—'}</p></div>)}</div></section>}
 
       {/* Operations Action Center: 6 real-time cards */}
-      <section className="space-y-3">
+      <section id="dashboard-decision" className="dashboard-action-center space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -434,49 +460,17 @@ export const DashboardPage: React.FC = () => {
       </section>
 
       {/* Row 1: 5 Real KPI Cards with responsive columns & spacing */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 sm:gap-4">
-        {canViewCosts && <MetricKpiCard
-          label="Profit Margin"
-          value={money(netProfit)}
-          changePercent={data?.profitMarginPercent ? `${data.profitMarginPercent}%` : undefined}
-          isPositive={netProfit >= 0}
-          subtext="Delivered less all costs"
-          delay={0.02}
-        />}
-        <MetricKpiCard
-          label="Total Orders"
-          value={Number(totalOrdersCount).toLocaleString()}
-          subtext={`${data?.todayOrdersCount || 0} created today`}
-          isPositive={true}
-          delay={0.04}
-        />
-        <MetricKpiCard
-          label="Avg. Order Value"
-          value={money(avgOrderValue)}
-          subtext="Average per order"
-          isPositive={true}
-          delay={0.06}
-        />
-        <MetricKpiCard
-          label="Units Sold"
-          value={Number(totalUnitsSold).toLocaleString()}
-          subtext="Product units ordered"
-          isPositive={true}
-          delay={0.08}
-        />
-        <div className="col-span-2 sm:col-span-1 md:col-span-1 lg:col-span-1">
-          <MetricKpiCard
-            label="Pending Queue"
-            value={Number(pendingOrders).toLocaleString()}
-            isPositive={pendingOrders === 0}
-            subtext="Awaiting call verification"
-            delay={0.10}
-          />
-        </div>
-      </div>
+      <section id="dashboard-overview" className="dashboard-kpi grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Business overview">
+        {[
+          { label: 'Total Orders', value: totalOrdersCount.toLocaleString(), detail: `${Number(data?.todayOrdersCount || 0).toLocaleString()} created today` },
+          { label: 'Revenue', value: money(totalSalesSum), detail: `${Number(totalUnitsSold).toLocaleString()} units sold` },
+          { label: canViewCosts ? 'Estimated Profit' : 'Average Order Value', value: canViewCosts ? money(netProfit) : money(avgOrderValue), detail: canViewCosts ? `${data?.profitMarginPercent ?? 0}% profit margin` : 'Average per order' },
+          { label: 'Pending Web Orders', value: Number(pendingOrders).toLocaleString(), detail: 'Awaiting call verification' },
+        ].map(card => <article key={card.label} className="dashboard-metric-card"><span>{card.label}</span><strong>{card.value}</strong><small>{card.detail}</small></article>)}
+      </section>
 
       {/* Row 2: Sales & Returns Area Chart (60%) + Sales Conversion Funnel (40%) */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 sm:gap-6">
+      <div className="dashboard-reports grid grid-cols-1 gap-4 lg:grid-cols-12 sm:gap-6">
         <div className="lg:col-span-7 xl:col-span-8">
           <SalesReturnsChart
             data={trendData}
@@ -496,7 +490,7 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* Row 3: Sessions Gauge (1/3) + Traffic Sources (1/3) + Sales by Region (1/3) */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 sm:gap-6">
+      <div id="dashboard-marketing" className="grid grid-cols-1 gap-4 lg:grid-cols-12 sm:gap-6">
         <div className="lg:col-span-6 xl:col-span-4">
           <RadialGaugeCard
             title="Fulfillment Health"
@@ -526,7 +520,7 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* Operational Fast Pipeline: Call Center Quick Actions */}
-      <div className="rounded-2xl border border-slate-100/90 bg-white p-4 shadow-[0_2px_10px_rgba(0,0,0,0.02)] sm:p-5 lg:p-6 dark:border-slate-800 dark:bg-slate-900/90">
+      <div id="dashboard-operations" className="rounded-2xl border border-slate-100/90 bg-white p-4 shadow-[0_2px_10px_rgba(0,0,0,0.02)] sm:p-5 lg:p-6 dark:border-slate-800 dark:bg-slate-900/90">
         <div className="flex flex-col gap-2 border-b border-slate-100 pb-3 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
           <div>
             <h3 className="text-sm font-semibold text-slate-900 sm:text-base dark:text-white">
@@ -567,7 +561,7 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* Recent Orders Streamlined Table */}
-      <div className="rounded-2xl border border-slate-100/90 bg-white p-4 shadow-[0_2px_10px_rgba(0,0,0,0.02)] sm:p-5 lg:p-6 dark:border-slate-800 dark:bg-slate-900/90">
+      <div id="dashboard-activity" className="rounded-2xl border border-slate-100/90 bg-white p-4 shadow-[0_2px_10px_rgba(0,0,0,0.02)] sm:p-5 lg:p-6 dark:border-slate-800 dark:bg-slate-900/90">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
           <div>
             <h3 className="text-sm font-semibold text-slate-900 sm:text-base dark:text-white">

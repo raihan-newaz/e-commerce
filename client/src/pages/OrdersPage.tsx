@@ -15,9 +15,9 @@ import {
   AlertTriangle,
   RotateCcw,
   CheckSquare,
+  ExternalLink,
   Loader2,
   RefreshCw,
-  ShoppingCart,
   Pencil,
   Archive,
   Trash2,
@@ -28,7 +28,6 @@ import {
   SlidersHorizontal,
   ChevronDown,
   X,
-  PackageCheck,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { OrderActionsPopover } from '../components/orders/OrderActionsPopover';
@@ -534,32 +533,6 @@ export const OrdersPage: React.FC = () => {
 
   return (
       <div className="orders-page space-y-5">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
-            <ShoppingCart className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-            Orders
-          </h1>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
-            Manage customer orders, variations, and courier dispatch • nix.bd
-          </p>
-        </div>
-
-        <div className="orders-header-actions">
-          <button type="button" className="orders-button" onClick={handleExport} disabled={exporting || loading || (!selectedOrderIds.length && !orders.length)}>{exporting ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}{exporting ? 'Exporting…' : selectedOrderIds.length ? `Export selected (${selectedOrderIds.length})` : `Export page (${orders.length})`}</button>
-          <details ref={moreActionsRef} className="orders-more-actions" onBlur={event => { if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node)) event.currentTarget.open = false; }} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); } }}><summary className="orders-button">More actions <ChevronDown size={14} /></summary><div className="orders-more-content"><button type="button" onClick={handleSyncWooCommerce} disabled={syncingWoo}>{syncingWoo ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}{syncingWoo ? 'Syncing…' : 'Sync WooCommerce'}</button></div></details>
-          <button type="button" className="orders-button orders-primary" onClick={() => setIsCreateModalOpen(true)}><Plus size={16} /> Create Order</button>
-        </div>
-      </div>
-      <section aria-label="All-orders summary" className="orders-stats">
-        {[
-          { label: 'Total orders', value: statusCounts.ALL, icon: ShoppingCart, tone: 'neutral' },
-          { label: 'Pending', value: statusCounts.PENDING, icon: Clock, tone: 'amber' },
-          { label: 'In courier', value: statusCounts.IN_TRANSIT, icon: Truck, tone: 'blue' },
-          { label: 'Delivered', value: statusCounts.DELIVERED, icon: PackageCheck, tone: 'green' },
-        ].map(stat => <article className="orders-stat" key={stat.label}><div className="orders-stat-heading"><span>{stat.label}</span><stat.icon size={16} className={`orders-stat-icon ${stat.tone}`} /></div><strong>{stat.value === undefined ? '—' : stat.value.toLocaleString()}</strong><small>All orders · all time</small></article>)}
-      </section>
       <section className="orders-panel" aria-label="Orders list">
       {/* Tabs */}
       <div className="orders-tabs flex flex-wrap items-center gap-1.5 pb-2 border-b border-slate-100 dark:border-slate-800">
@@ -607,6 +580,9 @@ export const OrdersPage: React.FC = () => {
         </div>
 
         <div className="orders-toolbar-actions">
+          <button type="button" className="orders-button orders-primary" onClick={() => setIsCreateModalOpen(true)}><Plus size={15} /> New</button>
+          <button type="button" className="orders-button" onClick={handleExport} disabled={exporting || loading || (!selectedOrderIds.length && !orders.length)}>{exporting ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}{exporting ? 'Exporting…' : 'Export'}</button>
+          <details ref={moreActionsRef} className="orders-more-actions" onBlur={event => { if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node)) event.currentTarget.open = false; }} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); } }}><summary className="orders-button">More <ChevronDown size={14} /></summary><div className="orders-more-content"><button type="button" onClick={handleSyncWooCommerce} disabled={syncingWoo}>{syncingWoo ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}{syncingWoo ? 'Syncing…' : 'Sync WooCommerce'}</button></div></details>
           <button type="button" className={`orders-button ${filtersOpen ? 'is-active' : ''}`} aria-expanded={filtersOpen} aria-controls="orders-filters" onClick={() => setFiltersOpen(open => !open)}><SlidersHorizontal size={15} /> Filters {activeFilters.length > 0 && <span className="orders-count">{activeFilters.length}</span>}</button>
           <label><span className="sr-only">Sort orders</span><AdminSelect dropdownKey="pages.OrdersPage.tsx.1" aria-label="Sort orders" value={`${sortBy}:${sortOrder}`} onChange={event => { const [field, direction] = event.target.value.split(':'); updateFilter(() => { setSortBy(field); setSortOrder(direction); }); }}>
             <option value="createdAt:desc">Date: newest first</option><option value="createdAt:asc">Date: oldest first</option><option value="orderNumber:asc">Order number: ascending</option><option value="orderNumber:desc">Order number: descending</option><option value="grandTotal:desc">Total: high to low</option><option value="grandTotal:asc">Total: low to high</option><option value="status:asc">Status: A–Z</option><option value="status:desc">Status: Z–A</option>
@@ -805,13 +781,14 @@ export const OrdersPage: React.FC = () => {
                       className="rounded border-slate-300 dark:border-slate-700 text-emerald-600 focus:ring-emerald-500"
                     />
                   </th>
-                  <th className="py-3.5 px-3 min-w-[100px]">Order</th>
-                  <th className="py-3.5 px-3 min-w-[150px]">Customer</th>
-                  <th className="py-3.5 px-3 min-w-[180px]">Items & Variations</th>
-                  <th className="py-3.5 px-4 text-right whitespace-nowrap min-w-[120px]">COD Due</th>
-                  <th className="py-3.5 px-3 min-w-[100px] text-center">Priority</th>
-                  <th className="py-3.5 px-3 min-w-[130px]">Status</th>
-                  <th className="py-3.5 px-3 min-w-[120px]">Courier</th>
+                  <th className="py-3.5 px-3 min-w-[125px]">Created At</th>
+                  <th className="py-3.5 px-3 min-w-[80px]">Auto Call</th>
+                  <th className="py-3.5 px-3 min-w-[170px]">Customer</th>
+                  <th className="py-3.5 px-3 min-w-[150px]">Note</th>
+                  <th className="py-3.5 px-3 min-w-[180px]">Order Items</th>
+                  <th className="py-3.5 px-3 min-w-[90px] text-center">Success Rate</th>
+                  <th className="py-3.5 px-3 min-w-[90px]">Tags</th>
+                  <th className="py-3.5 px-3 min-w-[85px]">Site</th>
                   <th className="py-3.5 px-3 text-center min-w-[70px] w-16">Actions</th>
                 </tr>
               </thead>
@@ -835,171 +812,41 @@ export const OrdersPage: React.FC = () => {
                       />
                     </td>
 
-                    {/* Order Number & Time */}
-                    <td className="py-3.5 px-3 min-w-[100px] whitespace-nowrap">
-                      <div className="font-normal text-slate-800 dark:text-slate-200 text-xs flex items-center gap-1.5 hover:text-emerald-600">
-                        <Link to={`/orders/${o.id}`} onClick={event => event.stopPropagation()} className="font-semibold text-slate-900 dark:text-slate-100 hover:underline">#{o.orderNumber}</Link>
-                        {o.wooOrderId && (
-                          <span className="text-[9px] font-semibold px-1 rounded bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30">
-                            Woo
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-1 text-[10px] text-slate-400 font-normal leading-tight">
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-slate-400" />
-                          <span>{new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                        </div>
-                        <div className="mt-0.5 text-slate-400 font-medium">
-                          {formatOrderDate(o.createdAt)}
-                        </div>
-                      </div>
+                    <td className="py-3.5 px-3 min-w-[125px] whitespace-nowrap">
+                      <div className="font-medium text-slate-800 dark:text-slate-200">{new Date(o.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}, {new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                      <div className="mt-1 text-[10px] text-slate-400">ID: {o.orderNumber}</div>
                     </td>
 
-                    {/* Customer */}
+                    <td className="py-3.5 px-3" onClick={(event) => event.stopPropagation()}>
+                      <button type="button" title={`Call ${o.customerName}`} aria-label={`Call ${o.customerName}`} onClick={() => startCall({ orderId: o.id, orderNumber: o.orderNumber || o.id.slice(0, 8), customerName: o.customerName, phone: o.customerPhone })} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-purple-50 hover:text-[#40134c] dark:hover:bg-purple-950/30"><Phone className="h-4 w-4" /></button>
+                    </td>
+
+                    <td className="py-3.5 px-3 min-w-[170px]">
+                      <div className="flex items-center gap-1.5 font-medium text-slate-900 dark:text-slate-100"><span>{o.customerName}</span>{o.isFraudSuspect && <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[9px] font-semibold text-rose-700">RISK</span>}</div>
+                      <div className="mt-0.5 text-[11px] text-slate-600 dark:text-slate-300">{o.customerPhone}</div>
+                      <div className="mt-0.5 max-w-[190px] truncate text-[10px] text-slate-400">{o.customerAddress}</div>
+                    </td>
+
                     <td className="py-3.5 px-3 min-w-[150px]">
-                      <div className="font-medium text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                        <span>{o.customerName}</span>
-                        {o.isFraudSuspect && (
-                          <span className="text-[9px] font-medium px-1.5 py-0.2 rounded bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400">
-                            SUSPECT
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-slate-600 dark:text-slate-300 font-normal text-[11px]">{o.customerPhone}</span>
-                        {ivrManualEnabled && (
-                          <button
-                            type="button"
-                            title="Direct Call Customer (Web Phone)"
-                            onClick={() => startCall({
-                              orderId: o.id,
-                              orderNumber: o.orderNumber || o.id.slice(0, 8),
-                              customerName: o.customerName,
-                              phone: o.customerPhone
-                            })}
-                            className="p-1 rounded-md text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
-                          >
-                            <Phone className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                      <div className="text-[10px] text-slate-400 truncate max-w-[170px] mt-0.5">
-                        {o.customerAddress}
-                      </div>
+                      <div className="max-w-[180px] truncate text-xs text-slate-600 dark:text-slate-300">{o.internalNote || o.customerNote || '—'}</div>
+                      <div className="mt-1 text-[10px] text-slate-400">Updated {new Date(o.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                     </td>
 
-                    {/* Items & Variations */}
                     <td className="py-3.5 px-3 min-w-[180px]">
-                      <div className="space-y-1">
-                        {o.items.map((it) => (
-                          <div key={it.id} className="text-xs">
-                            <div className="flex items-center gap-1 font-normal text-slate-800 dark:text-slate-200">
-                              <span>{it.productName}</span>
-                              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">x{it.quantity}</span>
-                            </div>
-                            {(it.variantName || it.color || it.size) && (
-                              <span className="inline-block text-[10px] font-medium px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 mt-0.5">
-                                {it.variantName || `${it.color || ''} ${it.size ? `/ ${it.size}` : ''}`}
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
+                      <div className="space-y-2">{o.items.map((it) => <div key={it.id} className="flex items-start justify-between gap-2"><div className="min-w-0"><div className="truncate text-xs text-slate-800 dark:text-slate-200">{it.productName}</div><div className="text-[10px] text-slate-500">৳{Number(it.unitPrice).toLocaleString()}</div></div><span className="shrink-0 text-xs text-slate-500">{it.quantity}x</span></div>)}</div>
                     </td>
 
-                    {/* COD Amount */}
-                    <td className="py-3.5 px-4 text-right whitespace-nowrap min-w-[120px]">
-                      <div className="font-semibold text-slate-900 dark:text-slate-100 text-xs tabular-nums">
-                        ৳{(o.codAmount ?? o.grandTotal).toLocaleString()}
-                      </div>
-                      <span className={`orders-payment-pill payment-${o.paymentStatus?.toLowerCase() || 'pending'}`}><i />{({ PENDING: 'Pending', PARTIAL: 'Partial', PAID: 'Paid', REFUNDED: 'Refunded' })[o.paymentStatus] || o.paymentStatus || 'Pending'}</span>
-                      <div className="text-[10px] text-slate-400 tabular-nums mt-0.5 font-normal">
-                        Delivery: ৳{o.deliveryCharge}
-                      </div>
-                    </td>
+                    <td className="py-3.5 px-3 text-center tabular-nums">{typeof o.customer?.successRate === 'number' ? `${Math.round(o.customer.successRate)}%` : '—'}</td>
 
-                    {/* Priority Toggle */}
-                    <td className="py-3.5 px-3 min-w-[100px] text-center whitespace-nowrap" onClick={(event) => event.stopPropagation()}>
-                      {activeTab !== 'TRASH' ? (
-                        <button
-                          onClick={() => handleSinglePriority(o.id, o.priority === 'URGENT' ? 'NORMAL' : 'URGENT')}
-                          data-priority={o.priority}
-                          title="Click to toggle priority"
-                          className={`px-2 py-1 rounded-lg text-[10px] font-bold tracking-tight transition-all ${
-                            o.priority === 'URGENT'
-                              ? 'bg-amber-500 text-white shadow-sm hover:bg-amber-600'
-                              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-                          }`}
-                        >
-                          {o.priority === 'URGENT' ? '⚡ URGENT' : 'Normal'}
-                        </button>
-                      ) : (
-                        <span className="text-[10px] text-slate-400">{o.priority}</span>
-                      )}
-                    </td>
+                    <td className="py-3.5 px-3" onClick={event => event.stopPropagation()}><div className="flex flex-wrap gap-1">{activeTab !== 'TRASH' ? <button onClick={() => handleSinglePriority(o.id, o.priority === 'URGENT' ? 'NORMAL' : 'URGENT')} className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${o.priority === 'URGENT' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500 dark:bg-slate-800'}`}>{o.priority === 'URGENT' ? 'Urgent' : 'Normal'}</button> : <span className="text-xs text-slate-500">{o.priority}</span>}{o.isDuplicate && <span className="rounded-md bg-orange-50 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700">Duplicate</span>}{o.isFraudSuspect && <span className="rounded-md bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700">Suspect</span>}</div></td>
 
-                    {/* Status Dropdown */}
-                    <td className="py-3.5 px-3 min-w-[130px] whitespace-nowrap" onClick={(event) => event.stopPropagation()}>
-                      {activeTab !== 'TRASH' && <AdminSelect dropdownKey="pages.OrdersPage.tsx.8"
-                        data-status={o.status}
-                        aria-label={`Status for order ${o.orderNumber}`}
-                        value={o.status}
-                        onChange={(e) => handleStatusChange(o.id, e.target.value)}
-                        className={`h-9 text-xs font-medium rounded-xl px-3 py-0 border focus:outline-none transition-colors cursor-pointer inline-flex items-center ${
-                          o.status === 'DELIVERED'
-                            ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30'
-                            : o.status === 'IN_TRANSIT'
-                            ? 'bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-500/30'
-                            : o.status === 'CONFIRMED'
-                            ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/30'
-                            : o.status === 'PACKAGING'
-                            ? 'bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-500/30'
-                            : o.status === 'RETURNED'
-                            ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-500/30'
-                            : o.status === 'CANCELLED'
-                            ? 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-300 dark:border-slate-700'
-                            : 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/30'
-                        }`}
-                      >
-                        <option value="PENDING">Pending</option>
-                        <option value="CONFIRMED">Confirmed</option>
-                        <option value="PACKAGING">Packaging</option>
-                        <option value="IN_TRANSIT">In Courier</option>
-                        <option value="DELIVERED">Delivered</option>
-                        <option value="RETURNED">Returned</option>
-                        <option value="CANCELLED">Cancelled</option>
-                        <option value="HOLD">Hold</option>
-                        {!['PENDING', 'CONFIRMED', 'PACKAGING', 'IN_TRANSIT', 'DELIVERED', 'RETURNED', 'CANCELLED', 'HOLD'].includes(o.status) && <option value={o.status} disabled>{o.status.replace(/_/g, ' ')}</option>}
-                      </AdminSelect>}
-                      {activeTab === 'TRASH' && <span className="orders-payment-pill payment-refunded">{o.status.replace(/_/g, ' ')}</span>}
-                    </td>
-
-                    {/* Courier Logistics */}
-                    <td data-column="courier" className="py-3.5 px-3 min-w-[120px] whitespace-nowrap" onClick={(event) => event.stopPropagation()}>
-                      {o.courierName ? (
-                        <div className="h-9 flex flex-col justify-center">
-                          <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs leading-none">{o.courierName}</span>
-                          {o.courierTrackingCode && (
-                            <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 leading-tight mt-1">
-                              {o.courierTrackingCode}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setSelectedOrderForCourier(o)}
-                          className="h-9 inline-flex items-center justify-center gap-1.5 px-3.5 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-400 text-xs font-semibold rounded-xl border border-emerald-200 dark:border-emerald-500/30 transition-all shadow-sm"
-                        >
-                          <Truck className="w-3.5 h-3.5" />
-                          Send
-                        </button>
-                      )}
-                    </td>
+                    <td className="py-3.5 px-3 text-xs">{o.wooOrderId ? 'WooCommerce' : o.sourceChannel || 'Main'}</td>
 
                     {/* Actions */}
                     <td className="py-3.5 px-3 text-center" onClick={(event) => event.stopPropagation()}>
-                      <div className="relative inline-block text-left order-action-menu-container">
+                      <div className="inline-flex items-center gap-1 order-action-menu-container">
+                        <Link to={`/orders/${o.id}`} onClick={event => event.stopPropagation()} className="orders-open-link">Open <ExternalLink className="h-3 w-3" /></Link>
+                        <div className="relative inline-block text-left">
                         <button
                           type="button"
                           onClick={(e) => {
@@ -1021,6 +868,14 @@ export const OrdersPage: React.FC = () => {
 
                         {openActionMenuId === o.id && (
                           <OrderActionsPopover id={`order-actions-${o.id}`} onClose={() => setOpenActionMenuId(null)}>
+                            {activeTab !== 'TRASH' && <label className="block border-b border-slate-100 p-3 text-xs font-semibold dark:border-slate-800">Status<AdminSelect dropdownKey="pages.OrdersPage.tsx.status"
+                              aria-label={`Status for order ${o.orderNumber}`}
+                              value={o.status}
+                              onChange={(e) => { void handleStatusChange(o.id, e.target.value); setOpenActionMenuId(null); }}
+                              className="mt-2 h-8 w-full rounded-lg border border-slate-200 bg-white px-2 text-xs dark:border-slate-700 dark:bg-slate-900"
+                            >
+                              {['PENDING','CONFIRMED','PACKAGING','HANDED_OVER','IN_TRANSIT','DELIVERED','PARTIAL_DELIVERED','HOLD','CANCELLED','RETURNED','FAKE_TRASH'].map(status => <option key={status} value={status}>{status.replace(/_/g, ' ')}</option>)}
+                            </AdminSelect></label>}
                             {activeTab !== 'TRASH' && <label className="block border-b border-slate-100 p-3 text-xs font-semibold dark:border-slate-800">Assignee<span className="mb-2 block text-[10px] font-normal text-slate-500">{o.assignedTo?.name || 'Unassigned'}</span><AdminSelect dropdownKey="pages.OrdersPage.tsx.9"
                           aria-label={`Assign order ${o.orderNumber}`}
                           value={o.assignedTo?.id || ''}
@@ -1166,6 +1021,7 @@ export const OrdersPage: React.FC = () => {
                             )}
                           </OrderActionsPopover>
                         )}
+                        </div>
                       </div>
                     </td>
                   </tr>

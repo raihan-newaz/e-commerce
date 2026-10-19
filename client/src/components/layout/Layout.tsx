@@ -22,7 +22,7 @@ export const Layout: React.FC = () => {
       />
       <div
         className={`flex min-w-0 flex-1 flex-col transition-[padding] duration-300 ${
-          sidebarCollapsed ? "lg:pl-[72px]" : "lg:pl-[256px]"
+          sidebarCollapsed ? "lg:pl-[72px]" : "lg:pl-[288px]"
         }`}
       >
         <Navbar onToggleSidebar={() => setSidebarOpen(true)} />

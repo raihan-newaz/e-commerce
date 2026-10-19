@@ -14,3 +14,22 @@
 .order-details-page select[data-status]{height:38px;border:1px solid var(--detail-line);background:#fff;color:#344054;border-radius:10px;box-shadow:none}
 .dark .order-details-page select[data-status]{background:#0f172a;color:#e2e8f0}
 @media(max-width:640px){.order-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.order-summary-card{padding:14px}.order-summary-card strong{font-size:19px}.order-details-page section{max-width:100%;min-width:0}.order-details-page aside{min-width:0}}
+
+.order-details-page { max-width: 1600px; }
+.order-details-page .order-detail-header { border-color: var(--detail-line); box-shadow: 0 2px 8px rgb(28 20 35 / 4%); }
+.order-meta-pill { display: inline-flex; min-height: 30px; align-items: center; gap: 5px; border: 1px solid var(--detail-line); border-radius: 999px; background: #faf9fb; padding: 0 10px; color: #354052; font-size: 11px; white-space: nowrap; }
+.order-source-pill { border-color: #c7e6dc; background: #eaf7f2; color: #176b53; }
+.dark .order-meta-pill { background: #17151e; color: #e7e0eb; }
+.dark .order-source-pill { border-color: #285445; background: #132a22; color: #8bd1b6; }
+.detail-summary-strip { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; }
+.detail-summary-card { display: flex; min-width: 0; min-height: 112px; flex-direction: column; gap: 8px; border: 1px solid var(--detail-line); border-radius: 12px; background: #fff; padding: 15px 17px; box-shadow: 0 1px 3px rgb(28 20 35 / 3%); }
+.detail-summary-card > span { color: var(--detail-muted); font-size: 11px; }
+.detail-summary-card > strong { overflow: hidden; color: #171923; font-size: 18px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.detail-summary-card > small { overflow: hidden; color: var(--detail-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.dark .detail-summary-card { border-color: var(--detail-line); background: #17151e; }
+.dark .detail-summary-card > strong { color: #f4f1f6; }
+.order-detail-aside { align-self: start; }
+.order-aside-summary { position: sticky; top: 84px; }
+.order-detail-aside > section { border-color: var(--detail-line); }
+@media(max-width:1023px){.order-details-page .order-detail-header{align-items:flex-start}.order-meta-pill{white-space:normal}.detail-summary-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.order-aside-summary{position:static}}
+@media(max-width:640px){.detail-summary-strip{gap:8px}.detail-summary-card{min-height:100px;padding:12px}.detail-summary-card>strong{font-size:16px}.order-details-page .order-detail-header{padding:14px}.order-details-page .order-detail-header>div:last-child{width:100%}}
