@@ -2,7 +2,7 @@ import './orderDetails.css';
 import { useAuth } from '../context/AuthContext';
 import { AdminSelect } from '../components/admin/AdminSelect';
 import React, { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, ArrowLeft, Box, CalendarClock, CheckCircle2, Copy, Loader2, MapPin, MessageCircle, Phone, PhoneForwarded, Printer, Truck, UserRound } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Box, Copy, Loader2, MessageCircle, Phone, PhoneForwarded, Printer } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../lib/api';
@@ -28,6 +28,7 @@ export const OrderDetailsPage: React.FC = () => {
   const [staffError,setStaffError] = useState('');
   const loadSerial = useRef(0);
   const [order, setOrder] = useState<Order | null>(null);
+  const [nextStatus, setNextStatus] = useState('');
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
@@ -74,8 +75,8 @@ export const OrderDetailsPage: React.FC = () => {
     }
   };
 
-  const load = async () => { const serial=++loadSerial.current; try { const {data}=await api.get('/orders/'+id); if(serial===loadSerial.current){setOrder(data.order);setCustomerHistory(data.customerHistory || null);} } catch(error:any){if(serial===loadSerial.current)toast.error(error.response?.data?.message || 'Order not found');} finally {if(serial===loadSerial.current)setLoading(false);} };
-  useEffect(()=>{setLoading(true);setOrder(null);void load();return()=>{loadSerial.current++;};},[id]);
+  const load = async () => { const serial=++loadSerial.current; try { const {data}=await api.get('/orders/'+id); if(serial===loadSerial.current){setOrder(data.order);setNextStatus(data.order.status);setCustomerHistory(data.customerHistory || null);} } catch(error:any){if(serial===loadSerial.current)toast.error(error.response?.data?.message || 'Order not found');} finally {if(serial===loadSerial.current)setLoading(false);} };
+  useEffect(()=>{setLoading(true);setOrder(null);setNextStatus('');void load();return()=>{loadSerial.current++;};},[id]);
   useEffect(() => {
     if (!canManage) return;
     api.get('/auth/users').then(({ data }) => {
@@ -119,7 +120,7 @@ export const OrderDetailsPage: React.FC = () => {
     api.get(`/couriers/redx/events?orderId=${encodeURIComponent(id)}`).then(({ data }) => setRedxEvents(data.events || [])).catch(() => setRedxEvents([]));
     if (order.courierConsignmentId) api.get(`/couriers/redx/orders/${id}`).then(({ data }) => setRedxTracking(data.tracking || [])).catch(() => setRedxTracking([]));
   }, [id, order?.courierName, order?.courierConsignmentId]);
-  const updateStatus = async (status: string) => { if (!order || status === order.status) return; setUpdating(true); try { await api.patch(`/orders/${order.id}/status`, { status }); toast.success(`Order moved to ${pretty(status)}`); load(); } catch (error: any) { toast.error(error.response?.data?.message || 'Could not update status'); } finally { setUpdating(false); } };
+  const updateStatus = async (status: string) => { if (!order || status === order.status) { setNextStatus(order?.status || ''); return; } setUpdating(true); try { await api.patch(`/orders/${order.id}/status`, { status }); setNextStatus(status); toast.success(`Order moved to ${pretty(status)}`); load(); } catch (error: any) { setNextStatus(order.status); toast.error(error.response?.data?.message || 'Could not update status'); } finally { setUpdating(false); } };
   const copy = (value: string) => navigator.clipboard.writeText(value).then(() => toast.success('Copied'));
   const refreshPathao = async () => {
     if (!order) return;
@@ -207,160 +208,59 @@ export const OrderDetailsPage: React.FC = () => {
   if (!order) return <div className="py-24 text-center"><p className="font-bold">Order not found</p><Link className="mt-3 inline-block text-sm font-bold text-emerald-600 dark:text-emerald-400 hover:underline" to="/orders">Back to orders</Link></div>;
   let checkoutDetails: Record<string, string> = {};
   try { checkoutDetails = JSON.parse(order.checkoutDetails || '{}'); } catch { checkoutDetails = {}; }
-  return <div className="order-details-page mx-auto max-w-[1600px] space-y-5 pb-12">
-    <div className="order-detail-header flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-900 lg:flex-row lg:items-center">
-      <div className="flex items-center gap-3">
-        <Link to="/orders" className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
-          <ArrowLeft className="h-4 w-4"/>
-        </Link>
-        <div>
-          <div className="flex items-center gap-2">
-            <div><h2 className="text-xl font-semibold">Web Order Details</h2><p className="mt-0.5 text-xs text-slate-500">Order #{order.orderNumber} · Review and manage this web order</p></div>
-            {order.isFraudSuspect && <span className="rounded-full bg-rose-100 px-2 py-1 text-[10px] font-medium text-rose-700">RISK</span>}
-            {order.isDuplicate && <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-medium text-amber-700">DUPLICATE</span>}
-          </div>
-          <p className="mt-1 text-xs text-slate-500">Placed {new Date(order.createdAt).toLocaleString()} · Last updated {new Date(order.updatedAt).toLocaleString()}</p>
-        </div>
+  const providerCards = [
+    { name: 'Overall', tone: 'violet', active: true, state: pretty(order.status), detail: `Order #${order.orderNumber}` },
+    { name: 'Pathao', tone: 'rose', active: order.courierName === 'PATHAO', state: order.courierName === 'PATHAO' ? pretty(order.courierStatus || order.status) : 'Not assigned', detail: order.courierName === 'PATHAO' ? order.courierTrackingCode || 'No tracking yet' : 'No booking for this order' },
+    { name: 'Steadfast', tone: 'teal', active: order.courierName === 'STEADFAST', state: order.courierName === 'STEADFAST' ? pretty(order.courierStatus || order.status) : 'Not assigned', detail: order.courierName === 'STEADFAST' ? order.courierTrackingCode || 'No tracking yet' : 'No booking for this order' },
+    { name: 'RedX', tone: 'red', active: order.courierName === 'REDX', state: order.courierName === 'REDX' ? pretty(order.courierStatus || order.status) : 'Not assigned', detail: order.courierName === 'REDX' ? order.courierTrackingCode || 'No tracking yet' : 'No booking for this order' },
+    { name: 'Paperfly', tone: 'amber', active: order.courierName === 'PAPERFLY', state: order.courierName === 'PAPERFLY' ? pretty(order.courierStatus || order.status) : 'Not assigned', detail: order.courierName === 'PAPERFLY' ? order.courierTrackingCode || 'No tracking yet' : 'No booking for this order' },
+  ];
+  return <div className="order-details-page mx-auto max-w-[1600px] space-y-3 pb-12">
+    <div className="order-detail-header flex flex-col justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center">
+      <div className="flex min-w-0 items-center gap-3">
+        <Link to="/orders" aria-label="Back to orders" className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900"><ArrowLeft className="h-4 w-4"/></Link>
+        <div className="min-w-0"><h2 className="text-lg font-semibold leading-6">Web Order Details</h2><p className="truncate text-xs text-slate-500">Review and manage this web order · #{order.orderNumber}</p></div>
+        {(order.isFraudSuspect || order.isDuplicate) && <span className="hidden rounded-full bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-800 sm:inline-flex">Review required</span>}
       </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="order-meta-pill">{pretty(order.status)}</span>
+      <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
+        <span className={`order-meta-pill ${order.status === 'CANCELLED' ? 'order-status-cancel' : ''}`}>{pretty(order.status)}</span>
         <span className="order-meta-pill order-source-pill">{order.wooOrderId ? 'WooCommerce' : pretty(order.sourceChannel || 'WEB')}</span>
         <span className="order-meta-pill"><span className="text-slate-400">Created</span> {new Date(order.createdAt).toLocaleString()}</span>
         <span className="order-meta-pill"><span className="text-slate-400">Updated</span> {new Date(order.updatedAt).toLocaleString()}</span>
-        {/* Direct Call Header Button */}
-        <button
-          type="button"
-          onClick={() => startCall({ orderId: order.id, orderNumber: order.orderNumber, customerName: order.customerName, phone: order.customerPhone })}
-          className="inline-flex h-10 items-center gap-2 rounded-xl bg-emerald-600 px-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 cursor-pointer active:scale-95"
-          title={`Direct Call ${order.customerName} (${order.customerPhone})`}
-        >
-          <Phone className="h-4 w-4" />
-          <span>Direct Call</span>
-          <span className="hidden sm:inline font-mono text-xs opacity-90">({order.customerPhone})</span>
-        </button>
-
-        {/* WhatsApp Header Button */}
-        <a
-          target="_blank"
-          rel="noreferrer"
-          href={`https://wa.me/88${order.customerPhone.replace(/\D/g, '')}`}
-          className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#25D366] px-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#20ba59]"
-          title="Chat on WhatsApp"
-        >
-          <MessageCircle className="h-4 w-4" />
-          <span className="hidden sm:inline">WhatsApp</span>
-        </a>
-
-        {/* Automated Robot IVR Trigger */}
-        {ivrManualEnabled && (
-          <button
-            type="button"
-            disabled={ivrDialing}
-            onClick={handleTriggerIvrCall}
-            className="inline-flex h-10 items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-800/60 dark:bg-indigo-950/40 dark:text-indigo-300 disabled:opacity-50"
-            title="Trigger automated robot IVR call"
-          >
-            {ivrDialing ? <Loader2 className="h-4 w-4 animate-spin text-indigo-600 dark:text-indigo-400" /> : <PhoneForwarded className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />}
-            <span className="hidden md:inline">{ivrDialing ? 'Calling…' : 'Automated IVR'}</span>
-          </button>
-        )}
-
-        {canManage && !order.trashedAt && (
-          <button onClick={() => setEditOpen(true)} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium dark:border-slate-700 dark:bg-slate-900">
-            Edit order
-          </button>
-        )}
-        <button onClick={() => setInvoiceOpen(true)} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium dark:border-slate-700 dark:bg-slate-900">
-          <Printer className="h-4 w-4"/>Invoice
-        </button>
-        <AdminSelect dropdownKey="pages.OrderDetailsPage.tsx.1" aria-label="Order status" data-status={order.status} disabled={updating} value={order.status} onChange={(e) => updateStatus(e.target.value)} className="h-10 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 px-4 text-sm font-medium shadow transition outline-none">
-          {statuses.map(status => <option key={status} value={status}>{pretty(status)}</option>)}
-        </AdminSelect>
       </div>
     </div>
-    <section className="detail-summary-strip" aria-label="Order and fulfillment summary">
-      <article className="detail-summary-card"><span>Overall status</span><strong>{pretty(order.status)}</strong><small>Order #{order.orderNumber} · {pretty(order.priority)} priority</small></article>
-      <article className="detail-summary-card"><span>Courier</span><strong>{pretty(order.courierName || 'Not assigned')}</strong><small>{order.courierStatus ? pretty(order.courierStatus) : order.courierTrackingCode || 'Awaiting dispatch'}</small></article>
-      <article className="detail-summary-card"><span>Customer success rate</span><strong>{typeof order.customer?.successRate === 'number' ? `${Math.round(order.customer.successRate)}%` : '—'}</strong><small>{order.customer?.totalOrders ? `${order.customer.totalOrders} previous order${order.customer.totalOrders === 1 ? '' : 's'}` : 'No customer history available'}</small></article>
-      <article className="detail-summary-card"><span>Amount due · {pretty(order.paymentMethod)}</span><strong>{money(order.codAmount)}</strong><small>{pretty(order.paymentStatus)} · Advance {money(order.advancePaid)}</small></article>
-    </section>
-    {order.internalNote?.includes('[Courier review required]') && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">This order was amended after booking. Confirm the delivery address, products and COD amount with the courier.</p>}
-    {(order.isFraudSuspect || order.isDuplicate) && <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0"/><div><b>Review before fulfilment</b><p className="text-sm opacity-80">{order.isFraudSuspect ? 'Customer history triggered a risk flag. ' : ''}{order.isDuplicate ? 'A recent order has the same customer phone number.' : ''}</p></div></div>}
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]"><div className="space-y-6">
-      {/* Prominent Notes & Checkout Details Card with Dates/Times */}
-      <OrderNotesCard order={order} onRefresh={load} />
-      <section className="overflow-hidden rounded-2xl border border-slate-100/90 bg-white shadow-[0_2px_10px_rgba(0,0,0,0.02)] dark:border-slate-800 dark:bg-slate-900"><div className="flex items-center gap-2 border-b border-slate-200/80 px-5 py-4 dark:border-slate-800"><Box className="h-5 w-5 text-emerald-600 dark:text-emerald-400"/><h3 className="font-semibold">Order items</h3></div><div className="divide-y divide-slate-100 dark:divide-slate-800">{order.items.map(item => <div key={item.id} className="flex items-center gap-4 p-5">{(item.variant?.image || item.product?.image) ? <img src={item.variant?.image || item.product?.image} alt="" className="h-16 w-16 rounded-xl object-cover"/> : <span className="grid h-16 w-16 place-items-center rounded-xl bg-slate-100 dark:bg-slate-800"><Box className="h-5 w-5 text-slate-400"/></span>}<div className="min-w-0 flex-1"><b className="block truncate">{item.productName}</b><p className="mt-1 text-xs text-slate-500">{item.variantName || [item.color, item.size].filter(Boolean).join(' / ') || 'Standard'} · SKU {item.productSku || '—'}</p><p className="mt-2 text-xs font-bold text-slate-900 dark:text-slate-100">{money(item.unitPrice)} × {item.quantity}</p></div><b>{money(item.totalPrice)}</b></div>)}</div><div className="ml-auto max-w-sm space-y-2 border-t border-slate-200/80 p-5 text-sm dark:border-slate-800"><div className="flex justify-between text-slate-500"><span>Subtotal</span><span>{money(order.subtotal)}</span></div><div className="flex justify-between text-slate-500"><span>Delivery</span><span>{money(order.deliveryCharge)}</span></div>{order.discount > 0 && <div className="flex justify-between text-emerald-600"><span>Discount</span><span>-{money(order.discount)}</span></div>}<div className="flex justify-between border-t border-slate-200/80 pt-3 text-lg font-semibold dark:border-slate-700"><span>Grand total</span><span>{money(order.grandTotal)}</span></div><div className="flex justify-between text-xs text-slate-500"><span>Advance paid</span><span>{money(order.advancePaid)}</span></div><div className="flex justify-between rounded-xl bg-emerald-50 p-3 font-semibold text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300"><span>COD to collect</span><span>{money(order.codAmount)}</span></div></div></section>
-      <section className="grid gap-4 md:grid-cols-2"><div className="rounded-2xl border border-slate-100/90 bg-white p-5 shadow-[0_2px_10px_rgba(0,0,0,0.02)] dark:border-slate-800 dark:bg-slate-900"><h3 className="font-semibold">Payment</h3><dl className="mt-4 space-y-3 text-sm"><div className="flex justify-between"><dt className="text-slate-500">Method</dt><dd>{pretty(order.paymentMethod)}</dd></div><div className="flex justify-between"><dt className="text-slate-500">Status</dt><dd>{pretty(order.paymentStatus)}</dd></div></dl></div><div className="rounded-2xl border border-slate-100/90 bg-white p-5 shadow-[0_2px_10px_rgba(0,0,0,0.02)] dark:border-slate-800 dark:bg-slate-900"><h3 className="font-semibold">Courier information</h3><dl className="mt-4 space-y-3 text-sm"><div className="flex justify-between gap-2"><dt className="text-slate-500">Provider</dt><dd>{pretty(order.courierName)}</dd></div><div className="flex justify-between gap-2"><dt className="text-slate-500">Tracking</dt><dd className="break-all font-mono text-xs">{order.courierTrackingCode || 'Not dispatched'}</dd></div><div className="flex justify-between gap-2"><dt className="text-slate-500">Consignment</dt><dd className="break-all font-mono text-xs">{order.courierConsignmentId || '—'}</dd></div><div className="flex justify-between gap-2"><dt className="text-slate-500">Courier status</dt><dd>{pretty(order.courierStatus)}</dd></div><div className="flex justify-between gap-2"><dt className="text-slate-500">Courier charge</dt><dd>{money(order.courierCharge)}</dd></div><div className="flex justify-between gap-2"><dt className="text-slate-500">COD received</dt><dd>{money(order.courierCodReceived)}</dd></div><div className="flex justify-between gap-2"><dt className="text-slate-500">Settlement</dt><dd>{pretty(order.courierSettlementStatus)}</dd></div>{order.courierStoreId && <div className="flex justify-between gap-2"><dt className="text-slate-500">Pickup store</dt><dd>#{order.courierStoreId}</dd></div>}</dl></div></section>
 
-    </div><aside className="order-detail-aside space-y-5">
-      <section className="order-aside-summary rounded-2xl border border-slate-100/90 bg-white p-5 shadow-[0_2px_10px_rgba(0,0,0,0.02)] dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex items-center justify-between"><h3 className="font-semibold">Order Summary</h3><span className="text-[10px] text-slate-400">#{order.orderNumber}</span></div>
-        <div className="mt-4 space-y-2 border-t border-slate-100 pt-3 text-xs dark:border-slate-800">
-          <div className="flex justify-between gap-3"><span className="text-slate-500">Date</span><span>{new Date(order.createdAt).toLocaleString()}</span></div>
-          <div className="flex justify-between gap-3"><span className="text-slate-500">Status</span><span>{pretty(order.status)}</span></div>
-          <div className="flex justify-between gap-3"><span className="text-slate-500">Payment</span><span>{pretty(order.paymentMethod)}</span></div>
-          <div className="flex justify-between gap-3"><span className="text-slate-500">Source</span><span>{pretty(order.sourceChannel || (order.wooOrderId ? 'WooCommerce' : 'WEB'))}</span></div>
-          <div className="flex justify-between gap-3 border-t border-slate-100 pt-2 dark:border-slate-800"><span className="text-slate-500">Subtotal</span><span>{money(order.subtotal)}</span></div>
-          <div className="flex justify-between gap-3"><span className="text-slate-500">Delivery</span><span>{money(order.deliveryCharge)}</span></div>
-          {order.discount > 0 && <div className="flex justify-between gap-3"><span className="text-slate-500">Discount</span><span>−{money(order.discount)}</span></div>}
-          <div className="flex justify-between gap-3 border-t border-slate-100 pt-2 text-sm font-semibold dark:border-slate-800"><span>Total</span><span>{money(order.grandTotal)}</span></div>
-          <div className="flex justify-between gap-3"><span className="text-slate-500">COD to collect</span><span>{money(order.codAmount)}</span></div>
-        </div>
-        <div className="mt-4 border-t border-slate-100 pt-3 dark:border-slate-800"><h4 className="mb-2 text-xs font-semibold">Order Items</h4>{order.items.slice(0, 4).map(item => <div key={item.id} className="flex justify-between gap-2 py-1 text-xs"><span className="min-w-0 truncate">{item.productName}</span><span className="shrink-0 text-slate-500">{item.quantity}×</span></div>)}{order.items.length > 4 && <p className="pt-1 text-[10px] text-slate-400">and {order.items.length - 4} more items</p>}</div>
-        <div className="mt-4 border-t border-slate-100 pt-3 text-[11px] leading-5 text-slate-500 dark:border-slate-800"><p>IP: <span className="font-mono text-slate-700 dark:text-slate-300">{order.sourceIp || 'Not available'}</span></p><p>Mobile: <span className="text-slate-700 dark:text-slate-300">{order.customerPhone}</span></p><p>Device: <span className="text-slate-700 dark:text-slate-300">Not available</span></p></div>
-      </section>
-      <section className="rounded-2xl border border-slate-100/90 bg-white p-5 shadow-[0_2px_10px_rgba(0,0,0,0.02)] dark:border-slate-800 dark:bg-slate-900"><div className="flex items-center gap-2"><UserRound className="h-5 w-5 text-emerald-600 dark:text-emerald-400"/><h3 className="font-semibold">Customer</h3></div><p className="mt-4 font-bold">{order.customerName}</p><button onClick={() => copy(order.customerPhone)} className="mt-1 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-emerald-600">{order.customerPhone}<Copy className="h-3 w-3"/></button><div className="mt-4 grid grid-cols-2 gap-2"><button type="button" onClick={() => startCall({ orderId: order.id, orderNumber: order.orderNumber, customerName: order.customerName, phone: order.customerPhone })} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 transition shadow-sm"><Phone className="h-4 w-4"/>Direct Call</button><a target="_blank" rel="noreferrer" href={`https://wa.me/88${order.customerPhone.replace(/\D/g, '')}`} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-slate-900 text-sm font-bold text-white hover:bg-slate-800 transition dark:bg-slate-800"><MessageCircle className="h-4 w-4"/>WhatsApp</a></div>{ivrManualEnabled && (<button type="button" disabled={ivrDialing} onClick={handleTriggerIvrCall} className="mt-2.5 flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/80 px-3 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 hover:border-indigo-300 dark:border-indigo-800/60 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/40 disabled:opacity-50" title="Trigger automated IVR phone call to customer">{ivrDialing ? <Loader2 className="h-4 w-4 animate-spin text-indigo-600 dark:text-indigo-400" /> : <PhoneForwarded className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />}<span>{ivrDialing ? 'Calling Customer…' : 'Trigger Automated IVR'}</span></button>)}<dl className="mt-4 space-y-2 border-t border-slate-100 pt-3 text-xs dark:border-slate-800"><div className="flex justify-between gap-3"><dt className="text-slate-500">Order source</dt><dd>{pretty(order.sourceChannel|| (order.wooOrderId?'WooCommerce':'Unknown'))}</dd></div><div className="flex justify-between gap-3"><dt className="text-slate-500">{order.sourceChannel==='STAFF'?'Staff request IP':'Customer / checkout IP'}</dt><dd data-testid="order-source-ip" className="break-all font-mono">{order.sourceIp || 'Not captured'}</dd></div></dl>{!order.sourceIp && <p className="mt-2 text-[11px] text-slate-400">No customer IP was saved with this order.</p>}</section><section className="rounded-2xl border border-slate-100/90 bg-white p-5 shadow-[0_2px_10px_rgba(0,0,0,0.02)] dark:border-slate-800 dark:bg-slate-900"><div className="flex items-center gap-2"><MapPin className="h-5 w-5 text-emerald-600 dark:text-emerald-400"/><h3 className="font-semibold">Delivery address</h3></div><p className="mt-4 text-sm leading-6">{order.customerAddress}</p><p className="mt-2 text-xs text-slate-500">{[order.area, order.zone, order.city, order.district].filter(Boolean).join(', ')}</p></section>      <section className="rounded-2xl border border-slate-100/90 bg-white p-5 shadow-[0_2px_10px_rgba(0,0,0,0.02)] dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CalendarClock className="h-5 w-5 text-emerald-600 dark:text-emerald-400"/>
-            <h3 className="font-semibold">Status & team</h3>
-          </div>
-          <button
-            onClick={() => updatePriority(order.priority === 'URGENT' ? 'NORMAL' : 'URGENT')}
-            className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
-              order.priority === 'URGENT'
-                ? 'bg-amber-500 text-white shadow hover:bg-amber-600'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
-            }`}
-          >
-            {order.priority === 'URGENT' ? '⚡ URGENT PRIORITY' : 'Normal Priority'}
-          </button>
-        </div>
+    {order.internalNote?.includes('[Courier review required]') && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">This order was amended after booking. Confirm the delivery address, products and COD amount with the courier.</p>}
+    {(order.isFraudSuspect || order.isDuplicate) && <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0"/><div><b className="text-xs">Review before fulfilment</b><p className="text-xs opacity-80">{order.isFraudSuspect ? 'Customer history triggered a risk flag. ' : ''}{order.isDuplicate ? 'A recent order has the same customer phone number.' : ''}</p></div></div>}
 
-        <div className="mt-4 space-y-4">
-          <div className="flex gap-3">
-            <CheckCircle2 className="h-5 w-5 text-emerald-500"/>
-            <div>
-              <b className="text-sm">Order received</b>
-              <p className="text-xs text-slate-400">{new Date(order.createdAt).toLocaleString()}</p>
-            </div>
-          </div>
-          <div className="flex gap-3">
-            <Truck className="h-5 w-5 text-emerald-600 dark:text-emerald-400"/>
-            <div className="flex-1">
-              <b className="text-sm">Current stage: {pretty(order.status)}</b>
-              <div className="mt-2 flex flex-col gap-1.5">
-                <label className="text-[11px] font-semibold text-slate-500">Assigned team member</label>
-                <AdminSelect dropdownKey="pages.OrderDetailsPage.tsx.2" aria-label="Assigned team member" disabled={!canManage || assignmentBusy}
-                  value={order.assignedTo?.id || ''}
-                  onChange={(e) => updateAssignment(e.target.value ? e.target.value : null)}
-                  className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-800 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 cursor-pointer"
-                >
-                  <option value="">Unassigned</option>
-                  {order.assignedTo && !staffList.some(staff=>staff.id===order.assignedTo?.id) && <option value={order.assignedTo.id}>{order.assignedTo.name} (current)</option>}
-                  {staffList.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.role.replace(/_/g, ' ')})
-                    </option>
-                  ))}
-                </AdminSelect>{staffError && <p role="alert" className="text-xs text-rose-600">{staffError}</p>}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-    </aside></div>
+    <div className="order-editor-grid grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="min-w-0 space-y-3">
+        <section className="courier-performance-strip" aria-label="Order and courier status">
+          <article className="courier-performance-card courier-record-card"><div className="courier-card-heading"><span className="courier-logo-mark">M</span><b>Our Record</b>{customerHistory && customerHistory.totalPrevious > 0 && <span className="courier-card-count">{customerHistory.totalPrevious}</span>}</div><div className="courier-record-line"><span>Total previous</span><b>{customerHistory?.totalPrevious ?? 0}</b></div><div className="courier-record-line"><span>Delivered</span><b className="text-emerald-700">{customerHistory?.completed ?? 0}</b></div><div className="courier-record-line"><span>Cancelled / returned</span><b>{(customerHistory?.cancelled ?? 0) + (customerHistory?.returned ?? 0)}</b></div></article>
+          {providerCards.map((provider) => <article key={provider.name} className={`courier-performance-card courier-tone-${provider.tone} ${provider.active ? 'is-current' : ''}`}><div className="courier-card-heading"><span className="courier-logo-mark">{provider.name === 'Steadfast' ? '➤' : provider.name === 'RedX' ? 'R' : provider.name === 'Paperfly' ? 'P' : provider.name === 'Pathao' ? 'p' : '↗'}</span><b>{provider.name}</b>{provider.active && <span className="courier-current-dot" aria-label="Current courier"/>}</div><div className="courier-provider-state">{provider.state}</div><div className="courier-provider-detail" title={provider.detail}>{provider.detail}</div><div className={`courier-provider-progress ${provider.active ? 'active' : ''}`} /></article>)}
+        </section>
+        <section className="order-editor-section"><h3 className="order-section-kicker">Customer details</h3><div className="grid gap-3 border border-slate-200 bg-white p-3.5 dark:border-slate-800 dark:bg-slate-900 md:grid-cols-3"><div><label className="order-field-label">Mobile number</label><div className="order-reference-field flex items-center justify-between gap-2"><button type="button" onClick={() => copy(order.customerPhone)} className="truncate text-left">{order.customerPhone}</button><div className="flex shrink-0 items-center gap-1"><button aria-label="Call customer" onClick={() => startCall({ orderId: order.id, orderNumber: order.orderNumber, customerName: order.customerName, phone: order.customerPhone })} className="rounded-md p-1 text-emerald-700 hover:bg-emerald-50"><Phone className="h-4 w-4"/></button><a aria-label="WhatsApp customer" target="_blank" rel="noreferrer" href={`https://wa.me/88${order.customerPhone.replace(/\D/g, '')}`} className="rounded-md p-1 text-emerald-600 hover:bg-emerald-50"><MessageCircle className="h-4 w-4"/></a></div></div></div><div><label className="order-field-label">Name</label><div className="order-reference-field">{order.customerName || '—'}</div></div><div><label className="order-field-label">Delivery method</label><div className="order-reference-field flex items-center justify-between gap-2"><span>{pretty(order.courierName || 'Not selected')}</span>{!order.courierName && <button type="button" onClick={() => setDispatchOpen(true)} className="text-xs font-semibold text-purple-800 hover:underline">Choose courier</button>}</div></div></div></section>
+
+        <section className="order-editor-section"><h3 className="order-section-kicker">Shipping &amp; address</h3><div className="grid gap-3 border border-slate-200 bg-white p-3.5 dark:border-slate-800 dark:bg-slate-900 md:grid-cols-3"><div><label className="order-field-label">Address</label><div className="order-reference-field min-h-[72px] leading-5">{order.customerAddress || 'No address provided'}{[order.area, order.zone, order.city, order.district].filter(Boolean).length > 0 && <span className="mt-1 block text-xs text-slate-500">{[order.area, order.zone, order.city, order.district].filter(Boolean).join(', ')}</span>}</div></div><div><label className="order-field-label">Shipping note</label><div className="order-reference-field min-h-[72px] leading-5 text-slate-600 dark:text-slate-300">{order.customerNote || <span className="text-slate-400">No shipping note</span>}</div></div><div><div className="flex items-center justify-between"><label className="order-field-label">Extra options</label><button type="button" onClick={() => setEditOpen(true)} className="rounded-md border border-slate-200 px-2.5 py-1 text-[11px] font-semibold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">Edit order</button></div><div className="order-options-box"><span className="rounded-md border border-slate-200 px-2 py-1 text-xs dark:border-slate-700">{pretty(order.sourceChannel || (order.wooOrderId ? 'WooCommerce' : 'Website'))}</span><span className="text-[11px] text-slate-500">{pretty(order.paymentMethod)} · {pretty(order.paymentStatus)}</span><button type="button" onClick={() => setEditOpen(true)} className="mt-1 inline-flex items-center gap-1.5 self-end rounded-lg bg-purple-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-purple-800"><Printer className="h-3.5 w-3.5"/> Invoice</button></div></div></div></section>
+
+        <section className="order-editor-section order-boxed-section"><div className="order-section-heading"><div><h3>Add products</h3><p>Search by product name and SKU</p></div></div><button type="button" onClick={() => setEditOpen(true)} className="order-product-search mt-2"><span><span className="text-slate-400">⌕</span> Search and add products</span><span className="text-slate-400">⌄</span></button></section>
+
+        <section className="order-editor-section order-boxed-section"><div className="order-section-heading"><h3>Ordered products <span className="order-item-count">{order.items.length}</span></h3><button type="button" disabled={!canManage || Boolean(order.trashedAt)} onClick={() => setEditOpen(true)} className="text-xs font-semibold text-purple-800 hover:underline disabled:opacity-50">Edit products</button></div><div className="mt-3 space-y-2">{order.items.map(item => <article key={item.id} className="order-edit-line"><div className="flex min-w-0 items-center gap-3"><div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-800">{(item.variant?.image || item.product?.image) ? <img src={item.variant?.image || item.product?.image} alt="" className="h-full w-full object-cover"/> : <div className="grid h-full place-items-center"><Box className="h-5 w-5 text-slate-400"/></div>}</div><div className="min-w-0"><b className="block truncate text-sm">{item.productSku || item.productName}</b><p className="mt-0.5 truncate text-xs text-slate-500">{item.productName}</p><p className="text-xs text-slate-500">{item.variantName || [item.color, item.size].filter(Boolean).join(' / ') || 'Standard'}</p></div></div><div className="order-line-value"><span>Qty</span><b>{item.quantity}×</b></div><div className="order-line-value"><span>Price</span><b>{money(item.unitPrice)}</b></div><div className="order-line-value"><span>Total</span><b>{money(item.totalPrice)}</b></div><button type="button" disabled={!canManage || Boolean(order.trashedAt)} onClick={() => setEditOpen(true)} className="order-line-edit" aria-label={`Edit ${item.productName}`}>Edit</button></article>)}</div>{Object.keys(checkoutDetails).length > 0 && <div className="order-attributes-box"><b>Checkout details</b><div>{Object.entries(checkoutDetails).map(([key, value]) => <p key={key}><span>{key.replace(/_/g, ' ')}:</span> {String(value)}</p>)}</div></div>}</section>
+
+        <section className="order-editor-section order-boxed-section"><h3 className="order-section-kicker">Order total</h3><div className="order-total-fields"><div><span>Discount</span><b>{money(order.discount)}</b></div><div><span>Advance</span><b>{money(order.advancePaid)}</b></div><div><span>Sub total</span><b>{money(order.subtotal)}</b></div><div><span>Delivery charge</span><b>{money(order.deliveryCharge)}</b></div><div className="grand-total"><span>Grand total</span><b>{money(order.grandTotal)}</b></div></div>{order.status === 'PENDING' && <button type="button" disabled={updating || !canManage || order.riskReviewStatus === 'REVIEW_REQUIRED'} onClick={() => updateStatus('CONFIRMED')} className="order-approve-button">{updating ? 'Updating order…' : `Approve Order (${money(order.grandTotal)})`}</button>}</section>
+      </div>
+
+      <aside className="order-detail-aside space-y-3">
+        <section className="order-side-card order-aside-summary"><div className="order-side-heading"><h3>Order summary</h3><span>#{order.orderNumber}</span></div><div className="order-summary-meta"><div><span>Date</span><b>{new Date(order.createdAt).toLocaleString()}</b></div><div><span>Status</span><b>{pretty(order.status)}</b></div><div><span>Payment</span><b>{pretty(order.paymentMethod)}</b></div><div><span>Source</span><b>{pretty(order.sourceChannel || (order.wooOrderId ? 'WooCommerce' : 'WEB'))}</b></div></div><div className="order-summary-amounts"><div><span>Subtotal</span><b>{money(order.subtotal)}</b></div><div><span>Delivery</span><b>{money(order.deliveryCharge)}</b></div>{order.discount > 0 && <div><span>Discount</span><b>−{money(order.discount)}</b></div>}<div className="summary-grand"><span>Total</span><b>{money(order.grandTotal)}</b></div></div><div className="order-side-mini-items"><h4>Order items</h4>{order.items.slice(0, 4).map(item => <div key={item.id}><span className="truncate">{item.productSku || item.productName}</span><span>{item.quantity}x</span><b>{money(item.totalPrice)}</b></div>)}{order.items.length > 4 && <p>and {order.items.length - 4} more</p>}</div></section>
+
+        <section className="order-side-card"><div className="order-side-heading"><h3>Order flags</h3><span>{order.isFraudSuspect || order.isDuplicate ? 'Review' : '—'}</span></div><div className="order-flags">{order.isFraudSuspect && <span className="flag-risk">Risk review</span>}{order.isDuplicate && <span className="flag-duplicate">Duplicate</span>}{!order.isFraudSuspect && !order.isDuplicate && <span className="text-xs text-slate-400">No order flags</span>}</div></section>
+
+        <section className="order-side-card order-actions-card"><div className="order-side-heading"><h3>Order actions</h3></div><div className="order-pbx-call"><div><span className="inline-flex items-center gap-1.5 font-semibold text-emerald-800"><Phone className="h-3.5 w-3.5"/> PBX Call</span><span className="block text-[11px] text-slate-500">{order.customerPhone}</span></div><button type="button" onClick={() => startCall({ orderId: order.id, orderNumber: order.orderNumber, customerName: order.customerName, phone: order.customerPhone })} className="grid h-9 w-9 place-items-center rounded-lg bg-purple-900 text-white hover:bg-purple-800" aria-label="Call customer"><Phone className="h-4 w-4"/></button></div>{ivrManualEnabled && <button type="button" disabled={ivrDialing} onClick={handleTriggerIvrCall} className="order-action-secondary w-full justify-center text-indigo-700 disabled:opacity-50">{ivrDialing ? <Loader2 className="h-4 w-4 animate-spin"/> : <PhoneForwarded className="h-4 w-4"/>}{ivrDialing ? 'Calling…' : 'Automated IVR call'}</button>}<div className="order-call-history"><div className="flex items-center justify-between text-xs font-semibold"><span>Call history</span><span>{order.messageLogs?.filter(log => log.channel === 'IVR_CALL').length || 0}</span></div>{order.messageLogs?.filter(log => log.channel === 'IVR_CALL').slice(0, 2).map(log => <div key={log.id} className="order-call-entry"><span>{pretty(log.status || 'Recorded')}</span><small>{log.createdAt ? new Date(log.createdAt).toLocaleString() : '—'}</small></div>)}{!order.messageLogs?.some(log => log.channel === 'IVR_CALL') && <p className="mt-2 text-[11px] text-slate-400">No call history recorded.</p>}</div><div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-1.5"><AdminSelect dropdownKey="pages.OrderDetailsPage.tsx.1" aria-label="Change order status" disabled={updating} value={nextStatus || order.status} onChange={(e) => setNextStatus(e.target.value)} className="h-9 min-w-0 rounded-lg border border-slate-200 bg-white px-2 text-xs dark:border-slate-700 dark:bg-slate-950">{statuses.map(status => <option key={status} value={status}>{pretty(status)}</option>)}</AdminSelect><button type="button" disabled={updating || (nextStatus || order.status) === order.status} onClick={() => updateStatus(nextStatus || order.status)} className="h-9 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white disabled:opacity-50">{updating ? '…' : 'Update'}</button><Link to="/orders" className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 px-2 text-xs dark:border-slate-700"><ArrowLeft className="h-3.5 w-3.5"/>Back</Link></div><div className="grid grid-cols-2 gap-1.5">{canManage && !order.trashedAt && <button type="button" onClick={() => setEditOpen(true)} className="order-action-secondary justify-center">Edit order</button>}<button type="button" onClick={() => setInvoiceOpen(true)} className="order-action-secondary justify-center"><Printer className="h-3.5 w-3.5"/>Invoice</button><a target="_blank" rel="noreferrer" href={`https://wa.me/88${order.customerPhone.replace(/\D/g, '')}`} className="order-action-secondary justify-center"><MessageCircle className="h-3.5 w-3.5"/>WhatsApp</a><button type="button" onClick={() => copy(order.customerPhone)} className="order-action-secondary justify-center"><Copy className="h-3.5 w-3.5"/>Copy phone</button></div><button type="button" onClick={() => updatePriority(order.priority === 'URGENT' ? 'NORMAL' : 'URGENT')} className={`w-full rounded-lg px-3 py-2 text-xs font-semibold ${order.priority === 'URGENT' ? 'bg-amber-100 text-amber-800' : 'border border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300'}`}>{order.priority === 'URGENT' ? '⚡ Urgent priority' : 'Set urgent priority'}</button><div className="order-assignee"><label htmlFor="order-assignee" className="text-[11px] font-semibold text-slate-500">Assigned team member</label><AdminSelect id="order-assignee" dropdownKey="pages.OrderDetailsPage.tsx.2" aria-label="Assigned team member" disabled={!canManage || assignmentBusy} value={order.assignedTo?.id || ''} onChange={(e) => updateAssignment(e.target.value ? e.target.value : null)} className="mt-1 h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-xs dark:border-slate-700 dark:bg-slate-950"><option value="">Unassigned</option>{order.assignedTo && !staffList.some(staff=>staff.id===order.assignedTo?.id) && <option value={order.assignedTo.id}>{order.assignedTo.name} (current)</option>}{staffList.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.role.replace(/_/g, ' ')})</option>)}</AdminSelect>{staffError && <p role="alert" className="mt-1 text-xs text-rose-600">{staffError}</p>}</div></section>
+
+        <OrderNotesCard order={order} onRefresh={load}/>
+        <section className="order-side-card"><div className="order-side-heading"><h3>Attribution</h3></div><div className="space-y-2 text-[11px] text-slate-500"><p>Source: <b className="font-medium text-slate-700 dark:text-slate-200">{pretty(order.sourceChannel || (order.wooOrderId ? 'WooCommerce' : 'Website'))}</b></p><p>IP: <b className="break-all font-mono font-medium text-slate-700 dark:text-slate-200">{order.sourceIp || 'Not available'}</b></p><p>Mobile: <b className="font-medium text-slate-700 dark:text-slate-200">{order.customerPhone}</b></p><p>Device: <b className="font-medium text-slate-700 dark:text-slate-200">Not available</b></p></div></section>
+      </aside>
+    </div>
     <CourierLocationCard orderId={order.id} revision={order.updatedAt} canEdit={!order.courierConsignmentId && !['DELIVERED', 'RETURNED', 'CANCELLED'].includes(order.status)}/>
     {(order.riskReviewStatus === 'REVIEW_REQUIRED' || Boolean(order.riskReasons?.length) || Boolean(order.sourceIp)) && <OrderRiskCard order={order} onRefresh={load}/>}
     {order.courierName === 'PATHAO' && <section className="rounded-2xl border border-slate-100/90 bg-white p-5 shadow-[0_2px_10px_rgba(0,0,0,0.02)] dark:border-slate-800 dark:bg-slate-900"><h3 className="font-semibold">Pathao delivery timeline</h3><p className="mt-1 text-xs text-slate-500">Signed courier updates are saved here, including return and payment events.</p>{pathaoEvents.length ? <div className="mt-4 divide-y divide-slate-100 dark:divide-slate-800">{pathaoEvents.map((event) => <div key={event.id} className="flex flex-col gap-1 py-3 text-sm sm:flex-row sm:justify-between"><div><b>{pretty(event.event.replace(/^order\./, ''))}</b><p className="text-xs text-slate-500">{[event.reason, event.returnConsignmentId && `Return #${event.returnConsignmentId}`, event.invoiceId && `Invoice #${event.invoiceId}`, event.collectedAmount !== undefined && `Collected ${money(event.collectedAmount)}`, event.deliveryFee !== undefined && `Fee ${money(event.deliveryFee)}`].filter(Boolean).join(' · ') || (event.applied ? 'Order synchronized' : 'Recorded')}</p></div><span className="shrink-0 text-xs text-slate-500">{new Date(event.occurredAt).toLocaleString()}</span></div>)}</div> : <p className="mt-4 text-sm text-slate-500">No Pathao webhook events received yet.</p>}</section>}
