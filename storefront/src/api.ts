@@ -1,7 +1,15 @@
 import type { CustomerAccount, CustomerOrder, OrderResult, Product, StorefrontSettings, StorePage } from './types';
 
+const deviceFingerprint = () => {
+  try {
+    let value = localStorage.getItem('nix-device-id');
+    if (!value) { value = crypto.randomUUID(); localStorage.setItem('nix-device-id', value); }
+    return value;
+  } catch { return crypto.randomUUID(); }
+};
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, { ...init, headers: { 'Content-Type': 'application/json', ...init?.headers } });
+  const response = await fetch(url, { ...init, headers: { 'Content-Type': 'application/json', 'X-Device-Fingerprint': deviceFingerprint(), ...init?.headers } });
   const body = await response.text();
   let data: any = {};
   try { data = body ? JSON.parse(body) : {}; } catch { /* proxy and server failures may return an empty or non-JSON body */ }

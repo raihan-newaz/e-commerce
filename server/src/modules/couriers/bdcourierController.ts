@@ -4,6 +4,7 @@ import { z } from 'zod';
 import prisma from '../../prisma';
 import { AuthRequest } from '../../middlewares/auth';
 import { revealSecret } from '../../utils/security';
+import { normalizeOrderPhone } from '../orders/orderProtection';
 
 const API_BASE_URL = 'https://api.bdcourier.com';
 const timeout = 15_000;
@@ -54,12 +55,22 @@ export const checkBdCourierOrder = async (req: AuthRequest, res: Response): Prom
   try {
     const order = await prisma.order.findUnique({ where: { id: parsed.data.id }, select: { id: true, customerPhone: true, trashedAt: true } });
     if (!order || order.trashedAt) { res.status(404).json({ success: false, message: 'Order not found' }); return; }
-    const phone = String(order.customerPhone || '').replace(/\D/g, '').replace(/^0088/, '').replace(/^88/, '');
+    const phone = normalizeOrderPhone(order.customerPhone);
     if (!/^01[3-9]\d{8}$/.test(phone)) { res.status(400).json({ success: false, message: 'This order does not have a valid Bangladesh mobile number' }); return; }
     const apiKey = await getApiKey();
     const { data } = await axios.post(`${API_BASE_URL}/courier-check`, { phone }, { headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json', 'Content-Type': 'application/json' }, timeout });
+    if (data?.status === 'error' || data?.result?.status === 'error' || data?.success === false) {
+      res.status(502).json({ success: false, message: data?.message || data?.result?.message || 'BD Courier could not find a report for this phone number' });
+      return;
+    }
+    const checkedAt = new Date();
+    const saved = await prisma.bdCourierFraudCheck.upsert({
+      where: { phone },
+      create: { phone, result: data, checkedAt },
+      update: { result: data, checkedAt },
+    });
     res.setHeader('Cache-Control', 'no-store');
-    res.json({ success: true, result: data });
+    res.json({ success: true, result: saved.result, checkedAt: saved.checkedAt });
   } catch (error: any) {
     if (error.status) { res.status(error.status).json({ success: false, message: error.message }); return; }
     relayApiError(error, res);

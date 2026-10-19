@@ -7,7 +7,7 @@ import { logAudit } from '../audit/auditService';
 import { notifyOrderStatus, sendOrderNotification } from '../messaging/messageService';
 import { revealSecret } from '../../utils/security';
 import { getNextOrderNumber } from './orderNumberService';
-import { evaluateOrderRisk, normalizeClientIp, recordRiskDecision } from './orderProtection';
+import { evaluateOrderRisk, normalizeClientIp, normalizeDeviceFingerprint, normalizeOrderPhone, protectionSettings, recordRiskDecision } from './orderProtection';
 import { saveOrderCourierSuggestions } from '../couriers/orderLocationService';
 
 export const listOrders = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -254,6 +254,11 @@ export const getOrderById = async (req: Request, res: Response): Promise<void> =
       const capturedIp = normalizeClientIp(captured?.ipAddress);
       if (capturedIp) { order.sourceIp=capturedIp; if(!order.sourceChannel) order.sourceChannel=captured?.source || null; }
     }
+    const [courierFraudCheck, protection, fraudCourierConfig] = await Promise.all([
+      prisma.bdCourierFraudCheck.findUnique({ where: { phone: normalizeOrderPhone(order.customerPhone) } }),
+      protectionSettings(),
+      prisma.courierConfig.findUnique({ where: { provider: 'BDCOURIER' }, select: { isEnabled: true, apiKey: true } }),
+    ]);
     const historyWhere = {
       id: { not: order.id }, trashedAt: null,
       OR: [{ customerPhone: order.customerPhone }, ...(order.customerId ? [{ customerId: order.customerId }] : [])],
@@ -266,7 +271,7 @@ export const getOrderById = async (req: Request, res: Response): Promise<void> =
     ]);
     const countByStatus = Object.fromEntries(statusGroups.map((group) => [group.status, group._count._all]));
     const totalPrevious = await prisma.order.count({ where: historyWhere });
-    res.json({ success: true, order, customerHistory: {
+    res.json({ success: true, order, courierFraudCheck: courierFraudCheck ? { result: courierFraudCheck.result, checkedAt: courierFraudCheck.checkedAt } : null, autoCheckBdCourier: protection.autoCheckBdCourier && Boolean(fraudCourierConfig?.isEnabled && fraudCourierConfig.apiKey), customerHistory: {
       totalPrevious, completed: countByStatus.DELIVERED || 0, cancelled: countByStatus.CANCELLED || 0,
       returned: countByStatus.RETURNED || 0, partial: countByStatus.PARTIAL_DELIVERED || 0,
       lifetimeSpent: spent._sum.grandTotal || 0, recentOrders,
@@ -560,7 +565,7 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
     }
 
     const overrideReason = typeof req.body.overrideReason === 'string' ? req.body.overrideReason.trim() : '';
-    const riskInput = { phone: customerPhone, address: customerAddress || '', items: items.map((item: any) => ({ productId: item.productId, variantId: item.variantId, quantity: Number(item.quantity || 1) })), ip: normalizeClientIp(req.ip), source: 'STAFF' as const, override: req.user?.role === 'SUPER_ADMIN' && overrideReason.length >= 3 };
+    const riskInput = { phone: customerPhone, address: customerAddress || '', items: items.map((item: any) => ({ productId: item.productId, variantId: item.variantId, quantity: Number(item.quantity || 1) })), ip: normalizeClientIp(req.ip), deviceFingerprint: normalizeDeviceFingerprint(String(req.headers['x-device-fingerprint'] || '')), source: 'STAFF' as const, override: req.user?.role === 'SUPER_ADMIN' && overrideReason.length >= 3 };
     const risk = await prisma.$transaction(tx => evaluateOrderRisk(tx, riskInput));
     if (risk.decision === 'BLOCK') { await prisma.$transaction(tx => recordRiskDecision(tx, riskInput, risk)); res.status(409).json({ success: false, message: 'Order blocked by protection rules. Super Admin can override with a reason.', reasons: risk.reasons }); return; }
     let customer = await prisma.customer.findUnique({
@@ -672,6 +677,7 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
         customerNote,
         sourceChannel: 'STAFF',
         sourceIp: risk.ip,
+        deviceFingerprint: risk.deviceFingerprint,
         orderFingerprint: risk.fingerprint,
         riskReasons: risk.reasons,
         riskReviewStatus: risk.decision === 'HOLD' ? 'REVIEW_REQUIRED' : 'CLEAR',

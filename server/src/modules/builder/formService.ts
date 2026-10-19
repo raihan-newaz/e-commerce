@@ -7,7 +7,7 @@ import { documentForms, FormInputError, validateSubmission } from './core/forms'
 import { escapeHtml } from './core/registry';
 import type { PageDocument } from './core/schema';
 import { failure, validatedDocument } from './service';
-import { evaluateOrderRisk, recordRiskDecision, type RiskInput, type RiskResult } from '../orders/orderProtection';
+import { evaluateOrderRisk, normalizeDeviceFingerprint, recordRiskDecision, type RiskInput, type RiskResult } from '../orders/orderProtection';
 import { saveOrderCourierSuggestions } from '../couriers/orderLocationService';
 import { draftTokenHash } from '../orders/incompleteOrderRoutes';
 
@@ -35,7 +35,7 @@ export function formRenderContext(req: Request, res: Response, pageId: string, v
 }
 const receipt = (title: string, messages: string[], slug: string) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${escapeHtml(title)}</title><style>body{font:16px/1.7 system-ui,sans-serif;color:#193d2c;background:#f3f7ef;margin:0;padding:clamp(24px,8vw,100px)}main{max-width:700px;margin:auto;padding:40px;background:white;border-radius:12px}a{color:#176b53}</style></head><body><main><h1>${escapeHtml(title)}</h1>${messages.map(value => `<p>${escapeHtml(value)}</p>`).join('')}<a href="/b/${escapeHtml(slug)}">Return to the page</a></main></body></html>`;
 
-async function processOrderFromSubmission(values: Record<string, string>, pageSlug: string, submissionId: string, draftToken: string, ip: string) {
+async function processOrderFromSubmission(values: Record<string, string>, pageSlug: string, submissionId: string, draftToken: string, ip: string, deviceId: string) {
   const customerName = (values.customer_name || values.name || '').trim();
   const customerPhone = (values.customer_phone || values.phone || '').trim();
   const customerAddress = (values.customer_address || values.address || '').trim();
@@ -60,7 +60,7 @@ async function processOrderFromSubmission(values: Record<string, string>, pageSl
     if (!product || product.status !== 'ACTIVE' || product.productType === 'VARIABLE') throw failure(409, 'The selected product is unavailable. Please choose an active simple product.');
     const changed = await tx.product.updateMany({ where: { id: product.id, status: 'ACTIVE', stockQuantity: { gte: quantity } }, data: { stockQuantity: { decrement: quantity } } });
     if (!changed.count) throw failure(409, 'The selected product is out of stock.');
-    const riskInput = { phone: customerPhone, address: customerAddress, items: [{ productId: product.id, quantity }], ip, source: 'STUDIO_FORM' as const };
+    const riskInput = { phone: customerPhone, address: customerAddress, items: [{ productId: product.id, quantity }], ip, deviceFingerprint: normalizeDeviceFingerprint(deviceId), source: 'STUDIO_FORM' as const };
     const risk = await evaluateOrderRisk(tx, riskInput);
     if (risk.decision === 'BLOCK') {
       throw Object.assign(failure(409, `Order blocked by protection rule: ${risk.reasons.join(', ')}`), { riskInput, risk });
@@ -73,7 +73,7 @@ async function processOrderFromSubmission(values: Record<string, string>, pageSl
     const deliveryCharge = match ? Number(match[1]) : /বাইরে/.test(shippingText) ? 150 : /সাব/.test(shippingText) ? 130 : 70;
     const grandTotal = subtotal + deliveryCharge;
     const customer = await tx.customer.upsert({ where: { phone: risk.phone }, create: { name: customerName, phone: risk.phone, address: customerAddress, totalOrders: 1, totalSpent: grandTotal }, update: { totalOrders: { increment: 1 }, totalSpent: { increment: grandTotal } } });
-    const order = await tx.order.create({ data: { orderNumber, customerId: customer.id, customerName, customerPhone: risk.phone, customerAddress, status: risk.decision === 'HOLD' ? 'HOLD' : 'PENDING', paymentMethod: 'COD', paymentStatus: 'PENDING', subtotal, deliveryCharge, grandTotal, codAmount: grandTotal, cogsCost: product.buyPrice * quantity, sourceChannel: 'STUDIO_FORM', sourceIp: risk.ip, orderFingerprint: risk.fingerprint, riskReasons: risk.reasons, riskReviewStatus: risk.decision === 'HOLD' ? 'REVIEW_REQUIRED' : 'CLEAR', isFraudSuspect: risk.reasons.length > 0, isDuplicate: risk.reasons.includes('EXACT_DUPLICATE'), customerNote: `Studio order (/b/${pageSlug})`, checkoutDetails: JSON.stringify(values), items: { create: [{ productId: product.id, productName: product.name, productSku: product.sku, quantity, unitPrice, unitBuyPrice: product.buyPrice, totalPrice: subtotal, totalBuyPrice: product.buyPrice * quantity }] } } });
+    const order = await tx.order.create({ data: { orderNumber, customerId: customer.id, customerName, customerPhone: risk.phone, customerAddress, status: risk.decision === 'HOLD' ? 'HOLD' : 'PENDING', paymentMethod: 'COD', paymentStatus: 'PENDING', subtotal, deliveryCharge, grandTotal, codAmount: grandTotal, cogsCost: product.buyPrice * quantity, sourceChannel: 'STUDIO_FORM', sourceIp: risk.ip, deviceFingerprint: risk.deviceFingerprint, orderFingerprint: risk.fingerprint, riskReasons: risk.reasons, riskReviewStatus: risk.decision === 'HOLD' ? 'REVIEW_REQUIRED' : 'CLEAR', isFraudSuspect: risk.reasons.length > 0, isDuplicate: risk.reasons.includes('EXACT_DUPLICATE'), customerNote: `Studio order (/b/${pageSlug})`, checkoutDetails: JSON.stringify(values), items: { create: [{ productId: product.id, productName: product.name, productSku: product.sku, quantity, unitPrice, unitBuyPrice: product.buyPrice, totalPrice: subtotal, totalBuyPrice: product.buyPrice * quantity }] } } });
     await tx.stockMovement.create({ data: { productId: product.id, type: 'SALE_DEDUCTION', quantity: -quantity, previousStock: product.stockQuantity, currentStock: product.stockQuantity - quantity, note: 'Studio form order', createdById: null } });
     if (draft) await tx.incompleteCheckout.update({ where: { id: draft.id }, data: { status: 'CONVERTED', orderId: order.id } });
     await recordRiskDecision(tx, riskInput, risk, order.id);
@@ -111,7 +111,7 @@ export async function submitBuilderForm(req: Request, res: Response, next: NextF
     }
 
     // Automatically create OMS order if submission contains customer order fields
-    try { await processOrderFromSubmission(values, doc.slug, id, String(req.body._draft_token || id), req.ip || ''); }
+    try { await processOrderFromSubmission(values, doc.slug, id, String(req.body._draft_token || id), req.ip || '', typeof req.body._device_fingerprint === 'string' ? req.body._device_fingerprint : ''); }
     catch (error) { if (error instanceof Error && 'status' in error && typeof error.status === 'number') { if ('riskInput' in error && 'risk' in error) await prisma.$transaction(tx => recordRiskDecision(tx, error.riskInput as RiskInput, error.risk as RiskResult)); res.status(error.status).type('html').send(receipt('Order needs attention', [error.message], doc.slug)); return; } throw error; }
 
     res.status(200).type('html').send(receipt('Response received', [String(form.node.props.successMessage || 'Thank you. Your response has been received.')], doc.slug));

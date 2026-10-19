@@ -4,8 +4,8 @@ import type { Prisma } from '@prisma/client';
 import prisma from '../../prisma';
 
 export type OrderSource = 'STOREFRONT' | 'LANDING' | 'STUDIO_FORM' | 'WOOCOMMERCE' | 'STAFF' | 'INCOMPLETE';
-export type RiskInput = { phone: string; address: string; items: Array<{ productId?: string | null; variantId?: string | null; quantity: number }>; ip?: string | null; source: OrderSource; external?: boolean; override?: boolean };
-export type RiskResult = { decision: 'ALLOW' | 'HOLD' | 'BLOCK'; reasons: string[]; fingerprint: string; phone: string; ip: string | null };
+export type RiskInput = { phone: string; address: string; items: Array<{ productId?: string | null; variantId?: string | null; quantity: number }>; ip?: string | null; deviceFingerprint?: string | null; source: OrderSource; external?: boolean; override?: boolean };
+export type RiskResult = { decision: 'ALLOW' | 'HOLD' | 'BLOCK'; reasons: string[]; fingerprint: string; phone: string; ip: string | null; deviceFingerprint: string | null };
 type Tx = Prisma.TransactionClient;
 
 export const normalizeOrderPhone = (value: string) => {
@@ -17,6 +17,12 @@ export const normalizeOrderPhone = (value: string) => {
 export const normalizeClientIp = (value?: string | null) => {
   const ip = String(value || '').replace(/^::ffff:/, '');
   return net.isIP(ip) ? ip : null;
+};
+export const normalizeDeviceFingerprint = (value?: string | null) => {
+  const token = String(value || '').trim().toLowerCase();
+  if (/^[a-f\d]{64}$/.test(token)) return token;
+  if (!/^[a-f\d-]{36}$/.test(token)) return null;
+  return crypto.createHash('sha256').update(token).digest('hex');
 };
 const normalizeAddress = (value: string) => value.normalize('NFKC').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ');
 export const orderFingerprint = (phone: string, address: string, items: RiskInput['items']) => crypto.createHash('sha256').update(JSON.stringify({
@@ -39,14 +45,17 @@ export async function lockRiskSubjects(tx: Tx, phone: string, ip: string | null)
 export async function evaluateOrderRisk(tx: Tx, input: RiskInput): Promise<RiskResult> {
   const phone = normalizeOrderPhone(input.phone);
   const ip = normalizeClientIp(input.ip);
+  const deviceFingerprint = normalizeDeviceFingerprint(input.deviceFingerprint);
   const fingerprint = orderFingerprint(phone, input.address, input.items);
   const settings = await protectionSettings(tx);
   await lockRiskSubjects(tx, phone, ip);
   const now = Date.now();
   const from = (minutes: number) => new Date(now - minutes * 60_000);
-  const [customer, ipBlock, duplicate, hourlyPhone, dailyPhone, hourlyIp, recentIpOrders, recentAddressOrders] = await Promise.all([
+  const [customer, phoneBlock, ipBlock, deviceBlock, duplicate, hourlyPhone, dailyPhone, hourlyIp, recentIpOrders, recentAddressOrders] = await Promise.all([
     tx.customer.findUnique({ where: { phone }, select: { isBlacklisted: true, riskScore: true, returnedOrders: true } }),
-    ip ? tx.ipBlock.findUnique({ where: { ipAddress: ip } }) : Promise.resolve(null),
+    settings.checkPhoneBlockList ? tx.phoneBlock.findUnique({ where: { phone } }) : Promise.resolve(null),
+    settings.checkIpBlockList && ip ? tx.ipBlock.findUnique({ where: { ipAddress: ip } }) : Promise.resolve(null),
+    settings.checkDeviceBlockList && deviceFingerprint ? tx.deviceBlock.findUnique({ where: { fingerprint: deviceFingerprint } }) : Promise.resolve(null),
     tx.order.findFirst({ where: { orderFingerprint: fingerprint, createdAt: { gte: from(settings.duplicateWindowMinutes) } }, select: { id: true } }),
     tx.order.count({ where: { customerPhone: phone, createdAt: { gte: from(60) } } }),
     tx.order.count({ where: { customerPhone: phone, createdAt: { gte: from(1440) } } }),
@@ -56,8 +65,9 @@ export async function evaluateOrderRisk(tx: Tx, input: RiskInput): Promise<RiskR
   ]);
   const block: string[] = [];
   const hold: string[] = [];
-  if (customer?.isBlacklisted) block.push('BLACKLISTED_PHONE');
-  if (ipBlock && !ipBlock.revokedAt && (!ipBlock.expiresAt || ipBlock.expiresAt.getTime() > now)) block.push('BLOCKED_IP');
+  if (settings.checkPhoneBlockList && (customer?.isBlacklisted || phoneBlock && !phoneBlock.revokedAt && (!phoneBlock.expiresAt || phoneBlock.expiresAt.getTime() > now))) block.push('BLACKLISTED_PHONE');
+  if (settings.checkIpBlockList && ipBlock && !ipBlock.revokedAt && (!ipBlock.expiresAt || ipBlock.expiresAt.getTime() > now)) block.push('BLOCKED_IP');
+  if (deviceBlock && !deviceBlock.revokedAt && (!deviceBlock.expiresAt || deviceBlock.expiresAt.getTime() > now)) block.push('BLOCKED_DEVICE');
   if (duplicate) block.push('EXACT_DUPLICATE');
   if (hourlyPhone >= settings.phoneHourlyLimit) block.push('PHONE_HOURLY_LIMIT');
   if (dailyPhone >= settings.phoneDailyLimit) block.push('PHONE_DAILY_LIMIT');
@@ -67,12 +77,12 @@ export async function evaluateOrderRisk(tx: Tx, input: RiskInput): Promise<RiskR
   if (new Set(recentAddressOrders.filter(row => normalizeAddress(row.customerAddress) === normalizeAddress(input.address)).map(row => row.customerPhone)).size >= settings.sharedAddressPhoneThreshold) hold.push('SHARED_ADDRESS');
   const reasons = [...block, ...hold];
   const decision = block.length && !input.override ? input.external ? 'HOLD' : 'BLOCK' : hold.length || (block.length && input.override) ? 'HOLD' : 'ALLOW';
-  return { decision, reasons, fingerprint, phone, ip };
+  return { decision, reasons, fingerprint, phone, ip, deviceFingerprint };
 }
 
 export async function recordRiskDecision(tx: Tx, input: RiskInput, result: RiskResult, orderId?: string) {
   if (result.decision === 'ALLOW' && !result.reasons.length) return;
-  await tx.orderRiskEvent.create({ data: { orderId, source: input.source, decision: result.decision, phone: result.phone, ipAddress: result.ip, reasons: result.reasons } });
+  await tx.orderRiskEvent.create({ data: { orderId, source: input.source, decision: result.decision, phone: result.phone, ipAddress: result.ip, deviceFingerprint: result.deviceFingerprint, reasons: result.reasons } });
   if (result.decision !== 'BLOCK' || !result.ip || input.external || input.source === 'STAFF') return;
   const settings = await protectionSettings(tx);
   const recent = await tx.orderRiskEvent.count({ where: { ipAddress: result.ip, decision: 'BLOCK', createdAt: { gte: new Date(Date.now() - settings.autoBlockWindowMinutes * 60_000) } } });

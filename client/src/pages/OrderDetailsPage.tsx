@@ -10,6 +10,7 @@ import type { Order } from '../types';
 import { InvoiceModal } from '../components/orders/InvoiceModal';
 import { OrderEditModal } from '../components/orders/OrderEditModal';
 import { CustomerHistoryCard, type CustomerHistory } from '../components/orders/CustomerHistoryCard';
+import { OrderIdentifierProtection } from '../components/orders/OrderIdentifierProtection';
 import { CourierDispatchModal } from '../components/orders/CourierDispatchModal';
 import CourierLocationCard from '../components/orders/CourierLocationCard';
 import OrderRiskCard from '../components/orders/OrderRiskCard';
@@ -39,6 +40,10 @@ export const OrderDetailsPage: React.FC = () => {
   const [fraudCheckResult, setFraudCheckResult] = useState<BdCourierCheckResult | null>(null);
   const [fraudCheckError, setFraudCheckError] = useState('');
   const [fraudCheckBusy, setFraudCheckBusy] = useState(false);
+  const [fraudCheckedAt, setFraudCheckedAt] = useState<string | null>(null);
+  const [autoFraudCheckEnabled, setAutoFraudCheckEnabled] = useState(false);
+  const autoFraudCheckOrder = useRef<string | null>(null);
+  const fraudCheckRequest = useRef(0);
   const [trackingRefreshing, setTrackingRefreshing] = useState(false);
   const [pathaoEvents, setPathaoEvents] = useState<Array<{ id: string; event: string; occurredAt: string; applied: boolean; reason?: string; returnConsignmentId?: string; collectedAmount?: number; deliveryFee?: number; invoiceId?: string }>>([]);
   const [pathaoRecoveryCode, setPathaoRecoveryCode] = useState('');
@@ -79,8 +84,8 @@ export const OrderDetailsPage: React.FC = () => {
     }
   };
 
-  const load = async () => { const serial=++loadSerial.current; try { const {data}=await api.get('/orders/'+id); if(serial===loadSerial.current){setOrder(data.order);setNextStatus(data.order.status);setCustomerHistory(data.customerHistory || null);} } catch(error:any){if(serial===loadSerial.current)toast.error(error.response?.data?.message || 'Order not found');} finally {if(serial===loadSerial.current)setLoading(false);} };
-  useEffect(()=>{setLoading(true);setOrder(null);setNextStatus('');void load();return()=>{loadSerial.current++;};},[id]);
+  const load = async () => { const serial=++loadSerial.current; try { const {data}=await api.get('/orders/'+id); if(serial===loadSerial.current){setOrder(data.order);setNextStatus(data.order.status);setCustomerHistory(data.customerHistory || null);setFraudCheckResult(data.courierFraudCheck?.result || null);setFraudCheckedAt(data.courierFraudCheck?.checkedAt || null);setAutoFraudCheckEnabled(Boolean(data.autoCheckBdCourier));setFraudCheckError('');} } catch(error:any){if(serial===loadSerial.current)toast.error(error.response?.data?.message || 'Order not found');} finally {if(serial===loadSerial.current)setLoading(false);} };
+  useEffect(()=>{setLoading(true);setOrder(null);setNextStatus('');setFraudCheckResult(null);setFraudCheckedAt(null);setFraudCheckError('');setFraudCheckBusy(false);autoFraudCheckOrder.current=null;fraudCheckRequest.current++;void load();return()=>{loadSerial.current++;fraudCheckRequest.current++;};},[id]);
   useEffect(() => {
     if (!canManage) return;
     api.get('/auth/users').then(({ data }) => {
@@ -208,19 +213,28 @@ export const OrderDetailsPage: React.FC = () => {
     finally { setSteadfastRecoveryBusy(false); }
   };
 
-  const checkCourierFraud = async () => {
-    if (!order) return;
+  const checkCourierFraud = async (targetOrderId = order?.id, silent = false) => {
+    if (!targetOrderId) return;
+    const requestId = ++fraudCheckRequest.current;
     setFraudCheckBusy(true); setFraudCheckError('');
     try {
-      const { data } = await api.post(`/couriers/bdcourier/orders/${order.id}/fraud-check`);
+      const { data } = await api.post(`/couriers/bdcourier/orders/${targetOrderId}/fraud-check`);
+      if (requestId !== fraudCheckRequest.current) return;
       setFraudCheckResult(data.result || null);
+      setFraudCheckedAt(data.checkedAt || new Date().toISOString());
       if (data.result?.status === 'error') setFraudCheckError(data.result.message || 'BD Courier could not find a report for this phone number');
-      else toast.success('Courier fraud history loaded');
+      else if (!silent) toast.success('Courier history updated and saved');
     } catch (error: any) {
+      if (requestId !== fraudCheckRequest.current) return;
       setFraudCheckError(error.response?.data?.message || 'Could not check courier history');
-      toast.error(error.response?.data?.message || 'Could not check courier history');
-    } finally { setFraudCheckBusy(false); }
+      if (!silent) toast.error(error.response?.data?.message || 'Could not check courier history');
+    } finally { if (requestId === fraudCheckRequest.current) setFraudCheckBusy(false); }
   };
+  useEffect(() => {
+    if (!order || fraudCheckResult || !autoFraudCheckEnabled || autoFraudCheckOrder.current === order.id) return;
+    autoFraudCheckOrder.current = order.id;
+    void checkCourierFraud(order.id, true);
+  }, [order?.id, fraudCheckResult, autoFraudCheckEnabled]);
 
   if (loading) return <div className="py-24 text-center text-sm text-slate-500">Loading order…</div>;
   if (!order) return <div className="py-24 text-center"><p className="font-bold">Order not found</p><Link className="mt-3 inline-block text-sm font-bold text-emerald-600 dark:text-emerald-400 hover:underline" to="/orders">Back to orders</Link></div>;
@@ -270,14 +284,14 @@ export const OrderDetailsPage: React.FC = () => {
       </div>
 
       <aside className="order-detail-aside space-y-3">
-        <section className="order-side-card order-aside-summary"><div className="order-side-heading"><h3>Order summary</h3><span>#{order.orderNumber}</span></div><div className="order-summary-meta"><div><span>Date</span><b>{new Date(order.createdAt).toLocaleString()}</b></div><div><span>Status</span><b>{pretty(order.status)}</b></div><div><span>Payment</span><b>{pretty(order.paymentMethod)}</b></div><div><span>Source</span><b>{pretty(order.sourceChannel || (order.wooOrderId ? 'WooCommerce' : 'WEB'))}</b></div></div><div className="order-summary-amounts"><div><span>Subtotal</span><b>{money(order.subtotal)}</b></div><div><span>Delivery</span><b>{money(order.deliveryCharge)}</b></div>{order.discount > 0 && <div><span>Discount</span><b>−{money(order.discount)}</b></div>}<div className="summary-grand"><span>Total</span><b>{money(order.grandTotal)}</b></div></div><div className="order-side-mini-items"><h4>Order items</h4>{order.items.slice(0, 4).map(item => <div key={item.id}><span className="truncate">{item.productSku || item.productName}</span><span>{item.quantity}x</span><b>{money(item.totalPrice)}</b></div>)}{order.items.length > 4 && <p>and {order.items.length - 4} more</p>}</div></section>
+        <section className="order-side-card order-aside-summary"><div className="order-side-heading"><h3>Order summary</h3><span>#{order.orderNumber}</span></div><div className="order-summary-meta"><div><span>Date</span><b>{new Date(order.createdAt).toLocaleString()}</b></div><div><span>Status</span><b>{pretty(order.status)}</b></div><div><span>Payment</span><b>{pretty(order.paymentMethod)}</b></div><div><span>Source</span><b>{pretty(order.sourceChannel || (order.wooOrderId ? 'WooCommerce' : 'WEB'))}</b></div></div><div className="order-summary-amounts"><div><span>Subtotal</span><b>{money(order.subtotal)}</b></div><div><span>Delivery</span><b>{money(order.deliveryCharge)}</b></div>{order.discount > 0 && <div><span>Discount</span><b>−{money(order.discount)}</b></div>}<div className="summary-grand"><span>Total</span><b>{money(order.grandTotal)}</b></div></div><OrderIdentifierProtection orderId={order.id} orderNumber={order.orderNumber} canManage={user?.role === 'SUPER_ADMIN'}/><div className="order-side-mini-items"><h4>Order items</h4>{order.items.slice(0, 4).map(item => <div key={item.id}><span className="truncate">{item.productSku || item.productName}</span><span>{item.quantity}x</span><b>{money(item.totalPrice)}</b></div>)}{order.items.length > 4 && <p>and {order.items.length - 4} more</p>}</div></section>
 
         <section className="order-side-card"><div className="order-side-heading"><h3>Order flags</h3><span>{order.isFraudSuspect || order.isDuplicate ? 'Review' : '—'}</span></div><div className="order-flags">{order.isFraudSuspect && <span className="flag-risk">Risk review</span>}{order.isDuplicate && <span className="flag-duplicate">Duplicate</span>}{!order.isFraudSuspect && !order.isDuplicate && <span className="text-xs text-slate-400">No order flags</span>}</div></section>
 
         <section className="order-side-card order-actions-card"><div className="order-side-heading"><h3>Order actions</h3></div><div className="order-pbx-call"><div><span className="inline-flex items-center gap-1.5 font-semibold text-emerald-800"><Phone className="h-3.5 w-3.5"/> PBX Call</span><span className="block text-[11px] text-slate-500">{order.customerPhone}</span></div><button type="button" onClick={() => startCall({ orderId: order.id, orderNumber: order.orderNumber, customerName: order.customerName, phone: order.customerPhone })} className="grid h-9 w-9 place-items-center rounded-lg bg-purple-900 text-white hover:bg-purple-800" aria-label="Call customer"><Phone className="h-4 w-4"/></button></div>{ivrManualEnabled && <button type="button" disabled={ivrDialing} onClick={handleTriggerIvrCall} className="order-action-secondary w-full justify-center text-indigo-700 disabled:opacity-50">{ivrDialing ? <Loader2 className="h-4 w-4 animate-spin"/> : <PhoneForwarded className="h-4 w-4"/>}{ivrDialing ? 'Calling…' : 'Automated IVR call'}</button>}<div className="order-call-history"><div className="flex items-center justify-between text-xs font-semibold"><span>Call history</span><span>{order.messageLogs?.filter(log => log.channel === 'IVR_CALL').length || 0}</span></div>{order.messageLogs?.filter(log => log.channel === 'IVR_CALL').slice(0, 2).map(log => <div key={log.id} className="order-call-entry"><span>{pretty(log.status || 'Recorded')}</span><small>{log.createdAt ? new Date(log.createdAt).toLocaleString() : '—'}</small></div>)}{!order.messageLogs?.some(log => log.channel === 'IVR_CALL') && <p className="mt-2 text-[11px] text-slate-400">No call history recorded.</p>}</div><div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-1.5"><AdminSelect dropdownKey="pages.OrderDetailsPage.tsx.1" aria-label="Change order status" disabled={updating} value={nextStatus || order.status} onChange={(e) => setNextStatus(e.target.value)} className="h-9 min-w-0 rounded-lg border border-slate-200 bg-white px-2 text-xs dark:border-slate-700 dark:bg-slate-950">{statuses.map(status => <option key={status} value={status}>{pretty(status)}</option>)}</AdminSelect><button type="button" disabled={updating || (nextStatus || order.status) === order.status} onClick={() => updateStatus(nextStatus || order.status)} className="h-9 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white disabled:opacity-50">{updating ? '…' : 'Update'}</button><Link to="/orders" className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 px-2 text-xs dark:border-slate-700"><ArrowLeft className="h-3.5 w-3.5"/>Back</Link></div><div className="grid grid-cols-2 gap-1.5">{canManage && !order.trashedAt && <button type="button" onClick={() => setEditOpen(true)} className="order-action-secondary justify-center">Edit order</button>}<button type="button" onClick={() => setInvoiceOpen(true)} className="order-action-secondary justify-center"><Printer className="h-3.5 w-3.5"/>Invoice</button><a target="_blank" rel="noreferrer" href={`https://wa.me/88${order.customerPhone.replace(/\D/g, '')}`} className="order-action-secondary justify-center"><MessageCircle className="h-3.5 w-3.5"/>WhatsApp</a><button type="button" onClick={() => copy(order.customerPhone)} className="order-action-secondary justify-center"><Copy className="h-3.5 w-3.5"/>Copy phone</button></div><button type="button" onClick={() => updatePriority(order.priority === 'URGENT' ? 'NORMAL' : 'URGENT')} className={`w-full rounded-lg px-3 py-2 text-xs font-semibold ${order.priority === 'URGENT' ? 'bg-amber-100 text-amber-800' : 'border border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300'}`}>{order.priority === 'URGENT' ? '⚡ Urgent priority' : 'Set urgent priority'}</button><div className="order-assignee"><label htmlFor="order-assignee" className="text-[11px] font-semibold text-slate-500">Assigned team member</label><AdminSelect id="order-assignee" dropdownKey="pages.OrderDetailsPage.tsx.2" aria-label="Assigned team member" disabled={!canManage || assignmentBusy} value={order.assignedTo?.id || ''} onChange={(e) => updateAssignment(e.target.value ? e.target.value : null)} className="mt-1 h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-xs dark:border-slate-700 dark:bg-slate-950"><option value="">Unassigned</option>{order.assignedTo && !staffList.some(staff=>staff.id===order.assignedTo?.id) && <option value={order.assignedTo.id}>{order.assignedTo.name} (current)</option>}{staffList.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.role.replace(/_/g, ' ')})</option>)}</AdminSelect>{staffError && <p role="alert" className="mt-1 text-xs text-rose-600">{staffError}</p>}</div></section>
 
         <OrderNotesCard order={order} onRefresh={load}/>
-        <section className="order-side-card"><div className="order-side-heading"><h3>Attribution</h3></div><div className="space-y-2 text-[11px] text-slate-500"><p>Source: <b className="font-medium text-slate-700 dark:text-slate-200">{pretty(order.sourceChannel || (order.wooOrderId ? 'WooCommerce' : 'Website'))}</b></p><p>IP: <b className="break-all font-mono font-medium text-slate-700 dark:text-slate-200">{order.sourceIp || 'Not available'}</b></p><p>Mobile: <b className="font-medium text-slate-700 dark:text-slate-200">{order.customerPhone}</b></p><p>Device: <b className="font-medium text-slate-700 dark:text-slate-200">Not available</b></p></div></section>
+        <section className="order-side-card"><div className="order-side-heading"><h3>Attribution</h3></div><div className="space-y-2 text-[11px] text-slate-500"><p>Source: <b className="font-medium text-slate-700 dark:text-slate-200">{pretty(order.sourceChannel || (order.wooOrderId ? 'WooCommerce' : 'Website'))}</b></p><p>IP: <b className="break-all font-mono font-medium text-slate-700 dark:text-slate-200">{order.sourceIp || 'Not available'}</b></p><p>Mobile: <b className="font-medium text-slate-700 dark:text-slate-200">{order.customerPhone}</b></p><p>Device: <b className="font-mono font-medium text-slate-700 dark:text-slate-200">{order.deviceFingerprint ? `${order.deviceFingerprint.slice(0, 18)}…` : 'Not available'}</b></p></div></section>
       </aside>
     </div>
     <CourierLocationCard orderId={order.id} revision={order.updatedAt} canEdit={!order.courierConsignmentId && !['DELIVERED', 'RETURNED', 'CANCELLED'].includes(order.status)}/>
@@ -294,7 +308,7 @@ export const OrderDetailsPage: React.FC = () => {
     </section>}
     {order.courierName === 'REDX' && !order.courierConsignmentId && ['BOOKING_REQUESTED', 'BOOKING_UNCERTAIN'].includes(order.courierStatus || '') && <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 dark:border-amber-700/50 dark:bg-amber-500/10"><h3 className="font-semibold">Resolve RedX booking</h3><p className="mt-1 text-xs">Check invoice {order.orderNumber} in RedX before attempting another dispatch.</p><div className="mt-3 flex flex-wrap gap-2"><input value={redxRecoveryId} onChange={e => setRedxRecoveryId(e.target.value)} placeholder="Verified tracking ID" className="min-w-[190px] flex-1 rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm"/><button disabled={redxBusy || !redxRecoveryId.trim()} onClick={() => resolveRedx('ATTACH')} className="rounded-lg bg-slate-900 px-3 py-2 text-xs text-white disabled:opacity-50">Verify & attach</button>{order.courierStatus === 'BOOKING_UNCERTAIN' && <button disabled={redxBusy} onClick={() => resolveRedx('CLEAR')} className="rounded-lg border border-amber-400 px-3 py-2 text-xs text-amber-900 disabled:opacity-50">No booking exists — unlock retry</button>}</div></section>}
     <CustomerHistoryCard history={customerHistory}/>
-    <CourierFraudCheckCard result={fraudCheckResult} error={fraudCheckError} busy={fraudCheckBusy} onCheck={() => void checkCourierFraud()}/>
+    <CourierFraudCheckCard result={fraudCheckResult} checkedAt={fraudCheckedAt} error={fraudCheckError} busy={fraudCheckBusy} onCheck={() => void checkCourierFraud()}/>
     {!order.courierName && order.status !== 'HOLD' && !['DELIVERED', 'RETURNED', 'CANCELLED'].includes(order.status) && <button onClick={() => setDispatchOpen(true)} className="w-fit rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 px-4 py-2 text-sm font-medium shadow transition">Select courier & dispatch</button>}
     {editOpen && <OrderEditModal order={order} onClose={() => setEditOpen(false)} onSuccess={load}/>}
     {dispatchOpen && <CourierDispatchModal order={order} onClose={() => setDispatchOpen(false)} onSuccess={(updated) => { setOrder({ ...order, ...updated }); load(); }}/>} 

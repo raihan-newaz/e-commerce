@@ -45,6 +45,7 @@ export interface Order {
   area?: string;
   sourceChannel?: string | null;
   sourceIp?: string | null;
+  deviceFingerprint?: string | null;
   riskReasons?: string[] | null;
   riskReviewStatus?: string;
   status: 'PENDING' | 'CONFIRMED' | 'PACKAGING' | 'HANDED_OVER' | 'IN_TRANSIT' | 'DELIVERED' | 'PARTIAL_DELIVERED' | 'CANCELLED' | 'RETURNED' | 'HOLD' | 'FAKE_TRASH';

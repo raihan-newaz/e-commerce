@@ -28,7 +28,17 @@ export const countdownRuntime = `(() => {
 
   // Save product-bearing Studio order forms while customers fill them in.
   const setupDrafts = () => {
+    let deviceId = '';
+    try {
+      deviceId = localStorage.getItem('nix-device-id') || '';
+      if (!deviceId) { deviceId = crypto.randomUUID(); localStorage.setItem('nix-device-id', deviceId); }
+    } catch (_) { try { deviceId = crypto.randomUUID(); } catch (_) {} }
     document.querySelectorAll('form[action^="/b/"]').forEach((form) => {
+      if (!form.elements.namedItem('_device_fingerprint')) {
+        const field = document.createElement('input');
+        field.type = 'hidden'; field.name = '_device_fingerprint'; field.value = deviceId;
+        form.appendChild(field);
+      }
       let timer;
       const value = (names) => {
         for (const name of names) {

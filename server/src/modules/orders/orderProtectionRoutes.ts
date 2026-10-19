@@ -6,13 +6,14 @@ import { authenticateToken, requireRole, type AuthRequest } from '../../middlewa
 import { logAudit } from '../audit/auditService';
 import { normalizeLocation } from '../couriers/courierLocations';
 import { saveOrderCourierSuggestions, validateCourierSelection } from '../couriers/orderLocationService';
-import { normalizeClientIp, protectionSettings } from './orderProtection';
+import { normalizeClientIp, normalizeDeviceFingerprint, normalizeOrderPhone, protectionSettings } from './orderProtection';
 
 const router = Router();
 router.use(authenticateToken);
 const run = (handler: (req: AuthRequest, res: Response) => Promise<void>) => (req: Request, res: Response) => { Promise.resolve(handler(req as AuthRequest, res)).catch(error => res.status(500).json({ success: false, message: error.message })); };
 const providerSchema = z.enum(['STEADFAST', 'PATHAO', 'REDX']);
 const settingsSchema = z.object({
+  checkIpBlockList: z.boolean(), checkPhoneBlockList: z.boolean(), checkDeviceBlockList: z.boolean(), autoCheckBdCourier: z.boolean(),
   duplicateWindowMinutes: z.number().int().min(1).max(1440), phoneHourlyLimit: z.number().int().min(1).max(100),
   phoneDailyLimit: z.number().int().min(1).max(500), ipHourlyLimit: z.number().int().min(1).max(500),
   autoBlockRejectCount: z.number().int().min(1).max(100), autoBlockWindowMinutes: z.number().int().min(1).max(1440),
@@ -33,6 +34,12 @@ router.put('/settings', requireRole(['SUPER_ADMIN']), run(async (req, res) => {
 router.get('/ip-blocks', requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER']), run(async (_req, res) => {
   res.json({ success: true, blocks: await prisma.ipBlock.findMany({ orderBy: { updatedAt: 'desc' }, take: 200 }) });
 }));
+router.get('/phone-blocks', requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER']), run(async (_req, res) => {
+  res.json({ success: true, blocks: await prisma.phoneBlock.findMany({ orderBy: { updatedAt: 'desc' }, take: 200 }) });
+}));
+router.get('/device-blocks', requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER']), run(async (_req, res) => {
+  res.json({ success: true, blocks: await prisma.deviceBlock.findMany({ orderBy: { updatedAt: 'desc' }, take: 200 }) });
+}));
 router.post('/ip-blocks', requireRole(['SUPER_ADMIN']), run(async (req, res) => {
   const parsed = z.object({ ipAddress: z.string().max(45), reason: z.string().trim().min(3).max(500), expiresAt: z.string().datetime().nullable().optional() }).safeParse(req.body);
   const ip = parsed.success ? normalizeClientIp(parsed.data.ipAddress) : null;
@@ -45,6 +52,48 @@ router.post('/ip-blocks/:id/revoke', requireRole(['SUPER_ADMIN']), run(async (re
   const block = await prisma.ipBlock.update({ where: { id: String(req.params.id) }, data: { revokedAt: new Date() } });
   await logAudit({ userId: req.user?.id, userName: req.user?.name, action: 'UPDATE', entity: 'SETTING', entityId: block.id, details: { ipAddress: block.ipAddress, revoked: true }, ipAddress: req.ip });
   res.json({ success: true, block });
+}));
+router.post('/phone-blocks', requireRole(['SUPER_ADMIN']), run(async (req, res) => {
+  const parsed = z.object({ phone: z.string().trim().min(10).max(24), reason: z.string().trim().min(3).max(500), expiresAt: z.string().datetime().nullable().optional() }).safeParse(req.body);
+  const phone = parsed.success ? normalizeOrderPhone(parsed.data.phone) : '';
+  if (!parsed.success || !/^01[3-9]\d{8}$/.test(phone)) { res.status(400).json({ success: false, message: 'Enter a valid Bangladesh mobile number and reason' }); return; }
+  const block = await prisma.phoneBlock.upsert({ where: { phone }, create: { phone, reason: parsed.data.reason, expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null }, update: { kind: 'MANUAL', reason: parsed.data.reason, expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null, revokedAt: null } });
+  await logAudit({ userId: req.user?.id, userName: req.user?.name, action: 'CREATE', entity: 'SETTING', entityId: block.id, details: { phone, reason: block.reason }, ipAddress: req.ip });
+  res.json({ success: true, block });
+}));
+router.post('/phone-blocks/:id/revoke', requireRole(['SUPER_ADMIN']), run(async (req, res) => {
+  const block = await prisma.phoneBlock.update({ where: { id: String(req.params.id) }, data: { revokedAt: new Date() } });
+  await logAudit({ userId: req.user?.id, userName: req.user?.name, action: 'UPDATE', entity: 'SETTING', entityId: block.id, details: { phone: block.phone, revoked: true }, ipAddress: req.ip });
+  res.json({ success: true, block });
+}));
+router.post('/device-blocks', requireRole(['SUPER_ADMIN']), run(async (req, res) => {
+  const parsed = z.object({ fingerprint: z.string().regex(/^[a-f\d]{64}$/i), reason: z.string().trim().min(3).max(500), expiresAt: z.string().datetime().nullable().optional() }).safeParse(req.body);
+  const fingerprint = parsed.success ? normalizeDeviceFingerprint(parsed.data.fingerprint) : null;
+  if (!parsed.success || !fingerprint) { res.status(400).json({ success: false, message: 'Enter a valid device identifier and reason' }); return; }
+  const block = await prisma.deviceBlock.upsert({ where: { fingerprint }, create: { fingerprint, reason: parsed.data.reason, expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null }, update: { kind: 'MANUAL', reason: parsed.data.reason, expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null, revokedAt: null } });
+  await logAudit({ userId: req.user?.id, userName: req.user?.name, action: 'CREATE', entity: 'SETTING', entityId: block.id, details: { fingerprint, reason: block.reason }, ipAddress: req.ip });
+  res.json({ success: true, block });
+}));
+router.post('/device-blocks/:id/revoke', requireRole(['SUPER_ADMIN']), run(async (req, res) => {
+  const block = await prisma.deviceBlock.update({ where: { id: String(req.params.id) }, data: { revokedAt: new Date() } });
+  await logAudit({ userId: req.user?.id, userName: req.user?.name, action: 'UPDATE', entity: 'SETTING', entityId: block.id, details: { fingerprint: block.fingerprint, revoked: true }, ipAddress: req.ip });
+  res.json({ success: true, block });
+}));
+router.get('/orders/:id/identifiers', run(async (req, res) => {
+  const order = await prisma.order.findUnique({ where: { id: String(req.params.id) }, select: { sourceIp: true, customerPhone: true, deviceFingerprint: true } });
+  if (!order) { res.status(404).json({ success: false, message: 'Order not found' }); return; }
+  const phone = normalizeOrderPhone(order.customerPhone);
+  const [ipBlock, phoneBlock, deviceBlock] = await Promise.all([
+    order.sourceIp ? prisma.ipBlock.findUnique({ where: { ipAddress: normalizeClientIp(order.sourceIp) || '' } }) : null,
+    prisma.phoneBlock.findUnique({ where: { phone } }),
+    order.deviceFingerprint ? prisma.deviceBlock.findUnique({ where: { fingerprint: order.deviceFingerprint } }) : null,
+  ]);
+  const active = (block: { id: string; revokedAt: Date | null; expiresAt: Date | null } | null) => Boolean(block && !block.revokedAt && (!block.expiresAt || block.expiresAt > new Date()));
+  res.json({ success: true, identifiers: {
+    ip: { value: order.sourceIp, blockId: active(ipBlock) ? ipBlock?.id : null },
+    phone: { value: phone, blockId: active(phoneBlock) ? phoneBlock?.id : null },
+    device: { value: order.deviceFingerprint, blockId: active(deviceBlock) ? deviceBlock?.id : null },
+  } });
 }));
 router.get('/aliases', requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'DISPATCHER']), run(async (_req, res) => {
   res.json({ success: true, aliases: await prisma.courierLocationAlias.findMany({ orderBy: { createdAt: 'desc' }, take: 500 }) });

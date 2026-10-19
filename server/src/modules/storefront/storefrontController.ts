@@ -16,7 +16,7 @@ import { generateEventId } from './metaConversionsApi';
 import { revealSecret } from '../../utils/security';
 import { productSlug } from '../inventory/productValidation';
 import { getCache, setCache } from '../../redis';
-import { evaluateOrderRisk, normalizeClientIp, recordRiskDecision } from '../orders/orderProtection';
+import { evaluateOrderRisk, normalizeClientIp, normalizeDeviceFingerprint, recordRiskDecision } from '../orders/orderProtection';
 import { draftTokenHash } from '../orders/incompleteOrderRoutes';
 import { saveOrderCourierSuggestions } from '../couriers/orderLocationService';
 import { getIvrConfig } from '../orders/ivrService';
@@ -299,6 +299,7 @@ export const createStorefrontOrder = async (req: Request & { customer?: { id: st
       freeDeliveryMinQuantity = checkout.freeDeliveryMinQuantity || 0;
     } else if (couponCode) { res.status(400).json({ success: false, message: 'Coupon requires a landing page' }); return; }
     const phone = normalizePhone(inputCustomer.phone);
+    const deviceFingerprint = normalizeDeviceFingerprint(String(req.headers['x-device-fingerprint'] || ''));
     const accountCustomerId = req.customer?.phone === phone ? req.customer.id : null;
     const settings = await prisma.storefrontSettings.upsert({ where: { id: 'default' }, update: {}, create: { id: 'default' } });
     const checkoutConfig = parseJson<any>(settings.themeConfig, {}).checkoutFields || [];
@@ -453,7 +454,7 @@ export const createStorefrontOrder = async (req: Request & { customer?: { id: st
         });
       }
 
-      const riskInput = { phone, address: inputCustomer.address, items: orderItems.map(item => ({ productId: item.productId, variantId: item.variantId, quantity: item.quantity })), ip: normalizeClientIp(req.ip), source: pageSlug ? 'LANDING' as const : 'STOREFRONT' as const };
+      const riskInput = { phone, address: inputCustomer.address, items: orderItems.map(item => ({ productId: item.productId, variantId: item.variantId, quantity: item.quantity })), ip: normalizeClientIp(req.ip), deviceFingerprint, source: pageSlug ? 'LANDING' as const : 'STOREFRONT' as const };
       const risk = await evaluateOrderRisk(tx, riskInput);
       if (risk.decision === 'BLOCK') throw Object.assign(new Error(`Order blocked by protection rules: ${risk.reasons.join(', ')}`), { riskInput, risk, protectionBlock: true });
 
@@ -488,6 +489,7 @@ export const createStorefrontOrder = async (req: Request & { customer?: { id: st
           cogsCost,
           sourceChannel: pageSlug ? 'LANDING' : 'STOREFRONT',
           sourceIp: risk.ip,
+          deviceFingerprint: risk.deviceFingerprint,
           orderFingerprint: risk.fingerprint,
           riskReasons: risk.reasons,
           riskReviewStatus: risk.decision === 'HOLD' ? 'REVIEW_REQUIRED' : 'CLEAR',

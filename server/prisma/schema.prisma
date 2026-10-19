@@ -493,6 +493,7 @@ model Order {
   area            String?
   sourceChannel   String? @db.VarChar(32)
   sourceIp        String? @db.VarChar(45)
+  deviceFingerprint String? @db.VarChar(64)
   orderFingerprint String? @db.VarChar(64)
   riskReasons     Json?
   riskReviewStatus String @default("CLEAR") @db.VarChar(20)
@@ -555,6 +556,7 @@ model Order {
   @@index([trashedAt, createdAt])
   @@index([customerPhone, createdAt])
   @@index([sourceIp, createdAt])
+  @@index([deviceFingerprint, createdAt])
   @@index([orderFingerprint, createdAt])
   @@index([courierName, status])
   @@index([customerId, createdAt])
@@ -594,6 +596,10 @@ model CourierLocationAlias {
 
 model OrderProtectionSettings {
   id                    String   @id @default("default")
+  checkIpBlockList      Boolean  @default(true)
+  checkPhoneBlockList   Boolean  @default(true)
+  checkDeviceBlockList  Boolean  @default(true)
+  autoCheckBdCourier    Boolean  @default(true)
   duplicateWindowMinutes Int     @default(15)
   phoneHourlyLimit      Int      @default(3)
   phoneDailyLimit       Int      @default(6)
@@ -617,6 +623,39 @@ model IpBlock {
   updatedAt  DateTime @updatedAt
 }
 
+model PhoneBlock {
+  id         String   @id @default(uuid())
+  phone      String   @unique @db.VarChar(20)
+  reason     String   @db.VarChar(500)
+  kind       String   @default("MANUAL") @db.VarChar(20)
+  expiresAt  DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([revokedAt, expiresAt])
+}
+
+model DeviceBlock {
+  id                String   @id @default(uuid())
+  fingerprint       String   @unique @db.VarChar(64)
+  reason            String   @db.VarChar(500)
+  kind              String   @default("MANUAL") @db.VarChar(20)
+  expiresAt         DateTime?
+  revokedAt         DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([revokedAt, expiresAt])
+}
+
+model BdCourierFraudCheck {
+  phone     String   @id @db.VarChar(20)
+  result    Json
+  checkedAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model OrderRiskEvent {
   id         String   @id @default(uuid())
   orderId    String?
@@ -624,6 +663,7 @@ model OrderRiskEvent {
   decision   String   @db.VarChar(20)
   phone      String?  @db.VarChar(20)
   ipAddress  String?  @db.VarChar(45)
+  deviceFingerprint String? @db.VarChar(64)
   reasons    Json
   createdAt  DateTime @default(now())
 
