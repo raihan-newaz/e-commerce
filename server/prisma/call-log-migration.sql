@@ -1,4 +1,9 @@
 -- Persist PBX/WebPhone call lifecycle and CDR records.
+ALTER TABLE `MessageGatewayConfig`
+  ADD COLUMN `webphoneSipDomain` VARCHAR(253) NULL,
+  ADD COLUMN `webphoneExtension` VARCHAR(64) NULL,
+  ADD COLUMN `webphonePassword` TEXT NULL;
+
 CREATE TABLE `CallLog` (
   `id` VARCHAR(191) NOT NULL,
   `providerCallId` VARCHAR(120) NULL,

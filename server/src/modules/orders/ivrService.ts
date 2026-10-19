@@ -7,6 +7,9 @@ import { revealSecret } from '../../utils/security';
 export interface IvrConfigData {
   apiUrl: string;
   apiKey: string;
+  sipDomain: string;
+  sipExtension: string;
+  hasWebphonePassword: boolean;
   callerId: string;
   isEnabled: boolean;
   maxRetries: number;
@@ -16,6 +19,16 @@ export interface IvrConfigData {
   minOrderAmount: number;
   orderCallDelayMinutes: number;
   allowManualCall: boolean;
+}
+
+interface IvrPolicyExtras {
+  maxRetries?: number;
+  retryDelayMinutes?: number;
+  callStartTime?: string;
+  callEndTime?: string;
+  minOrderAmount?: number;
+  orderCallDelayMinutes?: number;
+  allowManualCall?: boolean;
 }
 
 export function formatBdPhone(phone: string): string {
@@ -30,7 +43,7 @@ export async function getIvrConfig(): Promise<IvrConfigData> {
     where: { type: 'ASTERISK_IVR' }
   });
 
-  let extra = {
+  let extra: IvrPolicyExtras = {
     maxRetries: 2,
     retryDelayMinutes: 15,
     callStartTime: '09:00',
@@ -42,7 +55,7 @@ export async function getIvrConfig(): Promise<IvrConfigData> {
 
   if (record?.clientId) {
     try {
-      extra = { ...extra, ...JSON.parse(record.clientId) };
+      extra = { ...extra, ...(JSON.parse(record.clientId) as IvrPolicyExtras) };
     } catch {
       // ignore json parse error
     }
@@ -59,19 +72,38 @@ export async function getIvrConfig(): Promise<IvrConfigData> {
   }
 
   const apiUrl = record?.apiUrl || process.env.PBX_IVR_URL || '';
+  const sipPassword = record?.webphonePassword ? (() => {
+    try { return revealSecret(record.webphonePassword); } catch { return ''; }
+  })() : process.env.PBX_WEBRTC_PASSWORD || '';
 
   return {
     apiUrl,
     apiKey,
+    sipDomain: record?.webphoneSipDomain || process.env.PBX_WEBRTC_SIP_DOMAIN?.trim() || '',
+    sipExtension: record?.webphoneExtension || process.env.PBX_WEBRTC_EXTENSION?.trim() || '',
+    hasWebphonePassword: Boolean(sipPassword),
     callerId: record?.senderId || '09639139179',
     isEnabled: Boolean(apiUrl && apiKey) && (record ? record.isEnabled : process.env.PBX_IVR_ENABLED === 'true'),
-    maxRetries: extra.maxRetries ?? 2,
-    retryDelayMinutes: extra.retryDelayMinutes ?? 15,
+    maxRetries: typeof extra.maxRetries === 'number' ? extra.maxRetries : 2,
+    retryDelayMinutes: typeof extra.retryDelayMinutes === 'number' ? extra.retryDelayMinutes : 15,
     callStartTime: extra.callStartTime || '09:00',
     callEndTime: extra.callEndTime || '22:00',
-    minOrderAmount: extra.minOrderAmount ?? 0,
-    orderCallDelayMinutes: extra.orderCallDelayMinutes ?? 0,
+    minOrderAmount: typeof extra.minOrderAmount === 'number' ? extra.minOrderAmount : 0,
+    orderCallDelayMinutes: typeof extra.orderCallDelayMinutes === 'number' ? extra.orderCallDelayMinutes : 0,
     allowManualCall: extra.allowManualCall !== false,
+  };
+}
+
+export async function getWebphoneCredentials() {
+  const record = await prisma.messageGatewayConfig.findUnique({ where: { type: 'ASTERISK_IVR' } });
+  let password = process.env.PBX_WEBRTC_PASSWORD || '';
+  if (record?.webphonePassword) {
+    try { password = revealSecret(record.webphonePassword); } catch { password = ''; }
+  }
+  return {
+    sipDomain: record?.webphoneSipDomain || process.env.PBX_WEBRTC_SIP_DOMAIN?.trim() || '',
+    extension: record?.webphoneExtension || process.env.PBX_WEBRTC_EXTENSION?.trim() || '',
+    password,
   };
 }
 

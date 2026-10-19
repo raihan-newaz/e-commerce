@@ -11,7 +11,6 @@ import {
   PhoneForwarded,
   Printer,
   Plus,
-  Clock,
   AlertTriangle,
   RotateCcw,
   CheckSquare,
@@ -202,14 +201,6 @@ export const OrdersPage: React.FC = () => {
     if (selectedOrders.length > 0) {
       setBulkOrdersForInvoice(selectedOrders);
     }
-  };
-
-  const formatOrderDate = (dateString: string | Date) => {
-    const d = new Date(dateString);
-    const day = d.getDate().toString().padStart(2, '0');
-    const month = d.toLocaleString('en-US', { month: 'short' });
-    const year = d.getFullYear();
-    return `${day} ${month} ${year}`;
   };
 
   const fetchOrders = async () => {

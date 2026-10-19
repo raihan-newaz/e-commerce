@@ -950,6 +950,9 @@ model MessageGatewayConfig {
   senderId     String?
   clientId     String?
   clientSecret String?
+  webphoneSipDomain String? @db.VarChar(253)
+  webphoneExtension String? @db.VarChar(64)
+  webphonePassword String? @db.Text
   isEnabled    Boolean  @default(false)
   isDefault    Boolean  @default(false)
   createdAt    DateTime @default(now())

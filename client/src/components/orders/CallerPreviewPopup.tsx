@@ -3,6 +3,10 @@ import { ExternalLink, Headphones, PhoneIncoming, PhoneMissed, PhoneOutgoing, X 
 import { Link } from 'react-router-dom';
 import api from '../../lib/api';
 
+type PreviewOrder = { id: string; orderNumber: string; createdAt: string; status: string; grandTotal: number; items: Array<{ productName: string }> };
+type PreviewHistory = { totalPrevious: number; completed: number; returned: number; cancelled: number; recentOrders: PreviewOrder[] };
+type PreviewData = { order?: { customerName?: string; customerPhone?: string }; customerHistory?: PreviewHistory };
+
 export type CallerPreview = {
   id?: string;
   orderId?: string;
@@ -17,7 +21,7 @@ export type CallerPreview = {
 };
 
 export function CallerPreviewPopup({ call, onClose }: { call: CallerPreview; onClose: () => void }) {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<PreviewData | null>(null);
   useEffect(() => {
     if (!call.orderId) return;
     let alive = true;
@@ -30,9 +34,9 @@ export function CallerPreviewPopup({ call, onClose }: { call: CallerPreview; onC
   const missed = ['MISSED', 'NO_ANSWER', 'BUSY', 'FAILED'].includes(call.status || '');
   const CallIcon = missed ? PhoneMissed : call.direction === 'INBOUND' ? PhoneIncoming : PhoneOutgoing;
   const recentOrders = history?.recentOrders || [];
-  const openOrders = recentOrders.filter((item: any) => !['DELIVERED', 'CANCELLED', 'RETURNED', 'PARTIAL_DELIVERED'].includes(item.status));
-  const closedOrders = recentOrders.filter((item: any) => ['CANCELLED', 'RETURNED'].includes(item.status));
-  const onlineOrders = recentOrders.filter((item: any) => ['DELIVERED', 'PARTIAL_DELIVERED'].includes(item.status));
+  const openOrders = recentOrders.filter(item => !['DELIVERED', 'CANCELLED', 'RETURNED', 'PARTIAL_DELIVERED'].includes(item.status));
+  const closedOrders = recentOrders.filter(item => ['CANCELLED', 'RETURNED'].includes(item.status));
+  const onlineOrders = recentOrders.filter(item => ['DELIVERED', 'PARTIAL_DELIVERED'].includes(item.status));
   const phone = call.phone || order?.customerPhone || '';
 
   return <aside role="dialog" aria-label="Caller preview" className="fixed bottom-20 right-4 z-[10000] flex max-h-[min(74dvh,680px)] w-[min(360px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_20px_70px_-20px_rgba(20,12,30,.5)] dark:border-slate-700 dark:bg-slate-900 sm:right-6">

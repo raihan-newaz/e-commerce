@@ -3,7 +3,7 @@ import { Router, Request, Response } from 'express';
 import prisma from '../../prisma';
 import { authenticateToken, requireRole, AuthRequest } from '../../middlewares/auth';
 import { maskSecret, keepExistingSecret, isAllowedRemoteUrl } from '../../utils/security';
-import { getIvrConfig, dispatchIvrCall, formatBdPhone } from './ivrService';
+import { getIvrConfig, getWebphoneCredentials, dispatchIvrCall, formatBdPhone } from './ivrService';
 import { handlePbxIvrWebhook } from './ivrWebhook';
 import { z } from 'zod';
 import axios from 'axios';
@@ -133,12 +133,15 @@ function verifyPbxSignature(body: string, signature: string, timestamp: string, 
 router.get('/config', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'CALL_CENTER_AGENT']), async (req: Request, res: Response): Promise<void> => {
   try {
     const config = await getIvrConfig();
+    const webphone = await getWebphoneCredentials();
     res.json({
       success: true,
       config: {
         ...config,
         apiKey: maskSecret(config.apiKey),
-        hasApiKey: Boolean(config.apiKey)
+        hasApiKey: Boolean(config.apiKey),
+        sipPassword: maskSecret(webphone.password) || '',
+        hasWebphonePassword: Boolean(webphone.password),
       }
     });
   } catch (error: any) {
@@ -149,8 +152,14 @@ router.get('/config', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS
 // Reveal API Secret Token
 router.post('/config/reveal', authenticateToken, requireRole(['SUPER_ADMIN']), async (req: Request, res: Response): Promise<void> => {
   try {
-    const config = await getIvrConfig();
+    const field = req.body?.field === 'sipPassword' ? 'sipPassword' : 'apiKey';
     res.setHeader('Cache-Control', 'no-store, max-age=0');
+    if (field === 'sipPassword') {
+      const config = await getWebphoneCredentials();
+      res.json({ success: true, sipPassword: config.password });
+      return;
+    }
+    const config = await getIvrConfig();
     res.json({ success: true, apiKey: config.apiKey });
   } catch (error: any) {
     res.status(400).json({ success: false, message: 'Could not reveal IVR secret' });
@@ -174,6 +183,9 @@ const ivrUpdateSchema = z.object({
   isEnabled: z.boolean(),
   apiUrl: z.string().trim(),
   apiKey: z.string().optional(),
+  sipDomain: z.string().trim().max(253).regex(/^[a-zA-Z0-9.-]*(?::\d{1,5})?$/).optional(),
+  sipExtension: z.string().trim().max(64).regex(/^[\w.+-]*$/).optional(),
+  sipPassword: z.string().max(256).optional(),
   callerId: z.string().trim().optional(),
   maxRetries: z.number().int().min(1).max(10).default(2),
   retryDelayMinutes: z.number().int().min(1).max(120).default(15),
@@ -197,6 +209,9 @@ router.put('/config', authenticateToken, requireRole(['SUPER_ADMIN']), async (re
       isEnabled,
       apiUrl,
       apiKey,
+      sipDomain,
+      sipExtension,
+      sipPassword,
       callerId,
       maxRetries,
       retryDelayMinutes,
@@ -217,6 +232,7 @@ router.put('/config', authenticateToken, requireRole(['SUPER_ADMIN']), async (re
     });
 
     const nextApiKey = keepExistingSecret(apiKey, existing?.apiKey);
+    const nextSipPassword = keepExistingSecret(sipPassword, existing?.webphonePassword);
     if (isEnabled && !nextApiKey) {
       res.status(400).json({ success: false, message: 'Set an IVR signing secret before enabling calls.' });
       return;
@@ -238,6 +254,9 @@ router.put('/config', authenticateToken, requireRole(['SUPER_ADMIN']), async (re
         type: 'ASTERISK_IVR',
         apiUrl,
         apiKey: nextApiKey,
+        webphoneSipDomain: sipDomain === undefined ? existing?.webphoneSipDomain ?? null : sipDomain || null,
+        webphoneExtension: sipExtension === undefined ? existing?.webphoneExtension ?? null : sipExtension || null,
+        webphonePassword: nextSipPassword,
         senderId: callerId || '09639139179',
         clientId: extraJson,
         isEnabled,
@@ -246,6 +265,9 @@ router.put('/config', authenticateToken, requireRole(['SUPER_ADMIN']), async (re
       update: {
         apiUrl,
         apiKey: nextApiKey,
+        webphoneSipDomain: sipDomain === undefined ? existing?.webphoneSipDomain ?? null : sipDomain || null,
+        webphoneExtension: sipExtension === undefined ? existing?.webphoneExtension ?? null : sipExtension || null,
+        webphonePassword: nextSipPassword,
         senderId: callerId || '09639139179',
         clientId: extraJson,
         isEnabled
@@ -260,6 +282,10 @@ router.put('/config', authenticateToken, requireRole(['SUPER_ADMIN']), async (re
         apiUrl: updated.apiUrl,
         apiKey: maskSecret(updated.apiKey),
         hasApiKey: Boolean(updated.apiKey),
+        sipDomain: updated.webphoneSipDomain || process.env.PBX_WEBRTC_SIP_DOMAIN?.trim() || '',
+        sipExtension: updated.webphoneExtension || process.env.PBX_WEBRTC_EXTENSION?.trim() || '',
+        sipPassword: maskSecret(nextSipPassword || process.env.PBX_WEBRTC_PASSWORD) || '',
+        hasWebphonePassword: Boolean(nextSipPassword || process.env.PBX_WEBRTC_PASSWORD),
         callerId: updated.senderId,
         maxRetries,
         retryDelayMinutes,
@@ -389,12 +415,10 @@ router.get('/logs', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_M
 router.get('/webphone-config', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'CALL_CENTER_AGENT']), async (req: Request, res: Response): Promise<void> => {
   try {
     const config = await getIvrConfig();
+    const webphone = await getWebphoneCredentials();
     const origin = new URL(appConfig.publicOrigin);
     const wsServer = `${origin.protocol === 'https:' ? 'wss:' : 'ws:'}//${origin.host}/ws-sip`;
-    const sipDomain = process.env.PBX_WEBRTC_SIP_DOMAIN?.trim();
-    const extension = process.env.PBX_WEBRTC_EXTENSION?.trim();
-    const password = process.env.PBX_WEBRTC_PASSWORD;
-    if (!process.env.PBX_SIP_UPSTREAM_URL || !sipDomain || !extension || !password) {
+    if (!process.env.PBX_SIP_UPSTREAM_URL || !webphone.sipDomain || !webphone.extension || !webphone.password) {
       res.status(503).json({ success: false, message: 'WebPhone credentials are not configured on the server.' });
       return;
     }
@@ -403,9 +427,9 @@ router.get('/webphone-config', authenticateToken, requireRole(['SUPER_ADMIN', 'O
       success: true,
       config: {
         wsServer,
-        sipDomain,
-        extension,
-        password,
+        sipDomain: webphone.sipDomain,
+        extension: webphone.extension,
+        password: webphone.password,
         displayName: (req as any).user?.name || 'NIX Agent',
         callerId: process.env.PBX_WEBRTC_CALLER_ID?.trim() || config.callerId,
       }

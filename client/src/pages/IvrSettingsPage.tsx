@@ -24,6 +24,10 @@ interface IvrConfig {
   apiUrl: string;
   apiKey?: string;
   hasApiKey: boolean;
+  sipDomain: string;
+  sipExtension: string;
+  sipPassword?: string;
+  hasWebphonePassword: boolean;
   callerId: string;
   maxRetries: number;
   retryDelayMinutes: number;
@@ -65,6 +69,10 @@ export const IvrSettingsPage: React.FC = () => {
     apiUrl: 'http://103.169.160.153:7088',
     apiKey: '',
     hasApiKey: false,
+    sipDomain: '',
+    sipExtension: '',
+    sipPassword: '',
+    hasWebphonePassword: false,
     callerId: '09639139179',
     maxRetries: 2,
     retryDelayMinutes: 15,
@@ -343,6 +351,50 @@ export const IvrSettingsPage: React.FC = () => {
                 <p className="text-[11px] text-slate-400 mt-1">
                   Used to generate SHA-256 HMAC signature on outbound call requests and verify callback results.
                 </p>
+              </div>
+            </div>
+
+            <div className="md:col-span-2 border-t border-slate-100 pt-5 dark:border-slate-800">
+              <h4 className="mb-1 text-xs font-bold text-slate-900 dark:text-slate-200">PBX WebPhone Extension Credentials</h4>
+              <p className="mb-4 text-[11px] text-slate-500 dark:text-slate-400">Add the SIP account used by staff to place calls from the browser. The password is encrypted in the database; the WebSocket proxy address stays server-side.</p>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300">SIP Domain</label>
+                  <input
+                    type="text"
+                    value={config.sipDomain}
+                    onChange={(e) => setConfig({ ...config, sipDomain: e.target.value })}
+                    placeholder="pbx.example.com"
+                    autoComplete="off"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
+                  />
+                  <p className="mt-1 text-[11px] text-slate-400">The PBX SIP host name, with an optional port.</p>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300">Extension / SIP Username</label>
+                  <input
+                    type="text"
+                    value={config.sipExtension}
+                    onChange={(e) => setConfig({ ...config, sipExtension: e.target.value })}
+                    placeholder="2703"
+                    autoComplete="off"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300">Extension Password</label>
+                  <SecretInput
+                    value={config.sipPassword || ''}
+                    onChange={(e) => setConfig({ ...config, sipPassword: e.target.value })}
+                    loadSavedSecret={async () => {
+                      const res = await api.post('/ivr/config/reveal', { field: 'sipPassword' });
+                      return res.data?.sipPassword || '';
+                    }}
+                    placeholder={config.hasWebphonePassword ? 'Extension password saved securely · enter only to change' : 'Enter SIP extension password'}
+                    autoComplete="new-password"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
+                  />
+                </div>
               </div>
             </div>
 

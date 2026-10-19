@@ -29,11 +29,12 @@ Build the tools image to run the version-pinned Prisma CLI (the runtime image ex
 ```sh
 docker build --target build -t nix-ecommerce-tools .
 docker run --rm --network host --env-file ./server/.env nix-ecommerce-tools node server/node_modules/prisma/build/index.js db execute --file server/prisma/upgrade-single-server.sql --schema server/prisma/schema.prisma
+docker run --rm --network host --env-file ./server/.env nix-ecommerce-tools node server/node_modules/prisma/build/index.js db execute --file server/prisma/call-log-migration.sql --schema server/prisma/schema.prisma
 docker compose up -d ecommerce
 curl --fail http://127.0.0.1:3010/api/ready
 ```
 
-The SQL adds an optional order email column and three new tables. It does not drop or rewrite historical data. It is a one-time upgrade from the inherited schema; check information_schema before execution. If any addition already exists, do not blindly rerun the whole SQL. A partial upgrade must be reviewed before retrying.
+The first SQL adds the optional order email column and email/checkout tables. The second adds PBX WebPhone credential fields and the call-history table. They do not drop or rewrite historical data. Each is a one-time upgrade from the inherited schema; check information_schema before execution. If any addition already exists, do not blindly rerun the whole SQL. A partial upgrade must be reviewed before retrying.
 
 ## Cutover
 
