@@ -29,6 +29,7 @@
 .admin-topbar{border-color:var(--admin-line)!important}
 .admin-page{min-width:0;font-size:14px;line-height:1.55}
 .admin-shell main{min-width:0}
+@media (min-width:1280px) and (max-width:1535px){.admin-topbar nav[aria-label="Quick actions"]{display:none}}
 .admin-page :is(.app-panel,.minimal-card){border-color:var(--admin-line);box-shadow:0 2px 8px rgba(28,20,35,.035)}
 .dark .admin-page :is(.app-panel,.minimal-card){box-shadow:none}
 .admin-page :is(button,a,input,select,textarea){transition-property:color,background-color,border-color,box-shadow,transform}
