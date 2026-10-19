@@ -116,6 +116,7 @@ export const revealCourierConfigSecret = async (req: Request, res: Response): Pr
     PATHAO: ['clientSecret', 'password', 'webhookSecret', 'webhookVerificationSecret'],
     REDX: ['apiKey', 'webhookSecret'],
     PAPERFLY: ['apiKey', 'secretKey', 'password'],
+    BDCOURIER: ['apiKey'],
   };
   if (!allowedFields[provider]?.includes(field)) { res.status(400).json({ success: false, message: 'Unsupported courier credential' }); return; }
   try {
@@ -134,7 +135,7 @@ export const updateCourierConfig = async (req: Request, res: Response): Promise<
     const provider = (req.params.provider as string).toUpperCase();
     const { apiKey, secretKey, clientId, clientSecret, username, password, storeId, baseUrl, isEnabled, isDefault, webhookSecret, webhookVerificationSecret } = req.body;
 
-    if (!['STEADFAST', 'PATHAO', 'REDX', 'PAPERFLY'].includes(provider)) { res.status(400).json({ success: false, message: 'Unsupported courier provider' }); return; }
+    if (!['STEADFAST', 'PATHAO', 'REDX', 'PAPERFLY', 'BDCOURIER'].includes(provider)) { res.status(400).json({ success: false, message: 'Unsupported courier provider' }); return; }
     if (provider === 'PATHAO') {
       try { pathaoBaseUrl(baseUrl || undefined); } catch (error: any) { res.status(400).json({ success: false, message: error.message }); return; }
     } else if (provider === 'STEADFAST') {
@@ -161,6 +162,7 @@ export const updateCourierConfig = async (req: Request, res: Response): Promise<
         res.status(400).json({ success: false, message: 'RedX webhook token must be at least 32 characters' }); return;
       }
     }
+    if (provider === 'BDCOURIER' && isEnabled && !nextApiKey) { res.status(400).json({ success: false, message: 'Save a BD Courier API key before enabling fraud checks' }); return; }
     if (provider === 'STEADFAST') {
       if (isEnabled && (!nextApiKey || !nextSecretKey)) { res.status(400).json({ success: false, message: 'Steadfast needs both API Key and Secret Key before enabling' }); return; }
       if (webhookSecret && webhookSecret !== MASKED_SECRET && String(webhookSecret).trim().length < 24) { res.status(400).json({ success: false, message: 'Enter the Steadfast webhook auth token (at least 24 characters)' }); return; }

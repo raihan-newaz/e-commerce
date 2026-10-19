@@ -66,6 +66,11 @@ export const SettingsPage: React.FC = () => {
   const [sfWebhookUrl, setSfWebhookUrl] = useState('');
   const [sfWebhookPublic, setSfWebhookPublic] = useState(false);
   const [sfBusy, setSfBusy] = useState(false);
+  const [bdCourierApiKey, setBdCourierApiKey] = useState('');
+  const [bdCourierEnabled, setBdCourierEnabled] = useState(false);
+  const [bdCourierBusy, setBdCourierBusy] = useState(false);
+  const [bdCourierConnection, setBdCourierConnection] = useState('');
+  const [bdCourierPlan, setBdCourierPlan] = useState<any>(null);
 
   const [pathaoClientId, setPathaoClientId] = useState('');
   const [pathaoClientSecret, setPathaoClientSecret] = useState('');
@@ -178,6 +183,11 @@ export const SettingsPage: React.FC = () => {
           setRedxEnabled(Boolean(rdx.isEnabled));
           setRedxWebhookSecret(rdx.webhookSecret || '');
         }
+        const bdCourier = courierRes.data.configs.find((c: any) => c.provider === 'BDCOURIER');
+        if (bdCourier) {
+          setBdCourierApiKey(bdCourier.apiKey || '');
+          setBdCourierEnabled(Boolean(bdCourier.isEnabled));
+        }
       }
 
       if (userRes?.data?.users) setUsers(userRes.data.users);
@@ -271,7 +281,7 @@ export const SettingsPage: React.FC = () => {
   };
 
   const updateCourierActive = async (
-    provider: 'STEADFAST' | 'PATHAO' | 'REDX',
+    provider: 'STEADFAST' | 'PATHAO' | 'REDX' | 'BDCOURIER',
     enabled: boolean,
     setEnabled: React.Dispatch<React.SetStateAction<boolean>>,
     setBusy: React.Dispatch<React.SetStateAction<boolean>>,
@@ -294,6 +304,34 @@ export const SettingsPage: React.FC = () => {
     try { await api.get('/couriers/steadfast/test'); toast.success('Steadfast credentials verified'); }
     catch (error: any) { toast.error(error.response?.data?.message || 'Steadfast connection failed'); }
     finally { setSfBusy(false); }
+  };
+
+  const saveBdCourier = async () => {
+    setBdCourierBusy(true);
+    try {
+      await api.put('/couriers/configs/BDCOURIER', { apiKey: bdCourierApiKey, isEnabled: bdCourierEnabled });
+      toast.success('BD Courier API settings saved');
+    } catch (error: any) { toast.error(error.response?.data?.message || 'Could not save BD Courier settings'); }
+    finally { setBdCourierBusy(false); }
+  };
+
+  const testBdCourier = async () => {
+    setBdCourierBusy(true); setBdCourierConnection('');
+    try {
+      const { data } = await api.get('/couriers/bdcourier/connection');
+      setBdCourierConnection(data.data?.message || 'Connection successful');
+      toast.success('BD Courier API key verified');
+    } catch (error: any) {
+      const message = error.response?.data?.message || 'BD Courier connection failed';
+      setBdCourierConnection(message); toast.error(message);
+    } finally { setBdCourierBusy(false); }
+  };
+
+  const loadBdCourierPlan = async () => {
+    setBdCourierBusy(true);
+    try { const { data } = await api.get('/couriers/bdcourier/plan'); setBdCourierPlan(data.data?.data || null); }
+    catch (error: any) { toast.error(error.response?.data?.message || 'Could not load BD Courier plan'); }
+    finally { setBdCourierBusy(false); }
   };
 
   const generateSteadfastWebhookToken = () => {
@@ -552,7 +590,7 @@ export const SettingsPage: React.FC = () => {
       {/* Courier API Keys Tab */}
       {section === 'couriers' && (
         <div className="space-y-4 max-w-3xl">
-          <nav aria-label="Courier providers" className="flex flex-wrap gap-2">{['Steadfast', 'Pathao', 'RedX'].map(provider => <a key={provider} href={`#courier-${provider.toLowerCase()}`} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900">{provider}</a>)}</nav>
+          <nav aria-label="Courier providers" className="flex flex-wrap gap-2">{['Steadfast', 'Pathao', 'RedX', 'BD Courier Fraud Check'].map(provider => <a key={provider} href={`#courier-${provider === 'BD Courier Fraud Check' ? 'bdcourier' : provider.toLowerCase()}`} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900">{provider}</a>)}</nav>
           {/* Steadfast */}
           <div id="courier-steadfast" className="scroll-mt-36 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-card space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -728,6 +766,20 @@ export const SettingsPage: React.FC = () => {
           >
             Save RedX Settings
           </button><button type="button" disabled={redxBusy} onClick={testRedx} className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-medium disabled:opacity-50 dark:border-slate-700">Test connection</button><button type="button" disabled={redxBusy} onClick={syncRedxAreas} className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-medium disabled:opacity-50 dark:border-slate-700">Sync RedX areas</button></div>
+
+          <div id="courier-bdcourier" className="scroll-mt-36 space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-card dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div><h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">BD Courier Fraud Checker</h3><p className="mt-1 text-xs text-slate-500">Cross-courier parcel history and fraud reports on an order’s detail page.</p></div>
+              <CourierToggle checked={bdCourierEnabled} disabled={bdCourierBusy} label="BD Courier fraud checks" onChange={(enabled) => void updateCourierActive('BDCOURIER', enabled, setBdCourierEnabled, setBdCourierBusy, 'BD Courier fraud checks')} />
+            </div>
+            <label className="block text-xs text-slate-700 dark:text-slate-300">BD Courier API key
+              <SecretInput autoComplete="new-password" value={bdCourierApiKey} onChange={(event) => setBdCourierApiKey(event.target.value)} loadSavedSecret={() => revealCourierSecret('BDCOURIER', 'apiKey')} placeholder="Paste your API key from BD Courier → Developer/API" className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono dark:border-slate-800 dark:bg-slate-950" />
+            </label>
+            <p className="text-xs text-slate-500">Base URL: <code>https://api.bdcourier.com</code>. Uses POST <code>/courier-check</code> with a Bearer key. The key is encrypted on this server. Searches are initiated manually from an order and are subject to BD Courier plan limits.</p>
+            {bdCourierConnection && <p role="status" className="text-xs text-slate-600 dark:text-slate-300">{bdCourierConnection}</p>}
+            {bdCourierPlan && <div className="grid gap-2 rounded-xl bg-slate-50 p-3 text-xs sm:grid-cols-3 dark:bg-slate-950"><p><span className="text-slate-500">Plan</span><br/><b>{bdCourierPlan.plan_name || (bdCourierPlan.has_subscription ? 'Active plan' : 'No active plan')}</b></p><p><span className="text-slate-500">Searches used</span><br/><b>{Number(bdCourierPlan.api_calls || 0).toLocaleString()}</b></p><p><span className="text-slate-500">Remaining</span><br/><b>{bdCourierPlan.remaining_free_calls ?? bdCourierPlan.remaining_paid_calls ?? '—'}</b></p></div>}
+            <div className="flex flex-wrap gap-2"><button type="button" disabled={bdCourierBusy} onClick={() => void saveBdCourier()} className="rounded-xl bg-purple-900 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50 dark:bg-purple-700">Save API settings</button><button type="button" disabled={bdCourierBusy || !bdCourierEnabled} onClick={() => void testBdCourier()} className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-medium disabled:opacity-50 dark:border-slate-700">Check connection</button><button type="button" disabled={bdCourierBusy || !bdCourierEnabled} onClick={() => void loadBdCourierPlan()} className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-medium disabled:opacity-50 dark:border-slate-700">Load plan & usage</button></div>
+          </div>
         </div>
       )}
 

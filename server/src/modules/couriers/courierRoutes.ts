@@ -21,6 +21,7 @@ import { steadfastWebhook } from './steadfastWebhook';
 import { redxWebhook } from './redxWebhook';
 import { redxTest, redxStores, redxStore, redxCreateStore, redxCharge, redxParcel, redxRefresh, redxUpdateParcel, redxResolveBooking, redxEvents } from './redxController';
 import { listCourierLocations, refreshCourierLocations } from './courierLocations';
+import { checkBdCourierConnection, checkBdCourierOrder, getBdCourierPlan } from './bdcourierController';
 import {
   steadfastPing, steadfastTest, steadfastBalance, steadfastPayments, steadfastPayment,
   steadfastPoliceStations, steadfastFraudScore, steadfastStatusLookup,
@@ -63,6 +64,9 @@ router.patch('/redx/orders/:orderId', authenticateToken, requireRole(['SUPER_ADM
 router.post('/redx/orders/:orderId/resolve', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER']), redxResolveBooking);
 router.get('/redx/events', authenticateToken, redxEvents);
 router.get('/availability', authenticateToken, courierAvailability);
+router.get('/bdcourier/connection', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER']), checkBdCourierConnection);
+router.get('/bdcourier/plan', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER']), getBdCourierPlan);
+router.post('/bdcourier/orders/:id/fraud-check', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'CALL_CENTER_AGENT']), checkBdCourierOrder);
 router.get('/locations/:provider', authenticateToken, listCourierLocations);
 router.post('/locations/:provider/refresh', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER']), refreshCourierLocations);
 

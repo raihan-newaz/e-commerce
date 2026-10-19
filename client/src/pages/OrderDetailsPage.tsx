@@ -15,6 +15,7 @@ import CourierLocationCard from '../components/orders/CourierLocationCard';
 import OrderRiskCard from '../components/orders/OrderRiskCard';
 import { useWebPhone } from '../context/WebPhoneContext';
 import { OrderNotesCard } from '../components/orders/OrderNotesCard';
+import CourierFraudCheckCard from '../components/orders/CourierFraudCheckCard';
 
 const statuses = ['PENDING', 'CONFIRMED', 'PACKAGING', 'HANDED_OVER', 'IN_TRANSIT', 'DELIVERED', 'PARTIAL_DELIVERED', 'HOLD', 'CANCELLED', 'RETURNED', 'FAKE_TRASH'];
 const money = (value: number) => `৳${Number(value || 0).toLocaleString()}`;
@@ -275,6 +276,7 @@ export const OrderDetailsPage: React.FC = () => {
     </section>}
     {order.courierName === 'REDX' && !order.courierConsignmentId && ['BOOKING_REQUESTED', 'BOOKING_UNCERTAIN'].includes(order.courierStatus || '') && <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 dark:border-amber-700/50 dark:bg-amber-500/10"><h3 className="font-semibold">Resolve RedX booking</h3><p className="mt-1 text-xs">Check invoice {order.orderNumber} in RedX before attempting another dispatch.</p><div className="mt-3 flex flex-wrap gap-2"><input value={redxRecoveryId} onChange={e => setRedxRecoveryId(e.target.value)} placeholder="Verified tracking ID" className="min-w-[190px] flex-1 rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm"/><button disabled={redxBusy || !redxRecoveryId.trim()} onClick={() => resolveRedx('ATTACH')} className="rounded-lg bg-slate-900 px-3 py-2 text-xs text-white disabled:opacity-50">Verify & attach</button>{order.courierStatus === 'BOOKING_UNCERTAIN' && <button disabled={redxBusy} onClick={() => resolveRedx('CLEAR')} className="rounded-lg border border-amber-400 px-3 py-2 text-xs text-amber-900 disabled:opacity-50">No booking exists — unlock retry</button>}</div></section>}
     <CustomerHistoryCard history={customerHistory}/>
+    <CourierFraudCheckCard orderId={order.id}/>
     {!order.courierName && order.status !== 'HOLD' && !['DELIVERED', 'RETURNED', 'CANCELLED'].includes(order.status) && <button onClick={() => setDispatchOpen(true)} className="w-fit rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 px-4 py-2 text-sm font-medium shadow transition">Select courier & dispatch</button>}
     {editOpen && <OrderEditModal order={order} onClose={() => setEditOpen(false)} onSuccess={load}/>}
     {dispatchOpen && <CourierDispatchModal order={order} onClose={() => setDispatchOpen(false)} onSuccess={(updated) => { setOrder({ ...order, ...updated }); load(); }}/>} 
