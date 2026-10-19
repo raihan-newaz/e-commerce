@@ -22,7 +22,6 @@ services:
       WEBP_MAX_DIMENSION: ${WEBP_MAX_DIMENSION:-2560}
     volumes:
       - ./server/uploads:/app/server/uploads
-      - ./server/dist:/app/server/dist:ro
     security_opt:
       - no-new-privileges:true
     cap_drop:
