@@ -414,6 +414,7 @@ router.get('/logs', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_M
 // Get WebPhone Config for in-browser WebRTC calling
 router.get('/webphone-config', authenticateToken, requireRole(['SUPER_ADMIN', 'OPERATIONS_MANAGER', 'CALL_CENTER_AGENT']), async (req: Request, res: Response): Promise<void> => {
   try {
+    res.setHeader('Cache-Control', 'no-store, private, max-age=0');
     const config = await getIvrConfig();
     const webphone = await getWebphoneCredentials();
     const origin = new URL(appConfig.publicOrigin);
