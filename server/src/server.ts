@@ -137,6 +137,7 @@ app.use((_req, res, next) => {
   const sendJson = res.json.bind(res);
   res.json = ((body: unknown) => {
     if (res.statusCode >= 500) {
+      console.error('[500 RESPONSE BODY]:', body);
       return sendJson({ success: false, message: 'Internal server error' });
     }
     return sendJson(body);
